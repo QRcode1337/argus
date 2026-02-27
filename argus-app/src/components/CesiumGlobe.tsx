@@ -31,6 +31,7 @@ import { VisualModeController } from "@/lib/cesium/shaders/visualModes";
 import { fetchMilitaryFlights } from "@/lib/ingest/adsb";
 import { fetchCctvCameras } from "@/lib/ingest/cctv";
 import { fetchOpenSkyFlights } from "@/lib/ingest/opensky";
+import { fetchAircraftPhoto } from "@/lib/ingest/planespotters";
 import { PollingManager } from "@/lib/ingest/pollingManager";
 import { fetchTleRecords } from "@/lib/ingest/tle";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
@@ -405,6 +406,17 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
       setSelectedIntel(intel);
       setShowFullIntel(intel.importance === "important");
+
+      if (intel.kind === "flight" || intel.kind === "military") {
+        const rawId = intel.id.replace(/^(flight-|mil-)/, "");
+        void fetchAircraftPhoto(rawId).then((photoUrl) => {
+          if (photoUrl) {
+            setSelectedIntel((prev) =>
+              prev && prev.id === intel.id ? { ...prev, imageUrl: photoUrl } : prev,
+            );
+          }
+        });
+      }
     }, ScreenSpaceEventType.LEFT_CLICK);
 
     const poller = new PollingManager();
