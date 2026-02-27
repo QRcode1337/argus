@@ -150,6 +150,7 @@ export interface CctvCamera {
   longitude: number;
   latitude: number;
   imageUrl: string;
+  streamUrl?: string;
   category: CameraCategory;
   provider: CameraProvider;
 }
@@ -169,4 +170,5 @@ export interface SelectedIntel {
   quickFacts: IntelDatum[];
   fullFacts: IntelDatum[];
   imageUrl?: string;
+  streamUrl?: string;
 }

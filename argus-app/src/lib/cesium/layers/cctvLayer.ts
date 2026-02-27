@@ -80,6 +80,7 @@ export class CctvLayer {
         properties: {
           kind: "cctv",
           imageUrl: camera.imageUrl,
+          streamUrl: camera.streamUrl ?? null,
           name: camera.name,
           category: camera.category,
           provider: camera.provider,

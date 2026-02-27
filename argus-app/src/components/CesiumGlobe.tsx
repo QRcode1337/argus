@@ -251,7 +251,11 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
     importance: classifyImportance(kind, props),
     quickFacts,
     fullFacts,
-    imageUrl: typeof props.imageUrl === "string" ? props.imageUrl : undefined,
+    imageUrl:
+      typeof props.imageUrl === "string" && props.imageUrl !== "/camera-placeholder.svg"
+        ? props.imageUrl
+        : undefined,
+    streamUrl: typeof props.streamUrl === "string" ? props.streamUrl : undefined,
   };
 };
 

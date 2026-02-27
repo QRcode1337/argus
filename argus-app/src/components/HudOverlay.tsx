@@ -161,6 +161,7 @@ export function HudOverlay({
   const {
     layers,
     toggleLayer,
+    setLayer,
     counts,
     camera,
     feedHealth,
@@ -336,7 +337,16 @@ export function HudOverlay({
             </div>
           ) : null}
 
-          {selectedIntel.imageUrl && (
+          {selectedIntel.streamUrl ? (
+            <iframe
+              src={selectedIntel.streamUrl}
+              title={selectedIntel.name}
+              className="mt-2 h-44 w-full rounded border border-[#284f63]"
+              allow="autoplay; encrypted-media"
+              allowFullScreen
+              sandbox="allow-scripts allow-same-origin allow-popups"
+            />
+          ) : selectedIntel.imageUrl ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -345,7 +355,13 @@ export function HudOverlay({
                 className="mt-2 h-32 w-full rounded border border-[#284f63] object-cover"
               />
             </>
-          )}
+          ) : selectedIntel.kind === "cctv" ? (
+            <div className="mt-2 flex h-32 w-full items-center justify-center rounded border border-[#1a3040] bg-[#040b17]">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-[#4e6a7a]">
+                No live feed
+              </span>
+            </div>
+          ) : null}
 
           <div className="mt-2 flex gap-2">
             <button
@@ -623,7 +639,10 @@ export function HudOverlay({
                     <button
                       key={cam.id}
                       type="button"
-                      onClick={() => onFlyToEntityById(`cctv-${cam.id}`)}
+                      onClick={() => {
+                        if (!layers.cctv) setLayer("cctv", true);
+                        onFlyToEntityById(`cctv-${cam.id}`);
+                      }}
                       className="flex w-full items-center gap-2 rounded-lg border border-[#123244] bg-[#040b17] p-1.5 text-left transition hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
                     >
                       <div className="h-10 w-14 shrink-0 overflow-hidden rounded border border-[#1a3040]">

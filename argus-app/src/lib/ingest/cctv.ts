@@ -59,6 +59,7 @@ const INTEL_CAMERAS: CctvCamera[] = [
     longitude: -110.8281,
     latitude: 44.4605,
     imageUrl: "/camera-placeholder.svg",
+    streamUrl: "https://www.youtube.com/embed/BWnloy8r0qU?autoplay=1&mute=1",
     category: "Nature",
     provider: "Hardcoded",
   },
@@ -200,6 +201,7 @@ const INTEL_CAMERAS: CctvCamera[] = [
     longitude: 139.7005,
     latitude: 35.6595,
     imageUrl: "/camera-placeholder.svg",
+    streamUrl: "https://www.youtube.com/embed/8H3nRCFVR6Y?autoplay=1&mute=1",
     category: "Traffic",
     provider: "Hardcoded",
   },
@@ -209,6 +211,7 @@ const INTEL_CAMERAS: CctvCamera[] = [
     longitude: -73.9851,
     latitude: 40.7580,
     imageUrl: "/camera-placeholder.svg",
+    streamUrl: "https://www.youtube.com/embed/rnXIjl_Rzy4?autoplay=1&mute=1",
     category: "Traffic",
     provider: "Hardcoded",
   },
@@ -227,9 +230,7 @@ type TflCamera = {
   additionalProperties?: TflAdditionalProperty[];
 };
 
-type TflResponse = {
-  places?: TflCamera[];
-};
+type TflResponse = TflCamera[] | { places?: TflCamera[] };
 
 const findImageUrl = (camera: TflCamera): string | null => {
   const pairs = camera.additionalProperties ?? [];
@@ -291,6 +292,7 @@ export async function fetchWindyWebcams(endpoint: string): Promise<CctvCamera[]>
         longitude: w.location.longitude,
         latitude: w.location.latitude,
         imageUrl: w.images?.current?.preview ?? w.images?.daylight?.preview ?? w.images?.current?.thumbnail ?? "/camera-placeholder.svg",
+        streamUrl: `https://webcams.windy.com/webcams/public/embed/player/${w.webcamId}/day`,
         category: mapWindyCategory(w.categories ?? []),
         provider: "Windy" as const,
       }));
@@ -306,8 +308,8 @@ export async function fetchCctvCameras(tflEndpoint: string, webcamsEndpoint?: st
   })
     .then(async (response) => {
       if (!response.ok) throw new Error(`CCTV HTTP ${response.status}`);
-      const data = (await response.json()) as TflResponse;
-      const places = data.places ?? [];
+      const raw = await response.json();
+      const places: TflCamera[] = Array.isArray(raw) ? raw : ((raw as { places?: TflCamera[] }).places ?? []);
       return places
         .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lon))
         .map((item) => ({
