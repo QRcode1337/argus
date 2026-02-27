@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import type {
   AnalyticsLayerKey,
+  CameraCategory,
   CameraReadout,
   FeedHealth,
   FeedKey,
@@ -50,6 +51,8 @@ type ArgusStore = {
     key: P,
     value: number,
   ) => void;
+  cctvCategoryFilter: CameraCategory | "All";
+  setCctvCategoryFilter: (filter: CameraCategory | "All") => void;
   toggleAnalyticsLayer: (key: AnalyticsLayerKey) => void;
   setActiveGfsCogPath: (path: string | null) => void;
 };
@@ -96,6 +99,8 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     sentinel_imagery: false,
   },
   activeGfsCogPath: null,
+  cctvCategoryFilter: "All",
+  setCctvCategoryFilter: (filter) => set({ cctvCategoryFilter: filter }),
   visualParams: {
     nvg: {
       gain: 0.75,

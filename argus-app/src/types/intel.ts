@@ -3,6 +3,8 @@ export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "tfl";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
 export type PlatformMode = "live" | "analytics";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";
+export type CameraCategory = "Traffic" | "Nature" | "Landmark" | "Wildlife" | "Scenic";
+export type CameraProvider = "TFL" | "Windy" | "Hardcoded";
 
 export type NvgVisualParams = {
   gain: number;
@@ -148,6 +150,8 @@ export interface CctvCamera {
   longitude: number;
   latitude: number;
   imageUrl: string;
+  category: CameraCategory;
+  provider: CameraProvider;
 }
 
 export interface IntelDatum {

@@ -81,6 +81,8 @@ export class CctvLayer {
           kind: "cctv",
           imageUrl: camera.imageUrl,
           name: camera.name,
+          category: camera.category,
+          provider: camera.provider,
         },
       });
 

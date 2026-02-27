@@ -27,7 +27,7 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "military", label: "Military Flights", feed: "ADS-B" },
   { key: "seismic", label: "Earthquakes (24h)", feed: "USGS" },
   { key: "satellites", label: "Satellites", feed: "CelesTrak" },
-  { key: "cctv", label: "CCTV Mesh", feed: "TFL JamCam" },
+  { key: "cctv", label: "CCTV Mesh", feed: "TFL + Windy" },
 ];
 
 const modeDefs: { key: VisualMode; label: string }[] = [
@@ -105,6 +105,8 @@ export function HudOverlay({
     setPlatformMode,
     analyticsLayers,
     toggleAnalyticsLayer,
+    cctvCategoryFilter,
+    setCctvCategoryFilter,
   } = useArgusStore();
 
   const analyticsLayerDefs: {
@@ -362,6 +364,25 @@ export function HudOverlay({
                 </button>
               );
             })}
+
+            {layers.cctv && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {(["All", "Traffic", "Nature", "Landmark", "Wildlife", "Scenic"] as const).map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCctvCategoryFilter(cat)}
+                    className={`rounded-lg border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
+                      cctvCategoryFilter === cat
+                        ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
+                        : "border-[#284f63] bg-[#081322] text-[#7298a8] hover:border-[#2ad4ff]"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </section>

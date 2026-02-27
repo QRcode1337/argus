@@ -207,6 +207,8 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       break;
     case "cctv":
       pushQuick("Camera", props.name);
+      pushQuick("Category", props.category);
+      pushQuick("Provider", props.provider);
       break;
     default:
       break;
@@ -510,8 +512,12 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       run: async () => {
         if (platformModeRef.current === "analytics") return;
         try {
-          const cameras = await fetchCctvCameras(ARGUS_CONFIG.endpoints.cctv);
-          const count = cctvLayer.upsertCameras(cameras.slice(0, ARGUS_CONFIG.limits.maxCctv));
+          const cameras = await fetchCctvCameras(ARGUS_CONFIG.endpoints.cctv, ARGUS_CONFIG.endpoints.webcams);
+          const categoryFilter = useArgusStore.getState().cctvCategoryFilter;
+          const filtered = categoryFilter === "All"
+            ? cameras
+            : cameras.filter((c) => c.category === categoryFilter);
+          const count = cctvLayer.upsertCameras(filtered.slice(0, ARGUS_CONFIG.limits.maxCctv));
           setCount("cctv", count);
           setFeedHealthy("tfl");
         } catch (error) {
