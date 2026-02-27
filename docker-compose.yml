@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: argus_postgis
+    environment:
+      POSTGRES_DB: argus
+      POSTGRES_USER: argus
+      POSTGRES_PASSWORD: argus_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U argus -d argus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  titiler:
+    image: ghcr.io/developmentseed/titiler:latest
+    container_name: argus_titiler
+    ports:
+      - "8000:80"
+    environment:
+      - PORT=80
+      - WORKERS_PER_CORE=1
+      - WEB_CONCURRENCY=1
+    volumes:
+      - ./data/tiles:/data
+    restart: unless-stopped
+
+  ingestor:
+    build:
+      context: ./ingestor
+      dockerfile: Dockerfile
+    container_name: argus_ingestor
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://argus:argus_dev@postgis:5432/argus
+      - TILES_DIR=/data/tiles
+      - GFS_CRON=0 */6 * * *
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./data/tiles:/data/tiles
+    restart: unless-stopped
+
+volumes:
+  postgis_data:

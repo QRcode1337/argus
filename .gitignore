@@ -1,0 +1,17 @@
+data/tiles/*.tif
+data/tiles/*.tiff
+*.grib2
+*.grb2
+__pycache__/
+*.pyc
+.env
+.env.local
+.env*.local
+
+# Next.js
+argus-app/.next/
+argus-app/node_modules/
+argus-app/.turbo/
+
+# macOS
+.DS_Store
