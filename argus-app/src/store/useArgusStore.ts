@@ -1,9 +1,11 @@
 import { create } from "zustand";
 
+import type { IntelBriefing } from "@/lib/intel/analysisEngine";
 import type {
   AnalyticsLayerKey,
   CameraCategory,
   CameraReadout,
+  CctvCamera,
   FeedHealth,
   FeedKey,
   LayerKey,
@@ -11,6 +13,14 @@ import type {
   VisualMode,
   VisualParams,
 } from "@/types/intel";
+
+export interface SearchResult {
+  id: string;
+  name: string;
+  kind: string;
+  lat: number | null;
+  lon: number | null;
+}
 
 type ArgusStore = {
   layers: Record<LayerKey, boolean>;
@@ -55,8 +65,16 @@ type ArgusStore = {
   setCctvCategoryFilter: (filter: CameraCategory | "All") => void;
   toggleAnalyticsLayer: (key: AnalyticsLayerKey) => void;
   setActiveGfsCogPath: (path: string | null) => void;
+  intelBriefing: IntelBriefing | null;
+  setIntelBriefing: (briefing: IntelBriefing | null) => void;
   trackedEntityId: string | null;
   setTrackedEntityId: (id: string | null) => void;
+  cameras: CctvCamera[];
+  setCameras: (cameras: CctvCamera[]) => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  searchResults: SearchResult[];
+  setSearchResults: (results: SearchResult[]) => void;
 };
 
 const emptyFeed = (): FeedHealth => ({
@@ -188,6 +206,14 @@ export const useArgusStore = create<ArgusStore>((set) => ({
       },
     })),
   setActiveGfsCogPath: (path) => set({ activeGfsCogPath: path }),
+  intelBriefing: null,
+  setIntelBriefing: (briefing) => set({ intelBriefing: briefing }),
   trackedEntityId: null,
   setTrackedEntityId: (id) => set({ trackedEntityId: id }),
+  cameras: [],
+  setCameras: (cameras) => set({ cameras }),
+  searchQuery: "",
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  searchResults: [],
+  setSearchResults: (results) => set({ searchResults: results }),
 }));

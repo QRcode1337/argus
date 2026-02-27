@@ -3,7 +3,7 @@ export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "tfl";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
 export type PlatformMode = "live" | "analytics";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";
-export type CameraCategory = "Traffic" | "Nature" | "Landmark" | "Wildlife" | "Scenic";
+export type CameraCategory = "Traffic" | "Nature" | "Landmark" | "Wildlife" | "Scenic" | "Infrastructure";
 export type CameraProvider = "TFL" | "Windy" | "Hardcoded";
 
 export type NvgVisualParams = {

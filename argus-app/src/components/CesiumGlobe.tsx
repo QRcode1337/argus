@@ -37,7 +37,16 @@ import { fetchAircraftPhoto } from "@/lib/ingest/planespotters";
 import { PollingManager } from "@/lib/ingest/pollingManager";
 import { fetchTleRecords } from "@/lib/ingest/tle";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
+import {
+  analyzeFlights,
+  analyzeMilitary,
+  analyzeSatellites,
+  analyzeSeismic,
+  generateBriefing,
+} from "@/lib/intel/analysisEngine";
+import type { IntelAlert } from "@/lib/intel/analysisEngine";
 import { useArgusStore } from "@/store/useArgusStore";
+import type { SearchResult } from "@/store/useArgusStore";
 import type { IntelDatum, IntelImportance, SelectedIntel } from "@/types/intel";
 
 import { HudOverlay } from "./HudOverlay";
@@ -275,6 +284,11 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const hoveredOriginalSizeRef = useRef<number | null>(null);
   const selectionRingRef = useRef<Entity | null>(null);
 
+  const flightAlertsRef = useRef<IntelAlert[]>([]);
+  const militaryAlertsRef = useRef<IntelAlert[]>([]);
+  const satelliteAlertsRef = useRef<IntelAlert[]>([]);
+  const seismicAlertsRef = useRef<IntelAlert[]>([]);
+
   const [selectedIntel, setSelectedIntel] = useState<SelectedIntel | null>(null);
   const [showFullIntel, setShowFullIntel] = useState(false);
   const [analyticsStatus, setAnalyticsStatus] = useState<string | null>(null);
@@ -292,8 +306,13 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const setFeedHealthy = useArgusStore((s) => s.setFeedHealthy);
   const setFeedError = useArgusStore((s) => s.setFeedError);
   const setCamera = useArgusStore((s) => s.setCamera);
+  const intelBriefing = useArgusStore((s) => s.intelBriefing);
+  const setIntelBriefing = useArgusStore((s) => s.setIntelBriefing);
   const trackedEntityId = useArgusStore((s) => s.trackedEntityId);
   const setTrackedEntityId = useArgusStore((s) => s.setTrackedEntityId);
+  const setCameras = useArgusStore((s) => s.setCameras);
+  const searchQuery = useArgusStore((s) => s.searchQuery);
+  const setSearchResults = useArgusStore((s) => s.setSearchResults);
 
   const flyToPoi = useCallback((poiId: string) => {
     const viewer = viewerRef.current;
@@ -357,6 +376,46 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     },
     [setTrackedEntityId],
   );
+
+  const flyToCoordinates = useCallback((lat: number, lon: number) => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    viewer.camera.flyTo({
+      destination: Cartesian3.fromDegrees(lon, lat, 500_000),
+      duration: 1.5,
+    });
+  }, []);
+
+  const flyToEntityById = useCallback((entityId: string) => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const entity = viewer.entities.getById(entityId);
+    if (!entity) return;
+
+    const position = entity.position?.getValue(JulianDate.now());
+    if (!position) return;
+
+    const intel = buildSelectedIntel(entity);
+    if (intel) {
+      setSelectedIntel(intel);
+      setShowFullIntel(intel.importance === "important");
+    }
+
+    const cameraAlt = viewer.camera.positionCartographic.height;
+    const targetAlt = Math.max(cameraAlt, 50_000);
+    const cartographic = Cartographic.fromCartesian(position);
+
+    viewer.camera.flyTo({
+      destination: Cartesian3.fromRadians(
+        cartographic.longitude,
+        cartographic.latitude,
+        targetAlt,
+      ),
+      duration: 1.5,
+    });
+  }, []);
 
   useEffect(() => {
     if (!mountRef.current || viewerRef.current) {
@@ -538,9 +597,11 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         if (platformModeRef.current === "analytics") return;
         try {
           const flights = await fetchOpenSkyFlights(ARGUS_CONFIG.endpoints.openSky);
-          const count = flightLayer.upsertFlights(flights.slice(0, ARGUS_CONFIG.limits.maxFlights));
+          const bounded = flights.slice(0, ARGUS_CONFIG.limits.maxFlights);
+          const count = flightLayer.upsertFlights(bounded);
           setCount("flights", count);
           setFeedHealthy("opensky");
+          flightAlertsRef.current = analyzeFlights(bounded);
         } catch (error) {
           setFeedError(
             "opensky",
@@ -557,11 +618,11 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         if (platformModeRef.current === "analytics") return;
         try {
           const flights = await fetchMilitaryFlights(ARGUS_CONFIG.endpoints.adsbMilitary);
-          const count = militaryLayer.upsertFlights(
-            flights.slice(0, ARGUS_CONFIG.limits.maxMilitaryFlights),
-          );
+          const bounded = flights.slice(0, ARGUS_CONFIG.limits.maxMilitaryFlights);
+          const count = militaryLayer.upsertFlights(bounded);
           setCount("military", count);
           setFeedHealthy("adsb");
+          militaryAlertsRef.current = analyzeMilitary(bounded);
         } catch (error) {
           setFeedError("adsb", error instanceof Error ? error.message : "Failed to fetch ADS-B");
         }
@@ -588,6 +649,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           );
           setCount("satellites", count);
           setFeedHealthy("celestrak");
+          satelliteAlertsRef.current = analyzeSatellites(count);
         } catch (error) {
           setFeedError(
             "celestrak",
@@ -607,6 +669,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           const count = seismicLayer.upsertEarthquakes(quakes);
           setCount("seismic", count);
           setFeedHealthy("usgs");
+          seismicAlertsRef.current = analyzeSeismic(count);
         } catch (error) {
           setFeedError("usgs", error instanceof Error ? error.message : "Failed to fetch USGS");
         }
@@ -620,6 +683,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         if (platformModeRef.current === "analytics") return;
         try {
           const cameras = await fetchCctvCameras(ARGUS_CONFIG.endpoints.cctv, ARGUS_CONFIG.endpoints.webcams);
+          setCameras(cameras);
           const categoryFilter = useArgusStore.getState().cctvCategoryFilter;
           const filtered = categoryFilter === "All"
             ? cameras
@@ -660,6 +724,71 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       pickerRef.current = null;
     };
   }, [setCamera, setCount, setFeedError, setFeedHealthy]);
+
+  // Entity search — watches searchQuery in store, populates searchResults
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const q = searchQuery.toLowerCase().trim();
+    const results: SearchResult[] = [];
+    const at = JulianDate.now();
+
+    const entities = viewer.entities.values;
+    for (let i = 0; i < entities.length && results.length < 20; i++) {
+      const entity = entities[i];
+      const props = readPropertyBag(entity, at);
+
+      const name =
+        (typeof props.callsign === "string" && props.callsign) ||
+        (typeof props.name === "string" && props.name) ||
+        (typeof props.place === "string" && props.place) ||
+        entity.id;
+
+      const kind = inferKindFromId(entity.id);
+
+      if (
+        name.toLowerCase().includes(q) ||
+        entity.id.toLowerCase().includes(q) ||
+        kind.toLowerCase().includes(q)
+      ) {
+        const position = entity.position?.getValue(at);
+        const cartographic = position ? Cartographic.fromCartesian(position) : null;
+
+        results.push({
+          id: entity.id,
+          name,
+          kind,
+          lat: cartographic ? CesiumMath.toDegrees(cartographic.latitude) : null,
+          lon: cartographic ? CesiumMath.toDegrees(cartographic.longitude) : null,
+        });
+      }
+    }
+
+    setSearchResults(results);
+  }, [searchQuery, setSearchResults]);
+
+  // Periodic intelligence briefing generation (every 15 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (platformModeRef.current === "analytics") return;
+
+      const allAlerts = [
+        ...flightAlertsRef.current,
+        ...militaryAlertsRef.current,
+        ...satelliteAlertsRef.current,
+        ...seismicAlertsRef.current,
+      ];
+
+      const briefing = generateBriefing(allAlerts);
+      setIntelBriefing(briefing);
+    }, 15_000);
+
+    return () => clearInterval(interval);
+  }, [setIntelBriefing]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -836,6 +965,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         onFlyToEntity={flyToSelectedEntity}
         onTrackEntity={handleTrackEntity}
         trackedEntityId={trackedEntityId}
+        intelBriefing={intelBriefing}
+        onFlyToCoordinates={flyToCoordinates}
+        onFlyToEntityById={flyToEntityById}
       />
     </div>
   );
