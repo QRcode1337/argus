@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180" fill="none">
+  <rect width="320" height="180" fill="#06120f"/>
+  <rect x="8" y="8" width="304" height="164" stroke="#2de59c" stroke-width="2"/>
+  <circle cx="160" cy="90" r="34" stroke="#2de59c" stroke-width="3"/>
+  <path d="M104 145h112" stroke="#2de59c" stroke-width="3"/>
+  <text x="160" y="28" text-anchor="middle" fill="#a5ffd4" font-family="monospace" font-size="14">ARGUS CCTV</text>
+</svg>

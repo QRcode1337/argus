@@ -1,0 +1,42 @@
+export const ARGUS_CONFIG = {
+  endpoints: {
+    openSky: process.env.NEXT_PUBLIC_OPENSKY_ENDPOINT ?? "/api/feeds/opensky",
+    celestrak: process.env.NEXT_PUBLIC_CELESTRAK_ENDPOINT ?? "/api/feeds/celestrak",
+    usgs: process.env.NEXT_PUBLIC_USGS_ENDPOINT ?? "/api/feeds/usgs",
+    adsbMilitary: process.env.NEXT_PUBLIC_ADSB_ENDPOINT ?? "/api/feeds/adsb-military",
+    cctv: process.env.NEXT_PUBLIC_CCTV_ENDPOINT ?? "/api/feeds/tfl-cctv",
+  },
+  pollMs: {
+    openSky: 10_000,
+    adsbMilitary: 10_000,
+    satellites: 5_000,
+    usgs: 5 * 60_000,
+    cctv: 60_000,
+  },
+  limits: {
+    maxFlights: 7000,
+    maxMilitaryFlights: 2500,
+    maxSatellites: 1200,
+    maxCctv: 300,
+    orbitSamples: 36,
+    orbitSampleStepMinutes: 4,
+  },
+} as const;
+
+export const CAMERA_PRESETS = [
+  { id: "pentagon", label: "Pentagon", lon: -77.0559, lat: 38.8719, height: 4200, heading: 0, pitch: -0.75, roll: 0 },
+  { id: "burj-khalifa", label: "Burj Khalifa", lon: 55.2744, lat: 25.1972, height: 3500, heading: 0, pitch: -0.72, roll: 0 },
+  { id: "london-bridge", label: "London Bridge", lon: -0.0877, lat: 51.5079, height: 3000, heading: 0, pitch: -0.7, roll: 0 },
+  { id: "eiffel-tower", label: "Eiffel Tower", lon: 2.2945, lat: 48.8584, height: 2500, heading: 0, pitch: -0.6, roll: 0 },
+  { id: "mt-fuji", label: "Mount Fuji", lon: 138.7274, lat: 35.3606, height: 18000, heading: 0, pitch: -0.4, roll: 0 },
+  { id: "times-square", label: "Times Square", lon: -73.9851, lat: 40.7580, height: 1800, heading: 0.1, pitch: -0.5, roll: 0 },
+  { id: "sydney-opera", label: "Sydney Opera", lon: 151.2153, lat: -33.8568, height: 2800, heading: -0.5, pitch: -0.6, roll: 0 },
+  { id: "yellowstone", label: "Yellowstone NP", lon: -110.5885, lat: 44.4280, height: 25000, heading: 0, pitch: -0.8, roll: 0 },
+  { id: "grand-canyon", label: "Grand Canyon", lon: -112.1129, lat: 36.1069, height: 12000, heading: -0.2, pitch: -0.5, roll: 0 },
+  { id: "great-barrier", label: "Great Barrier Reef", lon: 147.6992, lat: -18.2871, height: 40000, heading: 0, pitch: -0.9, roll: 0 },
+  { id: "giza-pyramids", label: "Giza Pyramids", lon: 31.1342, lat: 29.9792, height: 4500, heading: -0.3, pitch: -0.6, roll: 0 },
+  { id: "machu-picchu", label: "Machu Picchu", lon: -72.5450, lat: -13.1631, height: 5000, heading: 0.8, pitch: -0.5, roll: 0 },
+  { id: "banff-park", label: "Banff Nat. Park", lon: -115.5564, lat: 51.4968, height: 16000, heading: 0, pitch: -0.4, roll: 0 },
+  { id: "shibuya", label: "Shibuya Crossing", lon: 139.7005, lat: 35.6595, height: 1500, heading: 0, pitch: -0.7, roll: 0 },
+  { id: "venice", label: "Venice Canals", lon: 12.3155, lat: 45.4408, height: 4000, heading: 0.2, pitch: -0.6, roll: 0 },
+] as const;

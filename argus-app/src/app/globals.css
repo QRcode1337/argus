@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+:root {
+  --background: #01050a;
+  --foreground: #c4efff;
+  --font-mono: var(--font-plex-mono);
+}
+
+html,
+body,
+#__next {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 18% 16%, #0a2134 0%, transparent 30%),
+    radial-gradient(circle at 78% 18%, #0d1f30 0%, transparent 26%),
+    linear-gradient(160deg, #02060c 0%, #04080f 52%, #02060b 100%);
+  color: var(--foreground);
+  font-family: var(--font-mono), monospace;
+  overflow: hidden;
+}
+
+button {
+  cursor: pointer;
+}
+
+.argus-noise {
+  background-image: radial-gradient(rgba(75, 210, 255, 0.11) 0.5px, transparent 0.5px);
+  background-size: 3px 3px;
+  opacity: 0.18;
+}
+
+.argus-grid {
+  background-image:
+    linear-gradient(rgba(48, 140, 180, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(48, 140, 180, 0.08) 1px, transparent 1px);
+  background-size: 84px 84px;
+  opacity: 0.2;
+}
+
+.argus-viewport {
+  position: relative;
+  width: min(1220px, 80vw);
+  aspect-ratio: 1 / 1;
+  border: 1px solid rgba(61, 196, 255, 0.4);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 140px rgba(6, 21, 38, 0.84),
+    0 0 110px rgba(34, 121, 180, 0.42);
+}
+
+.argus-viewport::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle, transparent 52%, rgba(0, 0, 0, 0.58) 100%);
+  z-index: 2;
+}
+
+.argus-viewport::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  border: 1px solid rgba(40, 214, 255, 0.3);
+  box-shadow:
+    inset 0 0 0 1px rgba(20, 98, 125, 0.48),
+    inset 0 0 60px rgba(41, 215, 255, 0.14);
+  z-index: 3;
+}
+
+.argus-scanlines {
+  z-index: 4;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(170, 223, 255, 0.05) 0px,
+    rgba(170, 223, 255, 0.05) 1px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0) 4px
+  );
+  mix-blend-mode: screen;
+  opacity: 0.33;
+}
+
+@media (max-width: 980px) {
+  .argus-viewport {
+    width: 98vw;
+    border-radius: 24px;
+    border-left: none;
+    border-right: none;
+    aspect-ratio: 16 / 10;
+  }
+}
