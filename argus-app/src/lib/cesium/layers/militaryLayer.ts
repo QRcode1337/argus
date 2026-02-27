@@ -10,6 +10,7 @@ import {
   type Viewer,
 } from "cesium";
 
+import { lookupAircraftType } from "@/lib/data/aircraftTypes";
 import type { MilitaryFlight } from "@/types/intel";
 
 export class MilitaryLayer {
@@ -44,6 +45,8 @@ export class MilitaryLayer {
         continue;
       }
 
+      const typeInfo = lookupAircraftType(flight.type);
+
       const entity = this.viewer.entities.add({
         id: `mil-${flight.id}`,
         position,
@@ -71,6 +74,11 @@ export class MilitaryLayer {
           velocity: flight.velocity,
           track: flight.trueTrack,
           type: flight.type ?? "unknown",
+          aircraftFullName: typeInfo?.fullName ?? null,
+          aircraftCategory: typeInfo?.category ?? null,
+          aircraftManufacturer: typeInfo?.manufacturer ?? null,
+          aircraftOrigin: typeInfo?.originCountry ?? null,
+          imageUrl: typeInfo?.silhouettePath ?? "/aircraft/generic.svg",
         },
       });
 

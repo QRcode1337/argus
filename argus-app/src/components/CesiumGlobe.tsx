@@ -181,8 +181,12 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       break;
     case "military":
       pushQuick("Callsign", props.callsign);
-      pushQuick("Type", props.type);
+      pushQuick("Aircraft", props.aircraftFullName ?? props.type);
+      pushQuick("Category", props.aircraftCategory);
+      pushQuick("Manufacturer", props.aircraftManufacturer);
+      pushQuick("Origin", props.aircraftOrigin);
       pushQuick("Velocity (m/s)", props.velocity);
+      pushQuick("Track (deg)", props.track);
       break;
     case "earthquake":
       pushQuick("Magnitude", props.magnitude);
