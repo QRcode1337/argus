@@ -55,6 +55,8 @@ type ArgusStore = {
   setCctvCategoryFilter: (filter: CameraCategory | "All") => void;
   toggleAnalyticsLayer: (key: AnalyticsLayerKey) => void;
   setActiveGfsCogPath: (path: string | null) => void;
+  trackedEntityId: string | null;
+  setTrackedEntityId: (id: string | null) => void;
 };
 
 const emptyFeed = (): FeedHealth => ({
@@ -186,4 +188,6 @@ export const useArgusStore = create<ArgusStore>((set) => ({
       },
     })),
   setActiveGfsCogPath: (path) => set({ activeGfsCogPath: path }),
+  trackedEntityId: null,
+  setTrackedEntityId: (id) => set({ trackedEntityId: id }),
 }));

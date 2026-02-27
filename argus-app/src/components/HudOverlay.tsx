@@ -14,6 +14,9 @@ type HudOverlayProps = {
   showFullIntel: boolean;
   onToggleFullIntel: () => void;
   onCloseIntel: () => void;
+  onFlyToEntity: () => void;
+  onTrackEntity: (entityId: string | null) => void;
+  trackedEntityId: string | null;
 };
 
 type SliderDef = {
@@ -86,6 +89,9 @@ export function HudOverlay({
   showFullIntel,
   onToggleFullIntel,
   onCloseIntel,
+  onFlyToEntity,
+  onTrackEntity,
+  trackedEntityId,
 }: HudOverlayProps) {
   const {
     layers,
@@ -256,6 +262,39 @@ export function HudOverlay({
                 className="mt-2 h-32 w-full rounded border border-[#284f63] object-cover"
               />
             </>
+          )}
+
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={onFlyToEntity}
+              className={actionButtonClass}
+            >
+              Fly To
+            </button>
+            {(selectedIntel.kind === "flight" || selectedIntel.kind === "military" || selectedIntel.kind === "satellite") && (
+              <button
+                type="button"
+                onClick={() =>
+                  trackedEntityId === selectedIntel.id
+                    ? onTrackEntity(null)
+                    : onTrackEntity(selectedIntel.id)
+                }
+                className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition ${
+                  trackedEntityId === selectedIntel.id
+                    ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
+                    : "border-[#284f63] bg-[#081322] text-[#9ceaff] hover:border-[#2ad4ff]"
+                }`}
+              >
+                {trackedEntityId === selectedIntel.id ? "Stop Tracking" : "Track"}
+              </button>
+            )}
+          </div>
+
+          {trackedEntityId === selectedIntel.id && (
+            <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#2ad4ff]">
+              Tracking Active
+            </div>
           )}
 
           {selectedIntel.importance !== "important" ? (

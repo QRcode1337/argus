@@ -6,6 +6,7 @@ import {
   Cartographic,
   Cartesian2,
   Cartesian3,
+  Color,
   createOsmBuildingsAsync,
   createWorldTerrainAsync,
   Entity,
@@ -13,6 +14,7 @@ import {
   Ion,
   JulianDate,
   Math as CesiumMath,
+  PolylineGlowMaterialProperty,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
   Viewer,
@@ -244,6 +246,18 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
   };
 };
 
+const generateCirclePositions = (center: Cartesian3, radius: number, segments = 64): Cartesian3[] => {
+  const positions: Cartesian3[] = [];
+  const cartographic = Cartographic.fromCartesian(center);
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * 2 * Math.PI;
+    const lat = cartographic.latitude + (radius / 6371000) * Math.cos(angle);
+    const lon = cartographic.longitude + (radius / (6371000 * Math.cos(cartographic.latitude))) * Math.sin(angle);
+    positions.push(Cartesian3.fromRadians(lon, lat, cartographic.height));
+  }
+  return positions;
+};
+
 export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Viewer | null>(null);
@@ -257,6 +271,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
   const platformModeRef = useRef<"live" | "analytics">("live");
+  const hoveredEntityRef = useRef<Entity | null>(null);
+  const hoveredOriginalSizeRef = useRef<number | null>(null);
+  const selectionRingRef = useRef<Entity | null>(null);
 
   const [selectedIntel, setSelectedIntel] = useState<SelectedIntel | null>(null);
   const [showFullIntel, setShowFullIntel] = useState(false);
@@ -275,6 +292,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const setFeedHealthy = useArgusStore((s) => s.setFeedHealthy);
   const setFeedError = useArgusStore((s) => s.setFeedError);
   const setCamera = useArgusStore((s) => s.setCamera);
+  const trackedEntityId = useArgusStore((s) => s.trackedEntityId);
+  const setTrackedEntityId = useArgusStore((s) => s.setTrackedEntityId);
 
   const flyToPoi = useCallback((poiId: string) => {
     const viewer = viewerRef.current;
@@ -307,6 +326,37 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const toggleCollisionDetection = useCallback(() => {
     setCollisionEnabled((current) => !current);
   }, []);
+
+  const flyToSelectedEntity = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !selectedIntel) return;
+
+    const entity = viewer.entities.getById(selectedIntel.id);
+    if (!entity) return;
+
+    const position = entity.position?.getValue(JulianDate.now());
+    if (!position) return;
+
+    const cameraAlt = viewer.camera.positionCartographic.height;
+    const targetAlt = Math.max(cameraAlt, 50_000);
+    const cartographic = Cartographic.fromCartesian(position);
+
+    viewer.camera.flyTo({
+      destination: Cartesian3.fromRadians(
+        cartographic.longitude,
+        cartographic.latitude,
+        targetAlt,
+      ),
+      duration: 1.5,
+    });
+  }, [selectedIntel]);
+
+  const handleTrackEntity = useCallback(
+    (entityId: string | null) => {
+      setTrackedEntityId(entityId);
+    },
+    [setTrackedEntityId],
+  );
 
   useEffect(() => {
     if (!mountRef.current || viewerRef.current) {
@@ -421,6 +471,63 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       }
     }, ScreenSpaceEventType.LEFT_CLICK);
 
+    picker.setInputAction((event: { endPosition: Cartesian2 }) => {
+      const picked = viewer.scene.pick(event.endPosition);
+      const hasEntity =
+        defined(picked) &&
+        typeof picked === "object" &&
+        "id" in picked &&
+        picked.id instanceof Entity;
+
+      const newEntity = hasEntity ? (picked.id as Entity) : null;
+
+      if (hoveredEntityRef.current && hoveredEntityRef.current !== newEntity) {
+        if (hoveredEntityRef.current.point && hoveredOriginalSizeRef.current !== null) {
+          hoveredEntityRef.current.point.pixelSize = hoveredOriginalSizeRef.current as unknown as import("cesium").Property;
+        }
+        hoveredEntityRef.current = null;
+        hoveredOriginalSizeRef.current = null;
+      }
+
+      if (newEntity && newEntity.point && newEntity !== hoveredEntityRef.current) {
+        const currentSize = newEntity.point.pixelSize;
+        const sizeValue = typeof currentSize === "object" && currentSize !== null && "getValue" in currentSize
+          ? (currentSize as { getValue: (time: JulianDate) => number }).getValue(JulianDate.now())
+          : (currentSize as unknown as number);
+        hoveredOriginalSizeRef.current = sizeValue;
+        newEntity.point.pixelSize = (sizeValue * 1.5) as unknown as import("cesium").Property;
+        hoveredEntityRef.current = newEntity;
+      }
+    }, ScreenSpaceEventType.MOUSE_MOVE);
+
+    picker.setInputAction((event: { position: Cartesian2 }) => {
+      const picked = viewer.scene.pick(event.position);
+      if (
+        !defined(picked) ||
+        typeof picked !== "object" ||
+        !("id" in picked) ||
+        !(picked.id instanceof Entity)
+      ) {
+        return;
+      }
+
+      const entity = picked.id;
+      const position = entity.position?.getValue(JulianDate.now());
+      if (!position) return;
+
+      const cameraAlt = viewer.camera.positionCartographic.height;
+      const targetAlt = Math.max(cameraAlt, 50_000);
+
+      viewer.camera.flyTo({
+        destination: Cartesian3.fromRadians(
+          Cartographic.fromCartesian(position).longitude,
+          Cartographic.fromCartesian(position).latitude,
+          targetAlt,
+        ),
+        duration: 1.5,
+      });
+    }, ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
     const poller = new PollingManager();
     let lastTleFetchAt = 0;
 
@@ -530,6 +637,14 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       poller.stopAll();
       rasterLayer.unload();
       viewer.camera.changed.removeEventListener(onCameraChanged);
+
+      if (selectionRingRef.current) {
+        viewer.entities.remove(selectionRingRef.current);
+        selectionRingRef.current = null;
+      }
+      hoveredEntityRef.current = null;
+      hoveredOriginalSizeRef.current = null;
+
       picker.destroy();
       visualController.destroy();
       viewer.destroy();
@@ -551,6 +666,53 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     if (!viewer) return;
     viewer.scene.screenSpaceCameraController.enableCollisionDetection = collisionEnabled;
   }, [collisionEnabled]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    if (selectionRingRef.current) {
+      viewer.entities.remove(selectionRingRef.current);
+      selectionRingRef.current = null;
+    }
+
+    if (!selectedIntel) return;
+
+    const entity = viewer.entities.getById(selectedIntel.id);
+    if (!entity) return;
+
+    const position = entity.position?.getValue(JulianDate.now());
+    if (!position) return;
+
+    const ringPositions = generateCirclePositions(position, 5000);
+    const ringEntity = viewer.entities.add({
+      polyline: {
+        positions: ringPositions,
+        width: 3,
+        material: new PolylineGlowMaterialProperty({
+          glowPower: 0.3,
+          color: Color.fromCssColorString("#2ad4ff").withAlpha(0.7),
+        }),
+        clampToGround: false,
+      },
+    });
+    selectionRingRef.current = ringEntity;
+  }, [selectedIntel]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    if (!trackedEntityId) {
+      viewer.trackedEntity = undefined;
+      return;
+    }
+
+    const entity = viewer.entities.getById(trackedEntityId);
+    if (entity) {
+      viewer.trackedEntity = entity;
+    }
+  }, [trackedEntityId]);
 
   useEffect(() => {
     platformModeRef.current = platformMode;
@@ -667,7 +829,13 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         onCloseIntel={() => {
           setSelectedIntel(null);
           setShowFullIntel(false);
+          if (trackedEntityId) {
+            setTrackedEntityId(null);
+          }
         }}
+        onFlyToEntity={flyToSelectedEntity}
+        onTrackEntity={handleTrackEntity}
+        trackedEntityId={trackedEntityId}
       />
     </div>
   );
