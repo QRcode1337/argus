@@ -7,8 +7,10 @@ import {
   Cartesian2,
   Cartesian3,
   createOsmBuildingsAsync,
+  createWorldTerrainAsync,
   Entity,
   HeadingPitchRoll,
+  Ion,
   JulianDate,
   Math as CesiumMath,
   ScreenSpaceEventHandler,
@@ -39,6 +41,18 @@ import { HudOverlay } from "./HudOverlay";
 
 type CesiumGlobeProps = {
   className?: string;
+};
+
+type AnalyticsLayer = {
+  variable: string;
+  tile_url: string | null;
+  source_file?: string | null;
+  error?: string | null;
+};
+
+type AnalyticsResponse = {
+  layers: AnalyticsLayer[];
+  available_file_count?: number;
 };
 
 const formatValue = (value: unknown): string => {
@@ -227,6 +241,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
   const [selectedIntel, setSelectedIntel] = useState<SelectedIntel | null>(null);
   const [showFullIntel, setShowFullIntel] = useState(false);
+  const [analyticsStatus, setAnalyticsStatus] = useState<string | null>(null);
+  const [collisionEnabled, setCollisionEnabled] = useState(false);
 
   const layers = useArgusStore((s) => s.layers);
   const platformMode = useArgusStore((s) => s.platformMode);
@@ -263,12 +279,25 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     });
   }, []);
 
+  const resetCamera = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.camera.flyHome(1.2);
+  }, []);
+
+  const toggleCollisionDetection = useCallback(() => {
+    setCollisionEnabled((current) => !current);
+  }, []);
+
   useEffect(() => {
     if (!mountRef.current || viewerRef.current) {
       return;
     }
 
     (window as unknown as { CESIUM_BASE_URL?: string }).CESIUM_BASE_URL = "/cesium";
+    if (process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN) {
+      Ion.defaultAccessToken = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
+    }
 
     const viewer = new Viewer(mountRef.current, {
       animation: false,
@@ -283,8 +312,26 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       timeline: false,
       shouldAnimate: true,
     });
+    const cameraController = viewer.scene.screenSpaceCameraController;
+    cameraController.enableCollisionDetection = collisionEnabled;
+    cameraController.inertiaSpin = 0.82;
+    cameraController.inertiaTranslate = 0.82;
+    cameraController.inertiaZoom = 0.74;
+    cameraController.minimumZoomDistance = 15;
+    cameraController.maximumZoomDistance = 60_000_000;
 
     viewer.scene.globe.enableLighting = true;
+    if (process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN) {
+      void createWorldTerrainAsync({
+        requestVertexNormals: true,
+      })
+        .then((terrain) => {
+          viewer.terrainProvider = terrain;
+        })
+        .catch((error) => {
+          console.error("Failed to load Cesium World Terrain", error);
+        });
+    }
 
     void createOsmBuildingsAsync().then((tileset) => {
       viewer.scene.primitives.add(tileset);
@@ -466,6 +513,12 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   }, [setCamera, setCount, setFeedError, setFeedHealthy]);
 
   useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.scene.screenSpaceCameraController.enableCollisionDetection = collisionEnabled;
+  }, [collisionEnabled]);
+
+  useEffect(() => {
     platformModeRef.current = platformMode;
 
     if (platformMode === "analytics") {
@@ -485,21 +538,41 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   }, [platformMode]);
 
   useEffect(() => {
-    if (platformMode !== "analytics") return;
+    if (platformMode !== "analytics") {
+      setAnalyticsStatus(null);
+      return;
+    }
 
-    void fetch("/api/analytics/layers")
-      .then((r) => r.json())
-      .then((data: { layers: Array<{ variable: string; tile_url: string | null }> }) => {
-        const gfsLayer = data.layers.find((l) => l.variable === "t2m");
-        const tiTilerBase = process.env.NEXT_PUBLIC_TITILER_URL ?? "http://localhost:8000";
-        // Use the tile_url from PostGIS if available, otherwise construct a demo URL
-        const tileUrl =
-          gfsLayer?.tile_url ??
-          `${tiTilerBase}/cog/tiles/{z}/{x}/{y}.png?url=/data/tiles/demo.tif&colormap_name=rdylbu_r`;
-        setActiveGfsCogPath(tileUrl);
+    void fetch("/api/analytics/layers", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Analytics endpoint returned ${response.status}`);
+        }
+        return response.json() as Promise<AnalyticsResponse>;
       })
-      .catch(() => {
-        // API not yet available — silently ignore in dev
+      .then((data) => {
+        const gfsLayer = data.layers.find((layer) => layer.variable === "t2m");
+        if (gfsLayer?.tile_url) {
+          setActiveGfsCogPath(gfsLayer.tile_url);
+          setAnalyticsStatus(
+            gfsLayer.source_file
+              ? `Using ${gfsLayer.source_file.split("/").pop()}`
+              : "GFS raster layer ready",
+          );
+          return;
+        }
+
+        setActiveGfsCogPath(null);
+        setAnalyticsStatus(
+          gfsLayer?.error ??
+            "No GFS raster output found yet. Let the ingestor produce a .tif/.tiff tile source.",
+        );
+      })
+      .catch((error) => {
+        setActiveGfsCogPath(null);
+        setAnalyticsStatus(
+          error instanceof Error ? error.message : "Failed to load analytics layer metadata",
+        );
       });
   }, [platformMode, setActiveGfsCogPath]);
 
@@ -550,6 +623,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
       <HudOverlay
         onFlyToPoi={flyToPoi}
+        onResetCamera={resetCamera}
+        onToggleCollision={toggleCollisionDetection}
+        collisionEnabled={collisionEnabled}
+        analyticsStatus={analyticsStatus}
         selectedIntel={selectedIntel}
         showFullIntel={showFullIntel}
         onToggleFullIntel={() => setShowFullIntel((current) => !current)}

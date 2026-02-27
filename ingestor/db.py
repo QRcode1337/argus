@@ -34,11 +34,11 @@ def register_layer(
     Returns the new row id, or None on failure.
     """
     path = Path(cog_path)
-    # Build the TiTiler URL template for Cesium UrlTemplateImageryProvider
-    # TiTiler expects: /cog/tiles/{z}/{x}/{y}?url=<cog_path>&colormap_name=<cm>
+    # Build the TiTiler URL template for Cesium UrlTemplateImageryProvider.
+    # TiTiler expects a tile matrix set id (WebMercatorQuad for slippy-map XYZ).
     colormap = _colormap_for(var_cfg["short_name"])
     tile_url = (
-        f"{TITILER_URL}/cog/tiles/{{z}}/{{x}}/{{y}}.png"
+        f"{TITILER_URL}/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}.png"
         f"?url={cog_path}&colormap_name={colormap}&rescale=auto"
     )
     size_mb = path.stat().st_size / (1024 * 1024) if path.exists() else None

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   // Turbopack disabled to prevent os error 60 file read timeouts with large Cesium assets
   serverExternalPackages: ['cesium'],
   webpack: (config) => {

@@ -6,6 +6,10 @@ import type { LayerKey, SelectedIntel, VisualMode } from "@/types/intel";
 
 type HudOverlayProps = {
   onFlyToPoi: (poiId: string) => void;
+  onResetCamera: () => void;
+  onToggleCollision: () => void;
+  collisionEnabled: boolean;
+  analyticsStatus: string | null;
   selectedIntel: SelectedIntel | null;
   showFullIntel: boolean;
   onToggleFullIntel: () => void;
@@ -66,8 +70,18 @@ function SliderControl({ label, value, onChange }: SliderDef) {
   );
 }
 
+const controlInputClass =
+  "w-full rounded-lg border border-[#284f63] bg-[#081322] px-3 py-2 font-mono text-[12px] text-[#d5f7ff] focus:border-[#2ad4ff] focus:outline-none";
+
+const actionButtonClass =
+  "rounded-lg border border-[#284f63] bg-[#081322] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[#9ceaff] transition hover:border-[#2ad4ff]";
+
 export function HudOverlay({
   onFlyToPoi,
+  onResetCamera,
+  onToggleCollision,
+  collisionEnabled,
+  analyticsStatus,
   selectedIntel,
   showFullIntel,
   onToggleFullIntel,
@@ -93,9 +107,14 @@ export function HudOverlay({
     toggleAnalyticsLayer,
   } = useArgusStore();
 
-  const analyticsLayerDefs: { key: "gfs_weather" | "sentinel_imagery"; label: string; source: string; available: boolean }[] = [
-    { key: "gfs_weather",      label: "GFS Weather",        source: "NOAA GFS",  available: true },
-    { key: "sentinel_imagery", label: "Sentinel Imagery",   source: "Copernicus", available: false },
+  const analyticsLayerDefs: {
+    key: "gfs_weather" | "sentinel_imagery";
+    label: string;
+    source: string;
+    available: boolean;
+  }[] = [
+    { key: "gfs_weather", label: "GFS Weather", source: "NOAA GFS", available: true },
+    { key: "sentinel_imagery", label: "Sentinel Imagery", source: "Copernicus", available: false },
   ];
 
   const modeLabel = modeDefs.find((mode) => mode.key === visualMode)?.label ?? "Normal";
@@ -189,11 +208,9 @@ export function HudOverlay({
       </div>
 
       {selectedIntel ? (
-        <section className="pointer-events-auto absolute right-8 top-22 w-[348px] rounded-2xl border border-[#113446] bg-[#050b17d9] p-4 shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
+        <section className="pointer-events-auto absolute right-8 top-[5.5rem] w-[348px] rounded-2xl border border-[#113446] bg-[#050b17d9] p-4 shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
           <div className="flex items-center justify-between">
-            <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#e3ad50]">
-              Target Intel
-            </div>
+            <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#e3ad50]">Target Intel</div>
             <button
               type="button"
               onClick={onCloseIntel}
@@ -206,8 +223,7 @@ export function HudOverlay({
           <div className="mt-2 rounded-xl border border-[#123244] bg-[#040b17] p-3 font-mono">
             <div className="text-[15px] text-[#d5f7ff]">{selectedIntel.name}</div>
             <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[#6c8ea2]">
-              {selectedIntel.kind} ·{" "}
-              {selectedIntel.importance === "important" ? "Priority Target" : "Standard Target"}
+              {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority Target" : "Standard Target"}
             </div>
           </div>
 
@@ -232,10 +248,10 @@ export function HudOverlay({
           {selectedIntel.imageUrl && (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img 
-                src={selectedIntel.imageUrl} 
-                alt={selectedIntel.name} 
-                className="mt-2 w-full rounded border border-[#284f63] object-cover h-32" 
+              <img
+                src={selectedIntel.imageUrl}
+                alt={selectedIntel.name}
+                className="mt-2 h-32 w-full rounded border border-[#284f63] object-cover"
               />
             </>
           )}
@@ -256,7 +272,7 @@ export function HudOverlay({
         BAND-PAN BITS: 11 LVL: 1A
       </div>
 
-      <section className="pointer-events-auto absolute bottom-33 left-6 w-[370px] rounded-2xl border border-[#113446] bg-[#050b17d9] p-4 shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
+      <section className="pointer-events-auto absolute bottom-44 left-6 w-[370px] rounded-2xl border border-[#113446] bg-[#050b17d9] p-4 shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md max-[1140px]:left-4">
         {platformMode === "analytics" ? (
           <div className="mb-2 font-mono text-[12px] uppercase tracking-[0.33em] text-[#e3ad50]">Analytics // Raster Layers</div>
         ) : (
@@ -282,11 +298,12 @@ export function HudOverlay({
                 <div>
                   <div className="font-mono text-[20px] leading-none text-[#d5f7ff]">{layer.label}</div>
                   <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#6c8ea2]">
-                    {layer.source}{!layer.available ? " · Phase 4" : ""}
+                    {layer.source}
+                    {!layer.available ? " · Phase 4" : ""}
                   </div>
                 </div>
                 <span
-                  className={`inline-block rounded-md border px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] font-mono ${
+                  className={`inline-block rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] ${
                     !layer.available
                       ? "border-[#415f70] bg-[#071321] text-[#668092]"
                       : analyticsLayers[layer.key]
@@ -298,6 +315,12 @@ export function HudOverlay({
                 </span>
               </button>
             ))}
+
+            {analyticsStatus ? (
+              <div className="rounded-lg border border-[#1f3f52] bg-[#071020] px-3 py-2 font-mono text-[10px] text-[#7fb4c5]">
+                {analyticsStatus}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-2">
@@ -343,7 +366,7 @@ export function HudOverlay({
         )}
       </section>
 
-      <section className="pointer-events-auto absolute bottom-33 left-[410px] w-[348px] rounded-2xl border border-[#113446] bg-[#050b17d9] p-4 shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
+      <section className="pointer-events-auto absolute bottom-44 left-[26rem] w-[348px] rounded-2xl border border-[#113446] bg-[#050b17d9] p-4 shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md max-[1140px]:hidden">
         <div className="mb-2 font-mono text-[12px] uppercase tracking-[0.3em] text-[#e3ad50]">Signal Controls</div>
 
         <SliderControl
@@ -377,71 +400,78 @@ export function HudOverlay({
         </div>
       </section>
 
-      <section className="pointer-events-auto absolute bottom-22 left-1/2 w-[640px] max-w-[86vw] -translate-x-1/2 rounded-2xl border border-[#113446] bg-[#050b17d9] px-4 py-2 shadow-[0_0_30px_rgba(10,171,255,0.18)] backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#6b8d97] whitespace-nowrap">Locations</div>
-          <div className="flex flex-nowrap overflow-x-auto gap-2 pb-1 scrollbar-hide" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
-            {CAMERA_PRESETS.map((poi) => (
-              <button
-                key={poi.id}
-                type="button"
-                onClick={() => {
-                  setActivePoiId(poi.id);
-                  onFlyToPoi(poi.id);
-                }}
-                className={`flex-shrink-0 rounded-lg border px-3 py-1 font-mono text-[11px] tracking-[0.08em] transition whitespace-nowrap ${
-                  activePoiId === poi.id
-                    ? "border-[#2ad4ff] bg-[#0a2a44] text-[#b6f5ff]"
-                    : "border-[#284f63] bg-[#081322] text-[#7298a8] hover:border-[#2ad4ff]"
-                }`}
-              >
-                {poi.label}
-              </button>
-            ))}
-          </div>
+      <section className="pointer-events-auto absolute bottom-4 left-1/2 w-[min(95vw,760px)] -translate-x-1/2 rounded-2xl border border-[#113446] bg-[#050b17d9] p-3 shadow-[0_0_30px_rgba(10,171,255,0.18)] backdrop-blur-md">
+        <div className="grid gap-2 md:grid-cols-3">
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+            Location
+            <select
+              className={`${controlInputClass} mt-1`}
+              value={activePoiId ?? ""}
+              onChange={(event) => {
+                const nextPoi = event.target.value || null;
+                setActivePoiId(nextPoi);
+                if (nextPoi) {
+                  onFlyToPoi(nextPoi);
+                }
+              }}
+            >
+              <option value="">Select location</option>
+              {CAMERA_PRESETS.map((poi) => (
+                <option key={poi.id} value={poi.id}>
+                  {poi.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+            Platform
+            <select
+              className={`${controlInputClass} mt-1`}
+              value={platformMode}
+              onChange={(event) => setPlatformMode(event.target.value as "live" | "analytics")}
+            >
+              <option value="live">Live</option>
+              <option value="analytics">Analytics</option>
+            </select>
+          </label>
+
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+            Camera Mode
+            <select
+              className={`${controlInputClass} mt-1`}
+              value={visualMode}
+              onChange={(event) => setVisualMode(event.target.value as VisualMode)}
+            >
+              {modeDefs.map((mode) => (
+                <option key={mode.key} value={mode.key}>
+                  {mode.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-      </section>
 
-      <section className="pointer-events-auto absolute bottom-13 left-1/2 flex w-[640px] max-w-[86vw] -translate-x-1/2 gap-2 rounded-2xl border border-[#113446] bg-[#050b17d9] p-3 shadow-[0_0_30px_rgba(10,171,255,0.18)] backdrop-blur-md">
-        <button
-          type="button"
-          onClick={() => setPlatformMode("live")}
-          className={`flex-1 rounded-xl border px-3 py-2 font-mono text-[12px] uppercase tracking-[0.2em] transition ${
-            platformMode === "live"
-              ? "border-[#2ad4ff] bg-[#0a2a44] text-[#d5f7ff]"
-              : "border-[#284f63] bg-[#081322] text-[#7298a8] hover:border-[#2ad4ff]"
-          }`}
-        >
-          Live
-        </button>
-        <button
-          type="button"
-          onClick={() => setPlatformMode("analytics")}
-          className={`flex-1 rounded-xl border px-3 py-2 font-mono text-[12px] uppercase tracking-[0.2em] transition ${
-            platformMode === "analytics"
-              ? "border-[#e3ad50] bg-[#1a0f00] text-[#e3ad50]"
-              : "border-[#284f63] bg-[#081322] text-[#7298a8] hover:border-[#e3ad50]"
-          }`}
-        >
-          Analytics
-        </button>
-      </section>
-
-      <section className="pointer-events-auto absolute bottom-5 left-1/2 flex w-[640px] max-w-[86vw] -translate-x-1/2 gap-2 rounded-2xl border border-[#113446] bg-[#050b17d9] p-3 shadow-[0_0_30px_rgba(10,171,255,0.18)] backdrop-blur-md">
-        {modeDefs.map((mode) => (
+        <div className="mt-2 flex flex-wrap gap-2">
           <button
-            key={mode.key}
             type="button"
-            onClick={() => setVisualMode(mode.key)}
-            className={`flex-1 rounded-xl border px-3 py-2 font-mono text-[12px] uppercase tracking-[0.2em] transition ${
-              visualMode === mode.key
-                ? "border-[#2ad4ff] bg-[#0a2a44] text-[#d5f7ff]"
-                : "border-[#284f63] bg-[#081322] text-[#7298a8] hover:border-[#2ad4ff]"
-            }`}
+            onClick={() => {
+              if (activePoiId) {
+                onFlyToPoi(activePoiId);
+              }
+            }}
+            className={actionButtonClass}
+            disabled={!activePoiId}
           >
-            {mode.label}
+            Fly To Selected
           </button>
-        ))}
+          <button type="button" onClick={onResetCamera} className={actionButtonClass}>
+            Reset View
+          </button>
+          <button type="button" onClick={onToggleCollision} className={actionButtonClass}>
+            Terrain Collision: {collisionEnabled ? "On" : "Off"}
+          </button>
+        </div>
       </section>
     </div>
   );
