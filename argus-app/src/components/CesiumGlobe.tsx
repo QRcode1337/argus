@@ -190,7 +190,15 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       break;
     case "satellite":
       pushQuick("Name", props.name);
-      pushQuick("Class", props.classification);
+      pushQuick("Type", props.classification);
+      pushQuick("Orbit", props.orbitType);
+      pushQuick("Country", props.countryCode);
+      pushQuick("Launch Date", props.launchDate);
+      pushQuick("Size", props.rcsSize);
+      pushQuick("Period (min)", props.periodMinutes);
+      pushQuick("Inclination", props.inclinationDeg);
+      pushQuick("Apogee (km)", props.apogeeKm);
+      pushQuick("Perigee (km)", props.perigeeKm);
       break;
     case "cctv":
       pushQuick("Camera", props.name);

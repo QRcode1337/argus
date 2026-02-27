@@ -99,11 +99,29 @@ export interface MilitaryFlight {
   type: string | null;
 }
 
+export type OrbitType = "LEO" | "MEO" | "GEO" | "HEO" | "SSO" | "Unknown";
+export type RcsSize = "SMALL" | "MEDIUM" | "LARGE" | "Unknown";
+
+export interface SatelliteMetadata {
+  objectType: string | null;
+  countryCode: string | null;
+  launchDate: string | null;
+  launchSite: string | null;
+  rcsSize: RcsSize;
+  periodMinutes: number | null;
+  inclinationDeg: number | null;
+  apogeeKm: number | null;
+  perigeeKm: number | null;
+  decayDate: string | null;
+  orbitType: OrbitType;
+}
+
 export interface SatelliteRecord {
   id: string;
   name: string;
   tle1: string;
   tle2: string;
+  metadata?: SatelliteMetadata;
 }
 
 export interface SatellitePosition {

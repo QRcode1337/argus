@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const upstream =
     process.env.CELESTRAK_ENDPOINT ??
-    "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
+    "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=json";
 
   try {
     const response = await fetch(upstream, { cache: "no-store" });
@@ -14,7 +14,7 @@ export async function GET() {
     return new NextResponse(body, {
       status: response.status,
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Type": "application/json; charset=utf-8",
       },
     });
   } catch (error) {

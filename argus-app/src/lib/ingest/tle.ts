@@ -7,9 +7,41 @@ import {
   twoline2satrec,
 } from "satellite.js";
 
-import type { SatellitePosition, SatelliteRecord } from "@/types/intel";
+import type { SatellitePosition, SatelliteRecord, OrbitType, RcsSize } from "@/types/intel";
 
 const toDegrees = (radians: number): number => (radians * 180) / Math.PI;
+
+interface GpJsonRecord {
+  OBJECT_NAME: string;
+  NORAD_CAT_ID: number;
+  TLE_LINE1: string;
+  TLE_LINE2: string;
+  OBJECT_TYPE: string | null;
+  COUNTRY_CODE: string | null;
+  LAUNCH_DATE: string | null;
+  SITE: string | null;
+  RCS_SIZE: string | null;
+  PERIOD: number | null;
+  INCLINATION: number | null;
+  APOAPSIS: number | null;
+  PERIAPSIS: number | null;
+  DECAY_DATE: string | null;
+}
+
+function deriveOrbitType(periodMinutes: number | null): OrbitType {
+  if (periodMinutes === null) return "Unknown";
+  if (periodMinutes < 128) return "LEO";
+  if (periodMinutes >= 1400 && periodMinutes <= 1500) return "GEO";
+  if (periodMinutes <= 720) return "MEO";
+  return "HEO";
+}
+
+function normalizeRcsSize(raw: string | null): RcsSize {
+  if (!raw) return "Unknown";
+  const upper = raw.toUpperCase();
+  if (upper === "SMALL" || upper === "MEDIUM" || upper === "LARGE") return upper;
+  return "Unknown";
+}
 
 export async function fetchTleRecords(endpoint: string): Promise<SatelliteRecord[]> {
   const response = await fetch(endpoint, { cache: "no-store" });
@@ -18,31 +50,29 @@ export async function fetchTleRecords(endpoint: string): Promise<SatelliteRecord
     throw new Error(`CelesTrak HTTP ${response.status}`);
   }
 
-  const text = await response.text();
-  const lines = text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const json = (await response.json()) as GpJsonRecord[];
 
-  const records: SatelliteRecord[] = [];
-  for (let i = 0; i + 2 < lines.length; i += 3) {
-    const name = lines[i];
-    const tle1 = lines[i + 1];
-    const tle2 = lines[i + 2];
-
-    if (!tle1.startsWith("1 ") || !tle2.startsWith("2 ")) {
-      continue;
-    }
-
-    records.push({
-      id: tle1.slice(2, 7).trim() || `${i}`,
-      name,
-      tle1,
-      tle2,
-    });
-  }
-
-  return records;
+  return json
+    .filter((gp) => gp.TLE_LINE1 && gp.TLE_LINE2)
+    .map((gp) => ({
+      id: String(gp.NORAD_CAT_ID),
+      name: gp.OBJECT_NAME,
+      tle1: gp.TLE_LINE1,
+      tle2: gp.TLE_LINE2,
+      metadata: {
+        objectType: gp.OBJECT_TYPE,
+        countryCode: gp.COUNTRY_CODE,
+        launchDate: gp.LAUNCH_DATE,
+        launchSite: gp.SITE,
+        rcsSize: normalizeRcsSize(gp.RCS_SIZE),
+        periodMinutes: gp.PERIOD,
+        inclinationDeg: gp.INCLINATION,
+        apogeeKm: gp.APOAPSIS,
+        perigeeKm: gp.PERIAPSIS,
+        decayDate: gp.DECAY_DATE,
+        orbitType: deriveOrbitType(gp.PERIOD),
+      },
+    }));
 }
 
 export function computeSatellitePositions(

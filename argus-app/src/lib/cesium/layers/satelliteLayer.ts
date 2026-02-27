@@ -13,20 +13,6 @@ import {
 import { computeOrbitTrack, computeSatellitePositions } from "@/lib/ingest/tle";
 import type { SatelliteRecord } from "@/types/intel";
 
-function classifySatellite(name: string): string {
-  const upper = name.toUpperCase();
-  if (upper.includes("STARLINK")) return "Communications (LEO Constellation)";
-  if (upper.includes("ONEWEB")) return "Communications (LEO Constellation)";
-  if (upper.includes("ISS") || upper.includes("ZARYA")) return "Space Station (Manned)";
-  if (upper.includes("TIANGONG")) return "Space Station (Manned)";
-  if (upper.includes("GOES") || upper.includes("METEOSAT") || upper.includes("NOAA")) return "Meteorological / Weather";
-  if (upper.includes("GPS") || upper.includes("NAVSTAR") || upper.includes("GLONASS") || upper.includes("GALILEO") || upper.includes("BEIDOU")) return "Navigation / Positioning";
-  if (upper.includes("IRIDIUM") || upper.includes("GLOBALSTAR")) return "Communications (Voice/Data)";
-  if (upper.includes("LANDSAT") || upper.includes("SENTINEL")) return "Earth Observation";
-  if (upper.includes("HUBBLE") || upper.includes("JWST") || upper.includes("CHANDRA")) return "Space Telescope";
-  return "General Purpose / LEO Object";
-}
-
 export class SatelliteLayer {
   private viewer: Viewer;
 
@@ -101,7 +87,15 @@ export class SatelliteLayer {
         properties: {
           kind: "satellite",
           name: sat.name,
-          classification: classifySatellite(sat.name),
+          classification: record.metadata?.objectType ?? "Unknown",
+          orbitType: record.metadata?.orbitType ?? "Unknown",
+          countryCode: record.metadata?.countryCode ?? "Unknown",
+          launchDate: record.metadata?.launchDate ?? "Unknown",
+          rcsSize: record.metadata?.rcsSize ?? "Unknown",
+          periodMinutes: record.metadata?.periodMinutes,
+          inclinationDeg: record.metadata?.inclinationDeg,
+          apogeeKm: record.metadata?.apogeeKm,
+          perigeeKm: record.metadata?.perigeeKm,
         },
       });
 
