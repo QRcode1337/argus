@@ -70,6 +70,10 @@ export class FlightLayer {
           callsign: flight.callsign,
           velocity: flight.velocity,
           track: flight.trueTrack,
+          originCountry: flight.originCountry,
+          verticalRate: flight.verticalRate,
+          onGround: flight.onGround,
+          squawk: flight.squawk,
         },
       });
 

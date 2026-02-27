@@ -172,8 +172,12 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
   switch (kind) {
     case "flight":
       pushQuick("Callsign", props.callsign);
+      pushQuick("Origin", props.originCountry);
       pushQuick("Velocity (m/s)", props.velocity);
       pushQuick("Track (deg)", props.track);
+      pushQuick("Vert Rate (m/s)", props.verticalRate);
+      pushQuick("On Ground", props.onGround);
+      pushQuick("Squawk", props.squawk);
       break;
     case "military":
       pushQuick("Callsign", props.callsign);

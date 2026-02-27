@@ -82,6 +82,10 @@ export interface TrackedFlight {
   altitudeMeters: number;
   trueTrack: number;
   velocity: number;
+  originCountry: string;
+  verticalRate: number | null;
+  onGround: boolean;
+  squawk: string | null;
 }
 
 export interface MilitaryFlight {

@@ -77,5 +77,9 @@ export async function fetchOpenSkyFlights(endpoint: string): Promise<TrackedFlig
       altitudeMeters: state.geoAltitude ?? state.baroAltitude ?? 0,
       trueTrack: state.trueTrack ?? 0,
       velocity: state.velocity ?? 0,
+      originCountry: state.originCountry,
+      verticalRate: state.verticalRate,
+      onGround: state.onGround,
+      squawk: state.squawk,
     }));
 }
