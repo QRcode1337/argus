@@ -16,6 +16,7 @@ export interface IntelAlert {
   detail: string;
   timestamp: number;
   coordinates?: { lat: number; lon: number };
+  entityId?: string;
 }
 
 export interface IntelBriefing {
@@ -114,6 +115,7 @@ export function analyzeFlights(flights: TrackedFlight[]): IntelAlert[] {
         detail: `${flight.callsign} broadcasting emergency squawk ${flight.squawk} (${EMERGENCY_SQUAWKS[flight.squawk]}) at FL${Math.round(flight.altitudeMeters / 30.48).toString().padStart(3, "0")} over ${flight.originCountry}`,
         timestamp: now,
         coordinates: coords,
+        entityId: `flight-${flight.id}`,
       });
     }
 
@@ -127,6 +129,7 @@ export function analyzeFlights(flights: TrackedFlight[]): IntelAlert[] {
         detail: `${flight.callsign} at ${Math.round(flight.velocity)} m/s (${Math.round(flight.velocity * 1.944)} kt) \u2014 exceeds commercial threshold. Alt: ${Math.round(flight.altitudeMeters)}m`,
         timestamp: now,
         coordinates: coords,
+        entityId: `flight-${flight.id}`,
       });
     }
 
@@ -140,6 +143,7 @@ export function analyzeFlights(flights: TrackedFlight[]): IntelAlert[] {
         detail: `ICAO ${flight.id} transmitting without valid callsign at ${Math.round(flight.altitudeMeters)}m, track ${Math.round(flight.trueTrack)}\u00B0`,
         timestamp: now,
         coordinates: coords,
+        entityId: `flight-${flight.id}`,
       });
     }
 
@@ -157,6 +161,7 @@ export function analyzeFlights(flights: TrackedFlight[]): IntelAlert[] {
         detail: `${flight.callsign} ${direction.toLowerCase()}ing at ${Math.round(Math.abs(flight.verticalRate))} m/s (${Math.round(Math.abs(flight.verticalRate) * 196.85)} fpm) \u2014 Alt: ${Math.round(flight.altitudeMeters)}m`,
         timestamp: now,
         coordinates: coords,
+        entityId: `flight-${flight.id}`,
       });
     }
 
@@ -251,6 +256,7 @@ export function analyzeMilitary(flights: MilitaryFlight[]): IntelAlert[] {
         detail: `${flight.callsign} (hex: ${flight.id}) \u2014 no ICAO type designator. Alt: ${Math.round(flight.altitudeMeters)}m, Spd: ${Math.round(flight.velocity)} m/s`,
         timestamp: now,
         coordinates: coords,
+        entityId: `mil-${flight.id}`,
       });
     }
 
@@ -271,6 +277,7 @@ export function analyzeMilitary(flights: MilitaryFlight[]): IntelAlert[] {
           detail: `${flight.callsign} operating ${Math.round(distance)}km from ${airport.name}. Alt: ${Math.round(flight.altitudeMeters)}m`,
           timestamp: now,
           coordinates: coords,
+          entityId: `mil-${flight.id}`,
         });
         break; // One alert per aircraft is sufficient
       }
