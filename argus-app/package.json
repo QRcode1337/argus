@@ -10,6 +10,7 @@
     "setup-cesium": "node scripts/copy-cesium-assets.mjs"
   },
   "dependencies": {
+    "@vercel/analytics": "^1.6.1",
     "cesium": "^1.138.0",
     "next": "16.1.6",
     "react": "19.2.3",
