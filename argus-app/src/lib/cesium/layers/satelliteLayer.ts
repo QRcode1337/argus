@@ -48,7 +48,7 @@ export class SatelliteLayer {
         const prev = filtered[filtered.length - 1];
         const dLon = pt[0] - prev[0];
         const dLat = pt[1] - prev[1];
-        if (Math.abs(dLon) > 0.01 || Math.abs(dLat) > 0.01) {
+        if (Math.abs(dLon) > 0.05 || Math.abs(dLat) > 0.05) {
           filtered.push(pt);
         }
       }
