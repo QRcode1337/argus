@@ -40,7 +40,21 @@ export class SatelliteLayer {
 
       const position = Cartesian3.fromDegrees(sat.longitude, sat.latitude, sat.altitudeKm * 1000);
       const orbit = computeOrbitTrack(record, at, orbitSamples, orbitStepMinutes);
-      const orbitPositions = Cartesian3.fromDegreesArrayHeights(orbit.flat());
+
+      // Filter out near-duplicate points that cause Cesium polyline geometry errors
+      const filtered: [number, number, number][] = [];
+      for (const pt of orbit) {
+        if (filtered.length === 0) { filtered.push(pt); continue; }
+        const prev = filtered[filtered.length - 1];
+        const dLon = pt[0] - prev[0];
+        const dLat = pt[1] - prev[1];
+        if (Math.abs(dLon) > 0.01 || Math.abs(dLat) > 0.01) {
+          filtered.push(pt);
+        }
+      }
+      if (filtered.length < 2) continue;
+
+      const orbitPositions = Cartesian3.fromDegreesArrayHeights(filtered.flat());
 
       const existing = this.entities.get(sat.id);
       if (existing) {
