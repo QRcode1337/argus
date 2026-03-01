@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "scripts": {
+    "install": "cd argus-app && npm install",
+    "build": "cd argus-app && npm run setup-cesium && npm run build"
+  }
+}
