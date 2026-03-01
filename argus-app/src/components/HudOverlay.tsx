@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CAMERA_PRESETS } from "@/lib/config";
 import type { IntelBriefing, AlertSeverity, IntelAlert, ThreatLevel } from "@/lib/intel/analysisEngine";
 import { useArgusStore } from "@/store/useArgusStore";
@@ -205,6 +205,16 @@ export function HudOverlay({
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [alertFilter, setAlertFilter] = useState<AlertSeverity | null>(null);
   const [enlargedStream, setEnlargedStream] = useState<{ src: string; title: string } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"intel" | "feeds" | "controls" | "status" | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   const analyticsLayerDefs: {
     key: "gfs_weather" | "sentinel_imagery";
@@ -302,21 +312,21 @@ export function HudOverlay({
   return (
     <div className="pointer-events-none absolute inset-0 z-20 text-[12px] text-[#99ffca]">
       {/* ARGUS header */}
-      <header className="absolute left-6 top-4 font-mono">
-        <h1 className="text-[50px] font-semibold leading-none tracking-[0.34em] text-[#e8fcff]">
+      <header className="absolute left-3 top-2 font-mono md:left-6 md:top-4">
+        <h1 className="text-[24px] font-semibold leading-none tracking-[0.34em] text-[#e8fcff] md:text-[50px]">
           ARG<span className="text-[#2ad4ff]">US</span>
         </h1>
-        <p className="mt-1 text-[10px] uppercase tracking-[0.45em] text-[#4e9ca8]">Epsilon LLC</p>
+        <p className="mt-1 hidden text-[10px] uppercase tracking-[0.45em] text-[#4e9ca8] md:block">Epsilon LLC</p>
       </header>
 
-      {/* Active style display (top-right) */}
-      <div className="absolute right-8 top-7 text-right font-mono uppercase tracking-[0.28em] text-[#4e9ca8]">
+      {/* Active style display (top-right) — desktop only */}
+      <div className="absolute right-8 top-7 hidden text-right font-mono uppercase tracking-[0.28em] text-[#4e9ca8] md:block">
         <div className="text-[10px] text-[#6b8d97]">Active Style</div>
         <div className="text-[26px] text-[#2ad4ff]">{modeLabel}</div>
       </div>
 
-      {/* Selected intel panel (right side) */}
-      {selectedIntel ? (
+      {/* Selected intel panel (right side) — desktop only */}
+      {selectedIntel && !isMobile ? (
         <section className="pointer-events-auto absolute right-8 top-[5.5rem] w-[348px] rounded-2xl border border-[#113446] bg-[#050b17d9] p-4 shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
           <div className="flex items-center justify-between">
             <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#e3ad50]">Target Intel</div>
@@ -443,13 +453,13 @@ export function HudOverlay({
         </section>
       ) : null}
 
-      {/* Decorative side text */}
-      <div className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 font-mono text-[10px] uppercase tracking-[0.45em] text-[#2f5467]">
+      {/* Decorative side text — desktop only */}
+      <div className="absolute right-3 top-1/2 hidden -translate-y-1/2 rotate-90 font-mono text-[10px] uppercase tracking-[0.45em] text-[#2f5467] md:block">
         BAND-PAN BITS: 11 LVL: 1A
       </div>
 
-      {/* LEFT SIDEBAR - Collapsible Accordion Panels */}
-      {sidebarVisible ? (
+      {/* LEFT SIDEBAR - Collapsible Accordion Panels — desktop only */}
+      {sidebarVisible && !isMobile ? (
         <nav className="pointer-events-auto absolute left-4 top-24 w-[260px] rounded-2xl border border-[#113446] bg-[#050b17d9] shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
           {/* Sidebar header with hide button */}
           <div className="flex items-center justify-between border-b border-[#113446] px-3 py-2">
@@ -895,14 +905,14 @@ export function HudOverlay({
         <button
           type="button"
           onClick={() => setSidebarVisible(true)}
-          className="pointer-events-auto absolute left-4 top-24 rounded-lg border border-[#113446] bg-[#050b17d9] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#6c8ea2] shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md transition hover:border-[#2ad4ff] hover:text-[#9ceaff]"
+          className="pointer-events-auto absolute left-4 top-24 hidden rounded-lg border border-[#113446] bg-[#050b17d9] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#6c8ea2] shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md transition hover:border-[#2ad4ff] hover:text-[#9ceaff] md:block"
         >
           Panels
         </button>
       )}
 
-      {/* Bottom control bar */}
-      <section className="pointer-events-auto absolute bottom-4 left-1/2 w-[min(95vw,760px)] -translate-x-1/2 rounded-2xl border border-[#113446] bg-[#050b17d9] p-3 shadow-[0_0_30px_rgba(10,171,255,0.18)] backdrop-blur-md">
+      {/* Bottom control bar — desktop only */}
+      <section className="pointer-events-auto absolute bottom-4 left-1/2 hidden w-[min(95vw,760px)] -translate-x-1/2 rounded-2xl border border-[#113446] bg-[#050b17d9] p-3 shadow-[0_0_30px_rgba(10,171,255,0.18)] backdrop-blur-md md:block">
         <div className="grid gap-2 md:grid-cols-3">
           <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
             Location
@@ -976,8 +986,8 @@ export function HudOverlay({
         </div>
       </section>
 
-      {/* Camera controls - floating right side */}
-      <div className="pointer-events-auto absolute right-4 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
+      {/* Camera controls - floating right side — desktop only */}
+      <div className="pointer-events-auto absolute right-4 top-1/2 hidden -translate-y-1/2 flex-col items-center gap-1 md:flex">
         <button type="button" onClick={onZoomIn} className={camBtnClass} title="Zoom In">+</button>
         <button type="button" onClick={onZoomOut} className={camBtnClass} title="Zoom Out">&minus;</button>
         <div className="my-1 h-px w-6 bg-[#1a3a4f]" />
@@ -988,6 +998,294 @@ export function HudOverlay({
         </div>
         <button type="button" onClick={onTiltDown} className={camBtnClass} title="Tilt Down">&darr;</button>
       </div>
+
+      {/* ═══ MOBILE TAB BAR + SHEETS ═══ */}
+      {isMobile && (
+        <>
+          {/* Slide-up sheet */}
+          {mobileTab && (
+            <div className="pointer-events-auto fixed inset-x-0 bottom-[52px] z-50 max-h-[60vh] overflow-y-auto rounded-t-2xl border-t border-[#113446] bg-[#050b17f0] backdrop-blur-xl">
+              {/* Drag handle */}
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#113446] bg-[#050b17f0] px-4 py-2 backdrop-blur-xl">
+                <span className="font-mono text-[10px] uppercase tracking-[0.33em] text-[#e3ad50]">
+                  {mobileTab === "intel" ? "Intel Brief" : mobileTab === "feeds" ? "Live Feeds" : mobileTab === "controls" ? "Controls" : "Status"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMobileTab(null)}
+                  className="rounded border border-[#284f63] bg-[#081322] px-2 py-0.5 font-mono text-[9px] text-[#7298a8]"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="p-3">
+                {/* INTEL TAB */}
+                {mobileTab === "intel" && (
+                  <div className="space-y-2">
+                    {intelBriefing ? (
+                      <>
+                        <div className={`rounded-lg border px-2.5 py-2 font-mono ${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] uppercase tracking-[0.28em] text-[#6c8ea2]">Threat Level</span>
+                            <span className={`text-[14px] font-bold ${threatLevelColors[intelBriefing.threatLevel].text}`}>{intelBriefing.threatLevel}</span>
+                          </div>
+                          <div className="mt-1 text-[9px] text-[#7fb4c5]">{intelBriefing.summary}</div>
+                        </div>
+                        <div className="space-y-1">
+                          {(() => {
+                            const alerts = intelBriefing.alerts;
+                            const filtered = alertFilter ? alerts.filter((a) => a.severity === alertFilter) : alerts;
+                            return filtered.map((alert: IntelAlert) => (
+                              <button
+                                key={alert.id}
+                                type="button"
+                                onClick={() => {
+                                  if (alert.entityId) onFlyToEntityById(alert.entityId);
+                                  else if (alert.coordinates) onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
+                                  setMobileTab(null);
+                                }}
+                                className="w-full rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 text-left"
+                              >
+                                <div className="flex items-start gap-1.5">
+                                  <span className={`mt-px text-[10px] ${severityColors[alert.severity]}`}>{severityIcons[alert.severity]}</span>
+                                  <div className="min-w-0 flex-1">
+                                    <div className={`font-mono text-[10px] font-bold uppercase tracking-[0.1em] ${severityColors[alert.severity]}`}>{alert.title}</div>
+                                    <div className="mt-0.5 font-mono text-[9px] text-[#6c8ea2]">{alert.detail}</div>
+                                  </div>
+                                </div>
+                              </button>
+                            ));
+                          })()}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2.5 py-2 font-mono text-[10px] text-[#4e9ca8]">
+                        Awaiting first intelligence cycle...
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* FEEDS TAB */}
+                {mobileTab === "feeds" && (() => {
+                  const filtered = cameras.filter((cam) => cctvCategoryFilter === "All" || cam.category === cctvCategoryFilter);
+                  const featured = filtered.filter((cam) => cam.streamUrl);
+                  const cctvList = filtered.filter((cam) => !cam.streamUrl);
+                  return (
+                    <div className="space-y-3">
+                      {/* Category filter chips */}
+                      <div className="flex flex-wrap gap-1">
+                        {(["All", "Traffic", "Nature", "Landmark", "Wildlife", "Scenic", "Infrastructure"] as const).map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setCctvCategoryFilter(cat)}
+                            className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] transition ${
+                              cctvCategoryFilter === cat
+                                ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
+                                : "border-[#284f63] bg-[#081322] text-[#7298a8]"
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Featured streams */}
+                      {featured.length > 0 && (
+                        <div>
+                          <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.28em] text-[#6c8ea2]">Featured Feeds ({featured.length})</div>
+                          <div className="space-y-1">
+                            {featured.map((cam) => (
+                              <button
+                                key={cam.id}
+                                type="button"
+                                onClick={() => {
+                                  if (!layers.cctv) setLayer("cctv", true);
+                                  onFlyToEntityById(`cctv-${cam.id}`);
+                                  setEnlargedStream({ src: cam.streamUrl!, title: cam.name });
+                                  setMobileTab(null);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg border border-[#123244] bg-[#040b17] p-1.5 text-left"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate font-mono text-[9px] text-[#d5f7ff]">{cam.name}</div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-mono text-[7px] text-[#4e9ca8]">{cam.category}</span>
+                                    <span className="inline-block h-1 w-1 animate-pulse rounded-full bg-red-500" />
+                                    <span className="font-mono text-[7px] text-red-400">LIVE</span>
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* CCTV list */}
+                      {cctvList.length > 0 && (
+                        <div>
+                          <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.28em] text-[#6c8ea2]">CCTV Mesh ({cctvList.length})</div>
+                          <div className="max-h-[200px] overflow-y-auto">
+                            {cctvList.map((cam) => (
+                              <button
+                                key={cam.id}
+                                type="button"
+                                onClick={() => {
+                                  if (!layers.cctv) setLayer("cctv", true);
+                                  onFlyToEntityById(`cctv-${cam.id}`);
+                                  setMobileTab(null);
+                                }}
+                                className="flex w-full items-center gap-1.5 border-b border-[#0d1f2d] px-1 py-[3px] text-left"
+                              >
+                                <span className="h-1 w-1 shrink-0 rounded-full bg-[#4e9ca8]" />
+                                <span className="min-w-0 flex-1 truncate font-mono text-[8px] text-[#8eb8c8]">{cam.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* CONTROLS TAB */}
+                {mobileTab === "controls" && (
+                  <div className="space-y-3">
+                    {/* Location select */}
+                    <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+                      Location
+                      <select
+                        className={`${controlInputClass} mt-1`}
+                        value={activePoiId ?? ""}
+                        onChange={(event) => {
+                          const nextPoi = event.target.value || null;
+                          setActivePoiId(nextPoi);
+                          if (nextPoi) { onFlyToPoi(nextPoi); setMobileTab(null); }
+                        }}
+                      >
+                        <option value="">Select location</option>
+                        {CAMERA_PRESETS.map((poi) => (
+                          <option key={poi.id} value={poi.id}>{poi.label}</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    {/* Camera mode */}
+                    <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+                      Camera Mode
+                      <select
+                        className={`${controlInputClass} mt-1`}
+                        value={visualMode}
+                        onChange={(event) => setVisualMode(event.target.value as VisualMode)}
+                      >
+                        {modeDefs.map((mode) => (
+                          <option key={mode.key} value={mode.key}>{mode.label}</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    {/* Action buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => { onResetCamera(); setMobileTab(null); }} className={actionButtonClass}>Reset View</button>
+                      <button type="button" onClick={onToggleCollision} className={actionButtonClass}>
+                        Terrain: {collisionEnabled ? "On" : "Off"}
+                      </button>
+                    </div>
+
+                    {/* D-pad controls */}
+                    <div className="flex flex-col items-center gap-1 pt-1">
+                      <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.28em] text-[#6c8ea2]">Camera Controls</div>
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={onZoomIn} className={camBtnClass}>+</button>
+                        <button type="button" onClick={onZoomOut} className={camBtnClass}>&minus;</button>
+                      </div>
+                      <button type="button" onClick={onTiltUp} className={camBtnClass}>&uarr;</button>
+                      <div className="flex gap-1">
+                        <button type="button" onClick={onRotateLeft} className={camBtnClass}>&larr;</button>
+                        <button type="button" onClick={onRotateRight} className={camBtnClass}>&rarr;</button>
+                      </div>
+                      <button type="button" onClick={onTiltDown} className={camBtnClass}>&darr;</button>
+                    </div>
+
+                    {/* Layer toggles */}
+                    <div className="space-y-1">
+                      <div className="font-mono text-[8px] uppercase tracking-[0.28em] text-[#6c8ea2]">Layers</div>
+                      {layerDefs.map((layer) => (
+                        <button
+                          key={layer.key}
+                          type="button"
+                          onClick={() => toggleLayer(layer.key)}
+                          className="flex w-full items-center justify-between rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 text-left"
+                        >
+                          <span className="font-mono text-[10px] text-[#d5f7ff]">{layer.label}</span>
+                          <span className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase ${
+                            layers[layer.key]
+                              ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
+                              : "border-[#415f70] bg-[#071321] text-[#668092]"
+                          }`}>
+                            {layers[layer.key] ? "On" : "Off"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* STATUS TAB */}
+                {mobileTab === "status" && (
+                  <div className="space-y-2">
+                    <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
+                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Feed Health</div>
+                      <div>OpenSky: {feedHealth.opensky.status} @ {fmtDate(feedHealth.opensky.lastSuccessAt)}</div>
+                      <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
+                      <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
+                      <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
+                      <div>TFL: {feedHealth.tfl.status} @ {fmtDate(feedHealth.tfl.lastSuccessAt)}</div>
+                    </div>
+                    <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
+                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Camera</div>
+                      <div>ALT {camera.altMeters.toFixed(0)}m</div>
+                      <div>{camera.lat.toFixed(4)}N {camera.lon.toFixed(4)}E</div>
+                    </div>
+                    <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
+                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Counts</div>
+                      <div>Flights: {counts.flights} · Military: {counts.military}</div>
+                      <div>Satellites: {counts.satellites} · Quakes: {counts.seismic}</div>
+                      <div>Cameras: {counts.cctv}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tab bar */}
+          <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-50 flex border-t border-[#113446] bg-[#050b17f0] backdrop-blur-xl">
+            {([
+              { id: "intel" as const, label: "Intel", icon: "\u25C6" },
+              { id: "feeds" as const, label: "Feeds", icon: "\u25CE" },
+              { id: "controls" as const, label: "Controls", icon: "\u2699" },
+              { id: "status" as const, label: "Status", icon: "\u2588" },
+            ]).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setMobileTab(mobileTab === tab.id ? null : tab.id)}
+                className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 font-mono text-[9px] uppercase tracking-[0.14em] transition ${
+                  mobileTab === tab.id
+                    ? "text-[#2ad4ff]"
+                    : "text-[#4e6a7a]"
+                }`}
+              >
+                <span className="text-[14px]">{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Enlarged video overlay */}
       {enlargedStream && (
