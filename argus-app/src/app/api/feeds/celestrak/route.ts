@@ -1,30 +1,61 @@
-export const runtime = "edge";
+import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+let cachedBody: string | null = null;
+let cachedAt = 0;
+const CACHE_TTL_MS = 5 * 60_000;
 
 export async function GET() {
+  const now = Date.now();
+  if (cachedBody && now - cachedAt < CACHE_TTL_MS) {
+    return new NextResponse(cachedBody, {
+      status: 200,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    });
+  }
+
   const upstream =
-    "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=json";
+    process.env.CELESTRAK_ENDPOINT ??
+    "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=json";
 
   try {
-    const response = await fetch(upstream, { cache: "no-store" });
+    const response = await fetch(upstream, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
+    });
 
-    if (!response.ok || !response.body) {
-      return new Response(
-        JSON.stringify({ error: `CelesTrak HTTP ${response.status}` }),
-        { status: response.status, headers: { "Content-Type": "application/json" } },
+    if (!response.ok) {
+      if (cachedBody) {
+        return new NextResponse(cachedBody, {
+          status: 200,
+          headers: { "Content-Type": "application/json; charset=utf-8" },
+        });
+      }
+      return NextResponse.json(
+        { error: `CelesTrak HTTP ${response.status}` },
+        { status: response.status },
       );
     }
 
-    return new Response(response.body, {
+    const body = await response.text();
+    cachedBody = body;
+    cachedAt = now;
+
+    return new NextResponse(body, {
       status: 200,
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
-      },
+      headers: { "Content-Type": "application/json; charset=utf-8" },
     });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "CelesTrak proxy failed" }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
+    if (cachedBody) {
+      return new NextResponse(cachedBody, {
+        status: 200,
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+      });
+    }
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "CelesTrak proxy failed" },
+      { status: 502 },
     );
   }
 }

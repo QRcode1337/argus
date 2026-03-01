@@ -11,8 +11,8 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ARGUS",
-  description: "Real-time geospatial intelligence dashboard",
+  title: "ARGUS | Epsilon LLC",
+  description: "Real-time geospatial intelligence dashboard — Epsilon LLC",
 };
 
 export default function RootLayout({
