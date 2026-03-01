@@ -350,6 +350,46 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     setCollisionEnabled((current) => !current);
   }, []);
 
+  const zoomIn = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    const height = viewer.camera.positionCartographic.height;
+    const target = Math.max(height * 0.5, 15);
+    viewer.camera.zoomIn(height - target);
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    const height = viewer.camera.positionCartographic.height;
+    const target = Math.min(height * 2, 60_000_000);
+    viewer.camera.zoomOut(target - height);
+  }, []);
+
+  const tiltUp = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.camera.lookUp(CesiumMath.toRadians(10));
+  }, []);
+
+  const tiltDown = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.camera.lookDown(CesiumMath.toRadians(10));
+  }, []);
+
+  const rotateLeft = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.camera.rotateLeft(CesiumMath.toRadians(15));
+  }, []);
+
+  const rotateRight = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.camera.rotateRight(CesiumMath.toRadians(15));
+  }, []);
+
   const flyToSelectedEntity = useCallback(() => {
     const viewer = viewerRef.current;
     if (!viewer || !selectedIntel) return;
@@ -972,6 +1012,12 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         intelBriefing={intelBriefing}
         onFlyToCoordinates={flyToCoordinates}
         onFlyToEntityById={flyToEntityById}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onTiltUp={tiltUp}
+        onTiltDown={tiltDown}
+        onRotateLeft={rotateLeft}
+        onRotateRight={rotateRight}
       />
     </div>
   );

@@ -74,6 +74,7 @@ services:
       retries: 5
     networks:
       - argus_network
+    restart: unless-stopped
 
   titiler:
     image: ghcr.io/developmentseed/titiler:latest

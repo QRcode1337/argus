@@ -23,6 +23,12 @@ type HudOverlayProps = {
   intelBriefing: IntelBriefing | null;
   onFlyToCoordinates: (lat: number, lon: number) => void;
   onFlyToEntityById: (entityId: string) => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onTiltUp: () => void;
+  onTiltDown: () => void;
+  onRotateLeft: () => void;
+  onRotateRight: () => void;
 };
 
 type SliderDef = {
@@ -142,6 +148,9 @@ const controlInputClass =
 const actionButtonClass =
   "rounded-lg border border-[#284f63] bg-[#081322] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[#9ceaff] transition hover:border-[#2ad4ff]";
 
+const camBtnClass =
+  "flex h-8 w-8 items-center justify-center rounded-lg border border-[#1a3a4f] bg-[#050b17d9] font-mono text-[14px] text-[#9ceaff] shadow-[0_0_12px_rgba(10,145,223,0.15)] backdrop-blur-md transition hover:border-[#2ad4ff] hover:text-white active:bg-[#0a2a44]";
+
 export function HudOverlay({
   onFlyToPoi,
   onResetCamera,
@@ -158,6 +167,12 @@ export function HudOverlay({
   intelBriefing,
   onFlyToCoordinates,
   onFlyToEntityById,
+  onZoomIn,
+  onZoomOut,
+  onTiltUp,
+  onTiltDown,
+  onRotateLeft,
+  onRotateRight,
 }: HudOverlayProps) {
   const {
     layers,
@@ -530,7 +545,7 @@ export function HudOverlay({
                             Clear Filter ({filtered.length})
                           </button>
                         )}
-                        <div className="max-h-[360px] space-y-1 overflow-y-auto pr-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#284f63]">
+                        <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#284f63]">
                           {filtered.map((alert: IntelAlert) => (
                             <button
                               key={alert.id}
@@ -657,6 +672,9 @@ export function HudOverlay({
                       onClick={() => {
                         if (!layers.cctv) setLayer("cctv", true);
                         onFlyToEntityById(`cctv-${cam.id}`);
+                        if (cam.streamUrl) {
+                          setEnlargedStream({ src: cam.streamUrl, title: cam.name });
+                        }
                       }}
                       className="flex w-full items-center gap-2 rounded-lg border border-[#123244] bg-[#040b17] p-1.5 text-left transition hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
                     >
@@ -927,6 +945,19 @@ export function HudOverlay({
           </button>
         </div>
       </section>
+
+      {/* Camera controls - floating right side */}
+      <div className="pointer-events-auto absolute right-4 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
+        <button type="button" onClick={onZoomIn} className={camBtnClass} title="Zoom In">+</button>
+        <button type="button" onClick={onZoomOut} className={camBtnClass} title="Zoom Out">&minus;</button>
+        <div className="my-1 h-px w-6 bg-[#1a3a4f]" />
+        <button type="button" onClick={onTiltUp} className={camBtnClass} title="Tilt Up">&uarr;</button>
+        <div className="flex gap-1">
+          <button type="button" onClick={onRotateLeft} className={camBtnClass} title="Rotate Left">&larr;</button>
+          <button type="button" onClick={onRotateRight} className={camBtnClass} title="Rotate Right">&rarr;</button>
+        </div>
+        <button type="button" onClick={onTiltDown} className={camBtnClass} title="Tilt Down">&darr;</button>
+      </div>
 
       {/* Enlarged video overlay */}
       {enlargedStream && (
