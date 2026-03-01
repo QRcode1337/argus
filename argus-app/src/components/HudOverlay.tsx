@@ -658,59 +658,89 @@ export function HudOverlay({
             </CollapsibleSection>
           )}
 
-          {/* LIVE FEEDS section */}
-          {platformMode === "live" && cameras.length > 0 && (
-            <CollapsibleSection title="Live Feeds" badge={`${cameras.length}`}>
-              <div className="max-h-[260px] space-y-1.5 overflow-y-auto">
-                {cameras
-                  .filter((cam) => cctvCategoryFilter === "All" || cam.category === cctvCategoryFilter)
-                  .slice(0, 12)
-                  .map((cam) => (
-                    <button
-                      key={cam.id}
-                      type="button"
-                      onClick={() => {
-                        if (!layers.cctv) setLayer("cctv", true);
-                        onFlyToEntityById(`cctv-${cam.id}`);
-                        if (cam.streamUrl) {
-                          setEnlargedStream({ src: cam.streamUrl, title: cam.name });
-                        }
-                      }}
-                      className="flex w-full items-center gap-2 rounded-lg border border-[#123244] bg-[#040b17] p-1.5 text-left transition hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
-                    >
-                      <div className="h-10 w-14 shrink-0 overflow-hidden rounded border border-[#1a3040]">
-                        {cam.imageUrl && cam.imageUrl !== "/camera-placeholder.svg" ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={cam.imageUrl}
-                            alt={cam.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-[#071020] font-mono text-[9px] text-[#4e6a7a]">
-                            CAM
+          {/* FEATURED FEEDS — curated live streams with thumbnails */}
+          {platformMode === "live" && cameras.length > 0 && (() => {
+            const filtered = cameras.filter((cam) => cctvCategoryFilter === "All" || cam.category === cctvCategoryFilter);
+            const featured = filtered.filter((cam) => cam.streamUrl);
+            const cctv = filtered.filter((cam) => !cam.streamUrl);
+            return (
+              <>
+                {featured.length > 0 && (
+                  <CollapsibleSection title="Featured Feeds" badge={`${featured.length} live`}>
+                    <div className="max-h-[400px] space-y-1.5 overflow-y-auto">
+                      {featured.map((cam) => (
+                        <button
+                          key={cam.id}
+                          type="button"
+                          onClick={() => {
+                            if (!layers.cctv) setLayer("cctv", true);
+                            onFlyToEntityById(`cctv-${cam.id}`);
+                            setEnlargedStream({ src: cam.streamUrl!, title: cam.name });
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg border border-[#123244] bg-[#040b17] p-1.5 text-left transition hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
+                        >
+                          <div className="h-10 w-14 shrink-0 overflow-hidden rounded border border-[#1a3040]">
+                            {cam.imageUrl && cam.imageUrl !== "/camera-placeholder.svg" ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={cam.imageUrl}
+                                alt={cam.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center bg-[#071020] font-mono text-[9px] text-[#4e6a7a]">
+                                LIVE
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-mono text-[9px] text-[#d5f7ff]">
-                          {cam.name}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-[#4e9ca8]">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-mono text-[9px] text-[#d5f7ff]">
+                              {cam.name}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-[#4e9ca8]">
+                                {cam.category}
+                              </span>
+                              <span className="inline-block h-1 w-1 rounded-full bg-red-500 animate-pulse" />
+                              <span className="font-mono text-[7px] text-red-400">LIVE</span>
+                            </div>
+                          </div>
+                          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#99ffca]" />
+                        </button>
+                      ))}
+                    </div>
+                  </CollapsibleSection>
+                )}
+
+                {/* CCTV MESH — compact list of all TFL/bulk cameras */}
+                {cctv.length > 0 && (
+                  <CollapsibleSection title="CCTV Mesh" badge={`${cctv.length}`}>
+                    <div className="max-h-[300px] overflow-y-auto">
+                      {cctv.map((cam) => (
+                        <button
+                          key={cam.id}
+                          type="button"
+                          onClick={() => {
+                            if (!layers.cctv) setLayer("cctv", true);
+                            onFlyToEntityById(`cctv-${cam.id}`);
+                          }}
+                          className="flex w-full items-center gap-1.5 border-b border-[#0d1f2d] px-1 py-[3px] text-left transition hover:bg-[#0a1a2e]"
+                        >
+                          <span className="h-1 w-1 shrink-0 rounded-full bg-[#4e9ca8]" />
+                          <span className="min-w-0 flex-1 truncate font-mono text-[8px] text-[#8eb8c8]">
+                            {cam.name}
+                          </span>
+                          <span className="shrink-0 font-mono text-[7px] text-[#3a5a6a]">
                             {cam.category}
                           </span>
-                          <span className="font-mono text-[7px] text-[#4e6a7a]">
-                            {cam.provider}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#99ffca]" />
-                    </button>
-                  ))}
-              </div>
-            </CollapsibleSection>
-          )}
+                        </button>
+                      ))}
+                    </div>
+                  </CollapsibleSection>
+                )}
+              </>
+            );
+          })()}
 
           {/* INTEL FEEDS section */}
           <CollapsibleSection

@@ -121,6 +121,16 @@ const INTEL_CAMERAS: CctvCamera[] = [
     category: "Scenic",
     provider: "Hardcoded",
   },
+  {
+    id: "intel-israel-skyline-live",
+    name: "Tel Aviv & Jerusalem Skyline — Live",
+    longitude: 34.7818,
+    latitude: 32.0853,
+    imageUrl: "https://img.youtube.com/vi/qUDZ-lve5_k/hqdefault.jpg",
+    streamUrl: "https://www.youtube.com/embed/qUDZ-lve5_k?autoplay=1&mute=1",
+    category: "Landmark",
+    provider: "Hardcoded",
+  },
 
   // ── Nature / Wildlife Live Cams ────────────────────────────────────
   {
