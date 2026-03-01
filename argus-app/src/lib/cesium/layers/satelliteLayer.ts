@@ -6,7 +6,6 @@ import {
   Entity,
   LabelStyle,
   NearFarScalar,
-  PolylineGlowMaterialProperty,
   type Viewer,
 } from "cesium";
 
@@ -79,10 +78,7 @@ export class SatelliteLayer {
         polyline: {
           positions: new ConstantProperty(orbitPositions),
           width: 1,
-          material: new PolylineGlowMaterialProperty({
-            glowPower: 0.1,
-            color: Color.LIME.withAlpha(0.5),
-          }),
+          material: Color.LIME.withAlpha(0.4),
         },
         properties: {
           kind: "satellite",
