@@ -5,6 +5,7 @@ import { CAMERA_PRESETS } from "@/lib/config";
 import type { IntelBriefing, AlertSeverity, IntelAlert, ThreatLevel } from "@/lib/intel/analysisEngine";
 import { useArgusStore } from "@/store/useArgusStore";
 import type { LayerKey, SelectedIntel, VisualMode } from "@/types/intel";
+import { VideoOverlay } from "./VideoOverlay";
 
 type HudOverlayProps = {
   onFlyToPoi: (poiId: string) => void;
@@ -203,7 +204,7 @@ export function HudOverlay({
 
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [alertFilter, setAlertFilter] = useState<AlertSeverity | null>(null);
-  const [expandedStream, setExpandedStream] = useState<{ url: string; name: string } | null>(null);
+  const [enlargedStream, setEnlargedStream] = useState<{ src: string; title: string } | null>(null);
 
   const analyticsLayerDefs: {
     key: "gfs_weather" | "sentinel_imagery";
@@ -300,12 +301,12 @@ export function HudOverlay({
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 text-[12px] text-[#99ffca]">
-      {/* WORLDVIEW header */}
+      {/* ARGUS header */}
       <header className="absolute left-6 top-4 font-mono">
         <h1 className="text-[50px] font-semibold leading-none tracking-[0.34em] text-[#e8fcff]">
-          WORLD<span className="text-[#2ad4ff]">VIEW</span>
+          ARG<span className="text-[#2ad4ff]">US</span>
         </h1>
-        <p className="mt-1 text-[10px] uppercase tracking-[0.45em] text-[#4e9ca8]">No Place Left Behind</p>
+        <p className="mt-1 text-[10px] uppercase tracking-[0.45em] text-[#4e9ca8]">Epsilon LLC</p>
       </header>
 
       {/* Active style display (top-right) */}
@@ -354,22 +355,31 @@ export function HudOverlay({
           ) : null}
 
           {selectedIntel.streamUrl ? (
-            <div className="mt-2">
+            <div className="relative mt-2">
               <iframe
                 src={selectedIntel.streamUrl}
                 title={selectedIntel.name}
                 className="h-44 w-full rounded border border-[#284f63]"
                 allow="autoplay; encrypted-media"
                 allowFullScreen
-                sandbox="allow-scripts allow-same-origin allow-popups"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
               />
               <button
                 type="button"
-                onClick={() => setExpandedStream({ url: selectedIntel.streamUrl!, name: selectedIntel.name })}
-                className="mt-1 w-full rounded border border-[#284f63] bg-[#081322] py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#9ceaff] transition hover:border-[#2ad4ff]"
+                onClick={() =>
+                  setEnlargedStream({
+                    src: selectedIntel.streamUrl!,
+                    title: selectedIntel.name,
+                  })
+                }
+                className="absolute right-1.5 top-1.5 rounded border border-[#284f63] bg-[#081322]/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#2ad4ff] transition hover:border-[#2ad4ff] hover:bg-[#081322]"
               >
-                Expand Feed
+                Enlarge
               </button>
+              <div className="absolute left-1.5 top-1.5 flex items-center gap-1">
+                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                <span className="font-mono text-[8px] uppercase tracking-wider text-red-400/80">Live</span>
+              </div>
             </div>
           ) : selectedIntel.imageUrl ? (
             <>
@@ -518,7 +528,7 @@ export function HudOverlay({
                     ))}
                   </div>
 
-                  {/* Alerts list — clickable, filterable */}
+                  {/* Alerts list — clickable, filterable, scrollable */}
                   {(() => {
                     const filtered = alertFilter
                       ? intelBriefing.alerts.filter((a: IntelAlert) => a.severity === alertFilter)
@@ -532,10 +542,10 @@ export function HudOverlay({
                             onClick={() => setAlertFilter(null)}
                             className="mb-1 rounded border border-[#284f63] bg-[#081322] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.14em] text-[#7298a8] transition hover:border-[#2ad4ff]"
                           >
-                            Clear Filter
+                            Clear Filter ({filtered.length})
                           </button>
                         )}
-                        <div className="max-h-[400px] space-y-1 overflow-y-auto">
+                        <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#284f63]">
                           {filtered.map((alert: IntelAlert) => (
                             <button
                               key={alert.id}
@@ -547,7 +557,11 @@ export function HudOverlay({
                                   onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
                                 }
                               }}
-                              className="w-full rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 text-left transition cursor-pointer hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
+                              className={`w-full rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 text-left transition ${
+                                alert.coordinates || alert.entityId
+                                  ? "cursor-pointer hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
+                                  : "cursor-default"
+                              }`}
                             >
                               <div className="flex items-start gap-1.5">
                                 <span
@@ -659,7 +673,7 @@ export function HudOverlay({
                         if (!layers.cctv) setLayer("cctv", true);
                         onFlyToEntityById(`cctv-${cam.id}`);
                         if (cam.streamUrl) {
-                          setExpandedStream({ url: cam.streamUrl, name: cam.name });
+                          setEnlargedStream({ src: cam.streamUrl, title: cam.name });
                         }
                       }}
                       className="flex w-full items-center gap-2 rounded-lg border border-[#123244] bg-[#040b17] p-1.5 text-left transition hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
@@ -945,42 +959,13 @@ export function HudOverlay({
         <button type="button" onClick={onTiltDown} className={camBtnClass} title="Tilt Down">&darr;</button>
       </div>
 
-      {/* Expanded stream overlay */}
-      {expandedStream && (
-        <div
-          className="pointer-events-auto absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-          onClick={() => setExpandedStream(null)}
-          onKeyDown={(e) => e.key === "Escape" && setExpandedStream(null)}
-          role="button"
-          tabIndex={0}
-        >
-          <div
-            className="relative w-[85vw] max-w-[1200px] rounded-2xl border border-[#113446] bg-[#050b17] p-1 shadow-[0_0_60px_rgba(10,145,223,0.3)]"
-            onClick={(e) => e.stopPropagation()}
-            role="presentation"
-          >
-            <div className="flex items-center justify-between px-3 py-2">
-              <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#9ceaff]">
-                {expandedStream.name}
-              </span>
-              <button
-                type="button"
-                onClick={() => setExpandedStream(null)}
-                className="rounded border border-[#284f63] bg-[#081322] px-2 py-0.5 font-mono text-[10px] text-[#9ceaff] transition hover:border-[#2ad4ff]"
-              >
-                Close
-              </button>
-            </div>
-            <iframe
-              src={expandedStream.url}
-              title={expandedStream.name}
-              className="aspect-video w-full rounded-b-xl border-t border-[#113446]"
-              allow="autoplay; encrypted-media; fullscreen"
-              allowFullScreen
-              sandbox="allow-scripts allow-same-origin allow-popups"
-            />
-          </div>
-        </div>
+      {/* Enlarged video overlay */}
+      {enlargedStream && (
+        <VideoOverlay
+          src={enlargedStream.src}
+          title={enlargedStream.title}
+          onClose={() => setEnlargedStream(null)}
+        />
       )}
     </div>
   );

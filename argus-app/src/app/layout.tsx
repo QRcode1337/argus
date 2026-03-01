@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
 
 import "./globals.css";
 
@@ -21,7 +22,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${plexMono.variable} antialiased`}>{children}</body>
+      <body className={`${plexMono.variable} antialiased`}>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
