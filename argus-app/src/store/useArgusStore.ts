@@ -44,7 +44,7 @@ type ArgusStore = {
   toggleLayer: (layer: LayerKey) => void;
   setLayer: (layer: LayerKey, enabled: boolean) => void;
   setCount: (
-    key: "flights" | "military" | "satellites" | "seismic" | "cctv" | "bases" | "outages",
+    key: "flights" | "military" | "satellites" | "seismic" | "cctv" | "bases" | "outages" | "threats",
     value: number,
   ) => void;
   setFeedHealthy: (key: FeedKey) => void;
@@ -97,6 +97,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     cctv: true,
     bases: true,
     outages: true,
+    threats: true,
   },
   counts: {
     flights: 0,
@@ -106,6 +107,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     cctv: 0,
     bases: 0,
     outages: 0,
+    threats: 0,
   },
   feedHealth: {
     opensky: emptyFeed(),
@@ -114,6 +116,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     adsb: emptyFeed(),
     tfl: emptyFeed(),
     cfradar: emptyFeed(),
+    otx: emptyFeed(),
   },
   activePoiId: null,
   camera: {

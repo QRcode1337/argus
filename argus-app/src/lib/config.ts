@@ -7,6 +7,7 @@ export const ARGUS_CONFIG = {
     cctv: process.env.NEXT_PUBLIC_CCTV_ENDPOINT ?? "/api/feeds/tfl-cctv",
     webcams: process.env.NEXT_PUBLIC_WEBCAMS_ENDPOINT ?? "/api/feeds/webcams",
     cloudflareRadar: "/api/feeds/cloudflare-radar",
+    otx: "/api/feeds/otx",
   },
   pollMs: {
     openSky: 10_000,
@@ -16,6 +17,7 @@ export const ARGUS_CONFIG = {
     cctv: 60_000,
     webcams: 15 * 60_000,
     cloudflareRadar: 10 * 60_000,
+    otx: 10 * 60_000,
   },
   limits: {
     maxFlights: 7000,

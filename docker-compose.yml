@@ -30,6 +30,7 @@ services:
       - NEXT_PUBLIC_CESIUM_ION_TOKEN=${CESIUM_ION_TOKEN}
       - NEXT_PUBLIC_TITILER_URL=/tiles
       - CLOUDFLARE_RADAR_TOKEN=${CLOUDFLARE_RADAR_TOKEN}
+      - OTX_API_KEY=${OTX_API_KEY}
     depends_on:
       - argus-api
     networks:

@@ -31,6 +31,7 @@ import { MilitaryLayer } from "@/lib/cesium/layers/militaryLayer";
 import { RasterLayer } from "@/lib/cesium/layers/rasterLayer";
 import { BasesLayer } from "@/lib/cesium/layers/basesLayer";
 import { OutageLayer } from "@/lib/cesium/layers/outageLayer";
+import { ThreatLayer } from "@/lib/cesium/layers/threatLayer";
 import { SatelliteLayer } from "@/lib/cesium/layers/satelliteLayer";
 import { SeismicLayer } from "@/lib/cesium/layers/seismicLayer";
 import { VisualModeController } from "@/lib/cesium/shaders/visualModes";
@@ -41,6 +42,7 @@ import { fetchAircraftPhoto } from "@/lib/ingest/planespotters";
 import { PollingManager } from "@/lib/ingest/pollingManager";
 import { fetchTleRecords } from "@/lib/ingest/tle";
 import { fetchInternetOutages } from "@/lib/ingest/cloudflareRadar";
+import { fetchThreatPulses } from "@/lib/ingest/otx";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
 import {
   analyzeFlights,
@@ -129,6 +131,7 @@ const inferKindFromId = (id: string): string => {
   if (id.startsWith("cctv-")) return "cctv";
   if (id.startsWith("base-")) return "base";
   if (id.startsWith("outage-")) return "outage";
+  if (id.startsWith("threat-")) return "threat";
   return "unknown";
 };
 
@@ -138,7 +141,7 @@ const PRIORITY_THRESHOLDS = {
 } as const;
 
 const classifyImportance = (kind: string, props: Record<string, unknown>): IntelImportance => {
-  if (kind === "military") return "important";
+  if (kind === "military" || kind === "threat") return "important";
 
   const magnitude = toNumber(props.magnitude);
   if (
@@ -228,6 +231,15 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("Category", props.category);
       pushQuick("Provider", props.provider);
       break;
+    case "threat":
+      pushQuick("Adversary", props.adversary);
+      pushQuick("Malware", props.malware);
+      pushQuick("Industries", props.industries);
+      pushQuick("Target", props.targetedCountry);
+      pushQuick("IOCs", props.indicators);
+      pushQuick("TLP", props.tlp);
+      pushQuick("Tags", props.tags);
+      break;
     default:
       break;
   }
@@ -289,6 +301,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const cctvLayerRef = useRef<CctvLayer | null>(null);
   const basesLayerRef = useRef<BasesLayer | null>(null);
   const outageLayerRef = useRef<OutageLayer | null>(null);
+  const threatLayerRef = useRef<ThreatLayer | null>(null);
   const rasterLayerRef = useRef<RasterLayer | null>(null);
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
@@ -538,6 +551,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const cctvLayer = new CctvLayer(viewer);
     const basesLayer = new BasesLayer(viewer);
     const outageLayer = new OutageLayer(viewer);
+    const threatLayer = new ThreatLayer(viewer);
     const rasterLayer = new RasterLayer(viewer);
     const visualController = new VisualModeController(viewer);
     const picker = new ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -549,6 +563,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     cctvLayerRef.current = cctvLayer;
     basesLayerRef.current = basesLayer;
     outageLayerRef.current = outageLayer;
+    threatLayerRef.current = threatLayer;
     rasterLayerRef.current = rasterLayer;
 
     // Load static bases layer immediately
@@ -776,6 +791,22 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
+    poller.add({
+      id: "otx",
+      intervalMs: ARGUS_CONFIG.pollMs.otx,
+      run: async () => {
+        if (platformModeRef.current === "analytics") return;
+        try {
+          const threats = await fetchThreatPulses(ARGUS_CONFIG.endpoints.otx);
+          const count = threatLayer.update(threats);
+          setCount("threats", count);
+          setFeedHealthy("otx");
+        } catch (error) {
+          setFeedError("otx", error instanceof Error ? error.message : "Failed to fetch OTX");
+        }
+      },
+    });
+
     return () => {
       poller.stopAll();
       rasterLayer.unload();
@@ -800,6 +831,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       cctvLayerRef.current = null;
       basesLayerRef.current = null;
       outageLayerRef.current = null;
+      threatLayerRef.current = null;
       rasterLayerRef.current = null;
       visualModeRef.current = null;
       pickerRef.current = null;
@@ -953,6 +985,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       cctvLayerRef.current?.setVisible(false);
       basesLayerRef.current?.setVisible(false);
       outageLayerRef.current?.setVisible(false);
+      threatLayerRef.current?.setVisible(false);
     } else {
       const { layers } = useArgusStore.getState();
       flightLayerRef.current?.setVisible(layers.flights);
@@ -962,6 +995,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       cctvLayerRef.current?.setVisible(layers.cctv);
       basesLayerRef.current?.setVisible(layers.bases);
       outageLayerRef.current?.setVisible(layers.outages);
+      threatLayerRef.current?.setVisible(layers.threats);
     }
   }, [platformMode]);
 
@@ -1023,7 +1057,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     cctvLayerRef.current?.setVisible(layers.cctv);
     basesLayerRef.current?.setVisible(layers.bases);
     outageLayerRef.current?.setVisible(layers.outages);
-  }, [layers.bases, layers.cctv, layers.flights, layers.military, layers.outages, layers.satellites, layers.seismic]);
+    threatLayerRef.current?.setVisible(layers.threats);
+  }, [layers.bases, layers.cctv, layers.flights, layers.military, layers.outages, layers.satellites, layers.seismic, layers.threats]);
 
   // Globe ↔ Map scene mode toggle
   useEffect(() => {

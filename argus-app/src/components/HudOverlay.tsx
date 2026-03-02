@@ -45,6 +45,7 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "satellites", label: "Satellites", feed: "CelesTrak" },
   { key: "cctv", label: "CCTV Mesh", feed: "TFL + Windy" },
   { key: "outages", label: "Internet Outages", feed: "CF Radar" },
+  { key: "threats", label: "Cyber Threats", feed: "OTX" },
 ];
 
 const modeDefs: { key: VisualMode; label: string }[] = [
