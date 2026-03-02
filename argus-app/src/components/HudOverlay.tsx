@@ -40,6 +40,7 @@ type SliderDef = {
 const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "flights", label: "Live Flights", feed: "OpenSky" },
   { key: "military", label: "Military Flights", feed: "ADS-B" },
+  { key: "bases", label: "Military Bases", feed: "Static Intel" },
   { key: "seismic", label: "Earthquakes (24h)", feed: "USGS" },
   { key: "satellites", label: "Satellites", feed: "CelesTrak" },
   { key: "cctv", label: "CCTV Mesh", feed: "TFL + Windy" },
@@ -195,6 +196,10 @@ export function HudOverlay({
     toggleAnalyticsLayer,
     cctvCategoryFilter,
     setCctvCategoryFilter,
+    sceneMode,
+    setSceneMode,
+    dayNight,
+    toggleDayNight,
   } = useArgusStore();
 
   const cameras = useArgusStore((s) => s.cameras);
@@ -912,8 +917,8 @@ export function HudOverlay({
       )}
 
       {/* Bottom control bar — desktop only */}
-      <section className="pointer-events-auto absolute bottom-4 left-1/2 hidden w-[min(95vw,760px)] -translate-x-1/2 rounded-2xl border border-[#113446] bg-[#050b17d9] p-3 shadow-[0_0_30px_rgba(10,171,255,0.18)] backdrop-blur-md md:block">
-        <div className="grid gap-2 md:grid-cols-3">
+      <section className="pointer-events-auto absolute bottom-4 left-1/2 hidden w-[min(95vw,900px)] -translate-x-1/2 rounded-2xl border border-[#113446] bg-[#050b17d9] p-3 shadow-[0_0_30px_rgba(10,171,255,0.18)] backdrop-blur-md md:block">
+        <div className="grid gap-2 md:grid-cols-5">
           <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
             Location
             <select
@@ -960,6 +965,30 @@ export function HudOverlay({
                   {mode.label}
                 </option>
               ))}
+            </select>
+          </label>
+
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+            View
+            <select
+              className={`${controlInputClass} mt-1`}
+              value={sceneMode}
+              onChange={(event) => setSceneMode(event.target.value as "globe" | "map")}
+            >
+              <option value="globe">Globe</option>
+              <option value="map">Map</option>
+            </select>
+          </label>
+
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+            Lighting
+            <select
+              className={`${controlInputClass} mt-1`}
+              value={dayNight ? "on" : "off"}
+              onChange={() => toggleDayNight()}
+            >
+              <option value="off">Uniform</option>
+              <option value="on">Day / Night</option>
             </select>
           </label>
         </div>
@@ -1185,6 +1214,32 @@ export function HudOverlay({
                         ))}
                       </select>
                     </label>
+
+                    {/* View / Lighting */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+                        View
+                        <select
+                          className={`${controlInputClass} mt-1`}
+                          value={sceneMode}
+                          onChange={(event) => setSceneMode(event.target.value as "globe" | "map")}
+                        >
+                          <option value="globe">Globe</option>
+                          <option value="map">Map</option>
+                        </select>
+                      </label>
+                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+                        Lighting
+                        <select
+                          className={`${controlInputClass} mt-1`}
+                          value={dayNight ? "on" : "off"}
+                          onChange={() => toggleDayNight()}
+                        >
+                          <option value="off">Uniform</option>
+                          <option value="on">Day / Night</option>
+                        </select>
+                      </label>
+                    </div>
 
                     {/* Action buttons */}
                     <div className="flex flex-wrap gap-2">

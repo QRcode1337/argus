@@ -1,4 +1,5 @@
-export type LayerKey = "flights" | "military" | "satellites" | "seismic" | "cctv";
+export type LayerKey = "flights" | "military" | "satellites" | "seismic" | "cctv" | "bases";
+export type SceneMode = "globe" | "map";
 export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "tfl";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
 export type PlatformMode = "live" | "analytics";

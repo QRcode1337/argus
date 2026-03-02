@@ -16,6 +16,7 @@ import {
   JulianDate,
   Math as CesiumMath,
   PolylineGlowMaterialProperty,
+  SceneMode as CesiumSceneMode,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
   Viewer,
@@ -28,6 +29,7 @@ import { CctvLayer } from "@/lib/cesium/layers/cctvLayer";
 import { FlightLayer } from "@/lib/cesium/layers/flightLayer";
 import { MilitaryLayer } from "@/lib/cesium/layers/militaryLayer";
 import { RasterLayer } from "@/lib/cesium/layers/rasterLayer";
+import { BasesLayer } from "@/lib/cesium/layers/basesLayer";
 import { SatelliteLayer } from "@/lib/cesium/layers/satelliteLayer";
 import { SeismicLayer } from "@/lib/cesium/layers/seismicLayer";
 import { VisualModeController } from "@/lib/cesium/shaders/visualModes";
@@ -123,6 +125,7 @@ const inferKindFromId = (id: string): string => {
   if (id.startsWith("sat-")) return "satellite";
   if (id.startsWith("quake-")) return "earthquake";
   if (id.startsWith("cctv-")) return "cctv";
+  if (id.startsWith("base-")) return "base";
   return "unknown";
 };
 
@@ -281,6 +284,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const satLayerRef = useRef<SatelliteLayer | null>(null);
   const seismicLayerRef = useRef<SeismicLayer | null>(null);
   const cctvLayerRef = useRef<CctvLayer | null>(null);
+  const basesLayerRef = useRef<BasesLayer | null>(null);
   const rasterLayerRef = useRef<RasterLayer | null>(null);
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
@@ -317,6 +321,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const setTrackedEntityId = useArgusStore((s) => s.setTrackedEntityId);
   const setCameras = useArgusStore((s) => s.setCameras);
   const searchQuery = useArgusStore((s) => s.searchQuery);
+  const sceneMode = useArgusStore((s) => s.sceneMode);
+  const dayNight = useArgusStore((s) => s.dayNight);
   const setSearchResults = useArgusStore((s) => s.setSearchResults);
 
   const flyToPoi = useCallback((poiId: string) => {
@@ -526,6 +532,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const satLayer = new SatelliteLayer(viewer);
     const seismicLayer = new SeismicLayer(viewer);
     const cctvLayer = new CctvLayer(viewer);
+    const basesLayer = new BasesLayer(viewer);
     const rasterLayer = new RasterLayer(viewer);
     const visualController = new VisualModeController(viewer);
     const picker = new ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -535,7 +542,12 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     satLayerRef.current = satLayer;
     seismicLayerRef.current = seismicLayer;
     cctvLayerRef.current = cctvLayer;
+    basesLayerRef.current = basesLayer;
     rasterLayerRef.current = rasterLayer;
+
+    // Load static bases layer immediately
+    const basesCount = basesLayer.load();
+    setCount("bases", basesCount);
     visualModeRef.current = visualController;
     pickerRef.current = picker;
     viewerRef.current = viewer;
@@ -764,6 +776,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       satLayerRef.current = null;
       seismicLayerRef.current = null;
       cctvLayerRef.current = null;
+      basesLayerRef.current = null;
       rasterLayerRef.current = null;
       visualModeRef.current = null;
       pickerRef.current = null;
@@ -915,6 +928,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       satLayerRef.current?.setVisible(false);
       seismicLayerRef.current?.setVisible(false);
       cctvLayerRef.current?.setVisible(false);
+      basesLayerRef.current?.setVisible(false);
     } else {
       const { layers } = useArgusStore.getState();
       flightLayerRef.current?.setVisible(layers.flights);
@@ -922,6 +936,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       satLayerRef.current?.setVisible(layers.satellites);
       seismicLayerRef.current?.setVisible(layers.seismic);
       cctvLayerRef.current?.setVisible(layers.cctv);
+      basesLayerRef.current?.setVisible(layers.bases);
     }
   }, [platformMode]);
 
@@ -981,7 +996,24 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     satLayerRef.current?.setVisible(layers.satellites);
     seismicLayerRef.current?.setVisible(layers.seismic);
     cctvLayerRef.current?.setVisible(layers.cctv);
-  }, [layers.cctv, layers.flights, layers.military, layers.satellites, layers.seismic]);
+    basesLayerRef.current?.setVisible(layers.bases);
+  }, [layers.bases, layers.cctv, layers.flights, layers.military, layers.satellites, layers.seismic]);
+
+  // Globe ↔ Map scene mode toggle
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.scene.mode = sceneMode === "map"
+      ? CesiumSceneMode.SCENE2D
+      : CesiumSceneMode.SCENE3D;
+  }, [sceneMode]);
+
+  // Day/Night terminator toggle
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.scene.globe.enableLighting = dayNight;
+  }, [dayNight]);
 
   useEffect(() => {
     visualModeRef.current?.setMode(visualMode);

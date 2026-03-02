@@ -10,6 +10,7 @@ import type {
   FeedKey,
   LayerKey,
   PlatformMode,
+  SceneMode,
   VisualMode,
   VisualParams,
 } from "@/types/intel";
@@ -43,7 +44,7 @@ type ArgusStore = {
   toggleLayer: (layer: LayerKey) => void;
   setLayer: (layer: LayerKey, enabled: boolean) => void;
   setCount: (
-    key: "flights" | "military" | "satellites" | "seismic" | "cctv",
+    key: "flights" | "military" | "satellites" | "seismic" | "cctv" | "bases",
     value: number,
   ) => void;
   setFeedHealthy: (key: FeedKey) => void;
@@ -75,6 +76,10 @@ type ArgusStore = {
   setSearchQuery: (query: string) => void;
   searchResults: SearchResult[];
   setSearchResults: (results: SearchResult[]) => void;
+  sceneMode: SceneMode;
+  setSceneMode: (mode: SceneMode) => void;
+  dayNight: boolean;
+  toggleDayNight: () => void;
 };
 
 const emptyFeed = (): FeedHealth => ({
@@ -90,6 +95,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     satellites: false,
     seismic: false,
     cctv: true,
+    bases: true,
   },
   counts: {
     flights: 0,
@@ -97,6 +103,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     satellites: 0,
     seismic: 0,
     cctv: 0,
+    bases: 0,
   },
   feedHealth: {
     opensky: emptyFeed(),
@@ -216,4 +223,8 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setSearchQuery: (query) => set({ searchQuery: query }),
   searchResults: [],
   setSearchResults: (results) => set({ searchResults: results }),
+  sceneMode: "globe",
+  setSceneMode: (mode) => set({ sceneMode: mode }),
+  dayNight: false,
+  toggleDayNight: () => set((state) => ({ dayNight: !state.dayNight })),
 }));
