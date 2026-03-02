@@ -29,6 +29,7 @@ services:
       - NEXT_TELEMETRY_DISABLED=1
       - NEXT_PUBLIC_CESIUM_ION_TOKEN=${CESIUM_ION_TOKEN}
       - NEXT_PUBLIC_TITILER_URL=/tiles
+      - CLOUDFLARE_RADAR_TOKEN=${CLOUDFLARE_RADAR_TOKEN}
     depends_on:
       - argus-api
     networks:

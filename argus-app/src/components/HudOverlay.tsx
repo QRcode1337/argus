@@ -44,6 +44,7 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "seismic", label: "Earthquakes (24h)", feed: "USGS" },
   { key: "satellites", label: "Satellites", feed: "CelesTrak" },
   { key: "cctv", label: "CCTV Mesh", feed: "TFL + Windy" },
+  { key: "outages", label: "Internet Outages", feed: "CF Radar" },
 ];
 
 const modeDefs: { key: VisualMode; label: string }[] = [

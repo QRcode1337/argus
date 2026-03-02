@@ -6,6 +6,7 @@ export const ARGUS_CONFIG = {
     adsbMilitary: process.env.NEXT_PUBLIC_ADSB_ENDPOINT ?? "/api/feeds/adsb-military",
     cctv: process.env.NEXT_PUBLIC_CCTV_ENDPOINT ?? "/api/feeds/tfl-cctv",
     webcams: process.env.NEXT_PUBLIC_WEBCAMS_ENDPOINT ?? "/api/feeds/webcams",
+    cloudflareRadar: "/api/feeds/cloudflare-radar",
   },
   pollMs: {
     openSky: 10_000,
@@ -14,6 +15,7 @@ export const ARGUS_CONFIG = {
     usgs: 5 * 60_000,
     cctv: 60_000,
     webcams: 15 * 60_000,
+    cloudflareRadar: 10 * 60_000,
   },
   limits: {
     maxFlights: 7000,

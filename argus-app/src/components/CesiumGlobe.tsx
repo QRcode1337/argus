@@ -30,6 +30,7 @@ import { FlightLayer } from "@/lib/cesium/layers/flightLayer";
 import { MilitaryLayer } from "@/lib/cesium/layers/militaryLayer";
 import { RasterLayer } from "@/lib/cesium/layers/rasterLayer";
 import { BasesLayer } from "@/lib/cesium/layers/basesLayer";
+import { OutageLayer } from "@/lib/cesium/layers/outageLayer";
 import { SatelliteLayer } from "@/lib/cesium/layers/satelliteLayer";
 import { SeismicLayer } from "@/lib/cesium/layers/seismicLayer";
 import { VisualModeController } from "@/lib/cesium/shaders/visualModes";
@@ -39,6 +40,7 @@ import { fetchOpenSkyFlights } from "@/lib/ingest/opensky";
 import { fetchAircraftPhoto } from "@/lib/ingest/planespotters";
 import { PollingManager } from "@/lib/ingest/pollingManager";
 import { fetchTleRecords } from "@/lib/ingest/tle";
+import { fetchInternetOutages } from "@/lib/ingest/cloudflareRadar";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
 import {
   analyzeFlights,
@@ -126,6 +128,7 @@ const inferKindFromId = (id: string): string => {
   if (id.startsWith("quake-")) return "earthquake";
   if (id.startsWith("cctv-")) return "cctv";
   if (id.startsWith("base-")) return "base";
+  if (id.startsWith("outage-")) return "outage";
   return "unknown";
 };
 
@@ -285,6 +288,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const seismicLayerRef = useRef<SeismicLayer | null>(null);
   const cctvLayerRef = useRef<CctvLayer | null>(null);
   const basesLayerRef = useRef<BasesLayer | null>(null);
+  const outageLayerRef = useRef<OutageLayer | null>(null);
   const rasterLayerRef = useRef<RasterLayer | null>(null);
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
@@ -533,6 +537,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const seismicLayer = new SeismicLayer(viewer);
     const cctvLayer = new CctvLayer(viewer);
     const basesLayer = new BasesLayer(viewer);
+    const outageLayer = new OutageLayer(viewer);
     const rasterLayer = new RasterLayer(viewer);
     const visualController = new VisualModeController(viewer);
     const picker = new ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -543,6 +548,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     seismicLayerRef.current = seismicLayer;
     cctvLayerRef.current = cctvLayer;
     basesLayerRef.current = basesLayer;
+    outageLayerRef.current = outageLayer;
     rasterLayerRef.current = rasterLayer;
 
     // Load static bases layer immediately
@@ -754,6 +760,22 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
+    poller.add({
+      id: "cloudflare-radar",
+      intervalMs: ARGUS_CONFIG.pollMs.cloudflareRadar,
+      run: async () => {
+        if (platformModeRef.current === "analytics") return;
+        try {
+          const outages = await fetchInternetOutages(ARGUS_CONFIG.endpoints.cloudflareRadar);
+          const count = outageLayer.update(outages);
+          setCount("outages", count);
+          setFeedHealthy("cfradar");
+        } catch (error) {
+          setFeedError("cfradar", error instanceof Error ? error.message : "Failed to fetch CF Radar");
+        }
+      },
+    });
+
     return () => {
       poller.stopAll();
       rasterLayer.unload();
@@ -777,6 +799,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       seismicLayerRef.current = null;
       cctvLayerRef.current = null;
       basesLayerRef.current = null;
+      outageLayerRef.current = null;
       rasterLayerRef.current = null;
       visualModeRef.current = null;
       pickerRef.current = null;
@@ -929,6 +952,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       seismicLayerRef.current?.setVisible(false);
       cctvLayerRef.current?.setVisible(false);
       basesLayerRef.current?.setVisible(false);
+      outageLayerRef.current?.setVisible(false);
     } else {
       const { layers } = useArgusStore.getState();
       flightLayerRef.current?.setVisible(layers.flights);
@@ -937,6 +961,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       seismicLayerRef.current?.setVisible(layers.seismic);
       cctvLayerRef.current?.setVisible(layers.cctv);
       basesLayerRef.current?.setVisible(layers.bases);
+      outageLayerRef.current?.setVisible(layers.outages);
     }
   }, [platformMode]);
 
@@ -997,7 +1022,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     seismicLayerRef.current?.setVisible(layers.seismic);
     cctvLayerRef.current?.setVisible(layers.cctv);
     basesLayerRef.current?.setVisible(layers.bases);
-  }, [layers.bases, layers.cctv, layers.flights, layers.military, layers.satellites, layers.seismic]);
+    outageLayerRef.current?.setVisible(layers.outages);
+  }, [layers.bases, layers.cctv, layers.flights, layers.military, layers.outages, layers.satellites, layers.seismic]);
 
   // Globe ↔ Map scene mode toggle
   useEffect(() => {

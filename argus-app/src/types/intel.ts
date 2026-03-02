@@ -1,6 +1,6 @@
-export type LayerKey = "flights" | "military" | "satellites" | "seismic" | "cctv" | "bases";
+export type LayerKey = "flights" | "military" | "satellites" | "seismic" | "cctv" | "bases" | "outages";
 export type SceneMode = "globe" | "map";
-export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "tfl";
+export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "tfl" | "cfradar";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
 export type PlatformMode = "live" | "analytics";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";
