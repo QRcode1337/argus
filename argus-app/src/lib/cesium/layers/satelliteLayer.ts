@@ -41,20 +41,21 @@ export class SatelliteLayer {
       const position = Cartesian3.fromDegrees(sat.longitude, sat.latitude, sat.altitudeKm * 1000);
       const orbit = computeOrbitTrack(record, at, orbitSamples, orbitStepMinutes);
 
-      // Filter out near-duplicate points that cause Cesium polyline geometry errors
-      const filtered: [number, number, number][] = [];
-      for (const pt of orbit) {
-        if (filtered.length === 0) { filtered.push(pt); continue; }
-        const prev = filtered[filtered.length - 1];
-        const dLon = pt[0] - prev[0];
-        const dLat = pt[1] - prev[1];
-        if (Math.abs(dLon) > 0.05 || Math.abs(dLat) > 0.05) {
-          filtered.push(pt);
+      // Filter out near-duplicate points that cause Cesium polyline geometry errors.
+      // Cesium requires a minimum Cartesian distance of 0.0125 between consecutive
+      // polyline vertices; we use a generous margin to be safe.
+      const allCartesians = orbit.map(
+        (pt) => Cartesian3.fromDegrees(pt[0], pt[1], pt[2])
+      );
+      const orbitPositions: Cartesian3[] = [];
+      for (const c of allCartesians) {
+        if (orbitPositions.length === 0) { orbitPositions.push(c); continue; }
+        const dist = Cartesian3.distance(orbitPositions[orbitPositions.length - 1], c);
+        if (dist > 0.1) {
+          orbitPositions.push(c);
         }
       }
-      if (filtered.length < 2) continue;
-
-      const orbitPositions = Cartesian3.fromDegreesArrayHeights(filtered.flat());
+      if (orbitPositions.length < 2) continue;
 
       const existing = this.entities.get(sat.id);
       if (existing) {

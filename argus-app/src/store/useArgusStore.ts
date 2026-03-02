@@ -85,10 +85,10 @@ const emptyFeed = (): FeedHealth => ({
 
 export const useArgusStore = create<ArgusStore>((set) => ({
   layers: {
-    flights: true,
-    military: false,
-    satellites: true,
-    seismic: true,
+    flights: false,
+    military: true,
+    satellites: false,
+    seismic: false,
     cctv: true,
   },
   counts: {
