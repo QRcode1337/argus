@@ -1,4 +1,5 @@
 import {
+  ArcType,
   Cartesian3,
   Color,
   ConstantProperty,
@@ -19,6 +20,10 @@ export class SatelliteLayer {
 
   private entities = new Map<string, Entity>();
 
+  private orbitEntity: Entity | null = null;
+
+  private selectedSatId: string | null = null;
+
   constructor(viewer: Viewer) {
     this.viewer = viewer;
   }
@@ -33,29 +38,8 @@ export class SatelliteLayer {
 
     for (const sat of positions) {
       seen.add(sat.id);
-      const record = this.records.find((item) => item.id === sat.id);
-      if (!record) {
-        continue;
-      }
 
       const position = Cartesian3.fromDegrees(sat.longitude, sat.latitude, sat.altitudeKm * 1000);
-      const orbit = computeOrbitTrack(record, at, orbitSamples, orbitStepMinutes);
-
-      // Filter out near-duplicate points that cause Cesium polyline geometry errors.
-      // Cesium requires a minimum Cartesian distance of 0.0125 between consecutive
-      // polyline vertices; we use a generous margin to be safe.
-      const allCartesians = orbit.map(
-        (pt) => Cartesian3.fromDegrees(pt[0], pt[1], pt[2])
-      );
-      const orbitPositions: Cartesian3[] = [];
-      for (const c of allCartesians) {
-        if (orbitPositions.length === 0) { orbitPositions.push(c); continue; }
-        const dist = Cartesian3.distance(orbitPositions[orbitPositions.length - 1], c);
-        if (dist > 0.1) {
-          orbitPositions.push(c);
-        }
-      }
-      if (orbitPositions.length < 2) continue;
 
       const existing = this.entities.get(sat.id);
       if (existing) {
@@ -65,11 +49,11 @@ export class SatelliteLayer {
         } else {
           existing.position = new ConstantPositionProperty(position);
         }
-        if (existing.polyline) {
-          existing.polyline.positions = new ConstantProperty(orbitPositions);
-        }
         continue;
       }
+
+      const record = this.records.find((item) => item.id === sat.id);
+      if (!record) continue;
 
       const entity = this.viewer.entities.add({
         id: `sat-${sat.id}`,
@@ -90,11 +74,6 @@ export class SatelliteLayer {
           backgroundColor: Color.BLACK.withAlpha(0.65),
           scaleByDistance: new NearFarScalar(3_000_000, 0.9, 10_000_000, 0),
         },
-        polyline: {
-          positions: new ConstantProperty(orbitPositions),
-          width: 1,
-          material: Color.LIME.withAlpha(0.4),
-        },
         properties: {
           kind: "satellite",
           name: sat.name,
@@ -114,20 +93,69 @@ export class SatelliteLayer {
     }
 
     for (const [id, entity] of this.entities.entries()) {
-      if (seen.has(id)) {
-        continue;
-      }
-
+      if (seen.has(id)) continue;
       this.viewer.entities.remove(entity);
       this.entities.delete(id);
+    }
+
+    // Refresh orbit trail for the selected satellite
+    if (this.selectedSatId) {
+      this.refreshOrbit(at, orbitSamples, orbitStepMinutes);
     }
 
     return this.entities.size;
   }
 
+  /** Show orbit trail for a satellite. Pass null to hide. */
+  showOrbit(satId: string | null, orbitSamples: number, orbitStepMinutes: number): void {
+    // Clear previous orbit
+    if (this.orbitEntity) {
+      this.viewer.entities.remove(this.orbitEntity);
+      this.orbitEntity = null;
+    }
+    this.selectedSatId = satId;
+
+    if (!satId) return;
+    this.refreshOrbit(new Date(), orbitSamples, orbitStepMinutes);
+  }
+
+  private refreshOrbit(at: Date, orbitSamples: number, orbitStepMinutes: number): void {
+    const record = this.records.find((r) => r.id === this.selectedSatId);
+    if (!record) return;
+
+    const orbit = computeOrbitTrack(record, at, orbitSamples, orbitStepMinutes);
+    const allCartesians = orbit.map(
+      (pt) => Cartesian3.fromDegrees(pt[0], pt[1], pt[2])
+    );
+    const filtered: Cartesian3[] = [];
+    for (const c of allCartesians) {
+      if (filtered.length === 0) { filtered.push(c); continue; }
+      if (Cartesian3.distance(filtered[filtered.length - 1], c) > 0.1) {
+        filtered.push(c);
+      }
+    }
+    if (filtered.length < 2) return;
+
+    if (this.orbitEntity) {
+      this.orbitEntity.polyline!.positions = new ConstantProperty(filtered);
+    } else {
+      this.orbitEntity = this.viewer.entities.add({
+        polyline: {
+          positions: new ConstantProperty(filtered),
+          width: 1.5,
+          material: Color.LIME.withAlpha(0.6),
+          arcType: new ConstantProperty(ArcType.NONE),
+        },
+      });
+    }
+  }
+
   setVisible(visible: boolean): void {
     for (const entity of this.entities.values()) {
       entity.show = visible;
+    }
+    if (this.orbitEntity) {
+      this.orbitEntity.show = visible;
     }
   }
 }

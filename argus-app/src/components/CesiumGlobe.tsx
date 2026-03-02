@@ -3,6 +3,7 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
 import {
+  ArcType,
   Cartographic,
   Cartesian2,
   Cartesian3,
@@ -262,7 +263,7 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
 const generateCirclePositions = (center: Cartesian3, radius: number, segments = 64): Cartesian3[] => {
   const positions: Cartesian3[] = [];
   const cartographic = Cartographic.fromCartesian(center);
-  for (let i = 0; i <= segments; i++) {
+  for (let i = 0; i < segments; i++) {
     const angle = (i / segments) * 2 * Math.PI;
     const lat = cartographic.latitude + (radius / 6371000) * Math.cos(angle);
     const lon = cartographic.longitude + (radius / (6371000 * Math.cos(cartographic.latitude))) * Math.sin(angle);
@@ -867,9 +868,27 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           color: Color.fromCssColorString("#2ad4ff").withAlpha(0.7),
         }),
         clampToGround: false,
+        arcType: ArcType.NONE,
       },
     });
     selectionRingRef.current = ringEntity;
+  }, [selectedIntel]);
+
+  // Show orbit trail only for the selected satellite
+  useEffect(() => {
+    const satLayer = satLayerRef.current;
+    if (!satLayer) return;
+
+    if (selectedIntel?.kind === "satellite") {
+      const rawId = selectedIntel.id.replace(/^sat-/, "");
+      satLayer.showOrbit(
+        rawId,
+        ARGUS_CONFIG.limits.orbitSamples,
+        ARGUS_CONFIG.limits.orbitSampleStepMinutes,
+      );
+    } else {
+      satLayer.showOrbit(null, 0, 0);
+    }
   }, [selectedIntel]);
 
   useEffect(() => {
