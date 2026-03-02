@@ -76,9 +76,16 @@ export async function GET() {
     process.env.OPENSKY_ENDPOINT ?? "https://opensky-network.org/api/states/all";
 
   try {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    const clientId = process.env.OPENSKY_CLIENT_ID;
+    const clientSecret = process.env.OPENSKY_CLIENT_SECRET;
+    if (clientId && clientSecret) {
+      headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+    }
+
     const response = await fetch(openSkyUrl, {
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      headers,
       signal: AbortSignal.timeout(8_000),
     });
 
