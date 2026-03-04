@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CAMERA_PRESETS } from "@/lib/config";
 import type { IntelBriefing, AlertSeverity, IntelAlert, ThreatLevel } from "@/lib/intel/analysisEngine";
 import { useArgusStore } from "@/store/useArgusStore";
-import type { LayerKey, SelectedIntel, VisualMode } from "@/types/intel";
+import type { LayerKey, PlaybackSpeed, PlatformMode, SelectedIntel, VisualMode } from "@/types/intel";
 
 type HudOverlayProps = {
   onFlyToPoi: (poiId: string) => void;
@@ -22,6 +22,9 @@ type HudOverlayProps = {
   intelBriefing: IntelBriefing | null;
   onFlyToCoordinates: (lat: number, lon: number) => void;
   onFlyToEntityById: (entityId: string) => void;
+  onPlayPause?: () => void;
+  onSeek?: (timestampMs: number) => void;
+  onPlaybackSpeedChange?: (speed: number) => void;
 };
 
 type SliderDef = {
@@ -157,6 +160,9 @@ export function HudOverlay({
   intelBriefing,
   onFlyToCoordinates,
   onFlyToEntityById,
+  onPlayPause,
+  onSeek,
+  onPlaybackSpeedChange,
 }: HudOverlayProps) {
   const {
     layers,
@@ -185,6 +191,11 @@ export function HudOverlay({
   const searchQuery = useArgusStore((s) => s.searchQuery);
   const setSearchQuery = useArgusStore((s) => s.setSearchQuery);
   const searchResults = useArgusStore((s) => s.searchResults);
+  const isPlaying = useArgusStore((s) => s.isPlaying);
+  const playbackSpeed = useArgusStore((s) => s.playbackSpeed);
+  const setPlaybackSpeed = useArgusStore((s) => s.setPlaybackSpeed);
+  const playbackTimeRange = useArgusStore((s) => s.playbackTimeRange);
+  const playbackCurrentTime = useArgusStore((s) => s.playbackCurrentTime);
 
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [alertFilter, setAlertFilter] = useState<AlertSeverity | null>(null);
@@ -419,7 +430,7 @@ export function HudOverlay({
           {/* Sidebar header with hide button */}
           <div className="flex items-center justify-between border-b border-[#113446] px-3 py-2">
             <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#6c8ea2]">
-              {platformMode === "analytics" ? "Analytics" : "Live"} Panels
+              {platformMode === "analytics" ? "Analytics" : platformMode === "playback" ? "Playback" : "Live"} Panels
             </span>
             <button
               type="button"
@@ -864,13 +875,19 @@ export function HudOverlay({
           </label>
 
           <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
-            Platform
+            <span className="flex items-center gap-1.5">
+              Platform
+              {platformMode === "live" && (
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" title="Recording" />
+              )}
+            </span>
             <select
               className={`${controlInputClass} mt-1`}
               value={platformMode}
-              onChange={(event) => setPlatformMode(event.target.value as "live" | "analytics")}
+              onChange={(event) => setPlatformMode(event.target.value as PlatformMode)}
             >
               <option value="live">Live</option>
+              <option value="playback">Playback</option>
               <option value="analytics">Analytics</option>
             </select>
           </label>
@@ -912,6 +929,57 @@ export function HudOverlay({
           </button>
         </div>
       </section>
+
+      {/* Playback Timeline Bar */}
+      {platformMode === "playback" && playbackTimeRange && (
+        <div className="pointer-events-auto absolute bottom-20 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded border border-cyan-800/50 bg-black/80 px-4 py-2 font-mono text-xs text-cyan-400 backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={onPlayPause}
+            className="flex h-7 w-7 items-center justify-center rounded border border-cyan-700/50 bg-cyan-900/30 text-cyan-400 transition-colors hover:bg-cyan-800/40"
+            title={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? "⏸" : "▶"}
+          </button>
+
+          <span className="min-w-[70px] text-center tabular-nums">
+            {new Date(playbackCurrentTime).toLocaleTimeString()}
+          </span>
+
+          <input
+            type="range"
+            min={playbackTimeRange.start}
+            max={playbackTimeRange.end}
+            value={playbackCurrentTime}
+            onChange={(e) => onSeek?.(Number(e.target.value))}
+            className="h-1 w-48 cursor-pointer accent-cyan-500"
+          />
+
+          <select
+            value={playbackSpeed}
+            onChange={(e) => {
+              const speed = Number(e.target.value) as PlaybackSpeed;
+              setPlaybackSpeed(speed);
+              onPlaybackSpeedChange?.(speed);
+            }}
+            className="rounded border border-cyan-800/50 bg-black/60 px-1.5 py-0.5 text-xs text-cyan-400"
+          >
+            <option value={1}>1x</option>
+            <option value={3}>3x</option>
+            <option value={5}>5x</option>
+            <option value={15}>15x</option>
+            <option value={60}>60x</option>
+          </select>
+
+          <button
+            type="button"
+            onClick={() => setPlatformMode("live")}
+            className="rounded border border-red-700/50 bg-red-900/30 px-2 py-0.5 text-xs font-bold text-red-400 transition-colors hover:bg-red-800/40"
+          >
+            LIVE
+          </button>
+        </div>
+      )}
     </div>
   );
 }
