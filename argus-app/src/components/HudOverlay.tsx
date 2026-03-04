@@ -6,6 +6,7 @@ import type { IntelBriefing, AlertSeverity, IntelAlert, ThreatLevel } from "@/li
 import { useArgusStore } from "@/store/useArgusStore";
 import type { LayerKey, SelectedIntel, VisualMode } from "@/types/intel";
 import { VideoOverlay } from "./VideoOverlay";
+import { TimelineScrubber } from "./TimelineScrubber";
 
 type HudOverlayProps = {
   onFlyToPoi: (poiId: string) => void;
@@ -1365,6 +1366,8 @@ export function HudOverlay({
           onClose={() => setEnlargedStream(null)}
         />
       )}
+
+      <TimelineScrubber />
     </div>
   );
 }
