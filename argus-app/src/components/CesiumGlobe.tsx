@@ -679,7 +679,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "opensky",
       intervalMs: ARGUS_CONFIG.pollMs.openSky,
       run: async () => {
-        if (platformModeRef.current === "analytics") return;
+        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
         try {
           const flights = await fetchOpenSkyFlights(ARGUS_CONFIG.endpoints.openSky);
           const bounded = flights.slice(0, ARGUS_CONFIG.limits.maxFlights);
@@ -701,7 +701,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "adsb-military",
       intervalMs: ARGUS_CONFIG.pollMs.adsbMilitary,
       run: async () => {
-        if (platformModeRef.current === "analytics") return;
+        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
         try {
           const flights = await fetchMilitaryFlights(ARGUS_CONFIG.endpoints.adsbMilitary);
           const bounded = flights.slice(0, ARGUS_CONFIG.limits.maxMilitaryFlights);
@@ -720,7 +720,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "satellites",
       intervalMs: ARGUS_CONFIG.pollMs.satellites,
       run: async () => {
-        if (platformModeRef.current === "analytics") return;
+        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
         try {
           const now = Date.now();
           if (now - lastTleFetchAt > 60_000 || useArgusStore.getState().counts.satellites === 0) {
@@ -759,7 +759,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "usgs",
       intervalMs: ARGUS_CONFIG.pollMs.usgs,
       run: async () => {
-        if (platformModeRef.current === "analytics") return;
+        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
         try {
           const quakes = await fetchUsgsQuakes(ARGUS_CONFIG.endpoints.usgs);
           const count = seismicLayer.upsertEarthquakes(quakes);
@@ -777,7 +777,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "cctv",
       intervalMs: ARGUS_CONFIG.pollMs.cctv,
       run: async () => {
-        if (platformModeRef.current === "analytics") return;
+        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
         try {
           const cameras = await fetchCctvCameras(ARGUS_CONFIG.endpoints.cctv, ARGUS_CONFIG.endpoints.webcams);
           setCameras(cameras);
@@ -798,7 +798,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "cloudflare-radar",
       intervalMs: ARGUS_CONFIG.pollMs.cloudflareRadar,
       run: async () => {
-        if (platformModeRef.current === "analytics") return;
+        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
         try {
           const outages = await fetchInternetOutages(ARGUS_CONFIG.endpoints.cloudflareRadar);
           const count = outageLayer.update(outages);
@@ -815,7 +815,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "otx",
       intervalMs: ARGUS_CONFIG.pollMs.otx,
       run: async () => {
-        if (platformModeRef.current === "analytics") return;
+        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
         try {
           const threats = await fetchThreatPulses(ARGUS_CONFIG.endpoints.otx);
           const count = threatLayer.update(threats);
@@ -832,7 +832,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "fred",
       intervalMs: ARGUS_CONFIG.pollMs.fred,
       run: async () => {
-        if (platformModeRef.current === "analytics") return;
+        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
         try {
           await fetchFredObservations(ARGUS_CONFIG.endpoints.fred);
           setFeedHealthy("fred");
@@ -846,7 +846,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "aisstream",
       intervalMs: ARGUS_CONFIG.pollMs.aisstream,
       run: async () => {
-        if (platformModeRef.current === "analytics") return;
+        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
         try {
           await fetchAisSnapshotCount(ARGUS_CONFIG.endpoints.aisstream);
           setFeedHealthy("ais");
@@ -886,6 +886,96 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       pickerRef.current = null;
     };
   }, [setCamera, setCameras, setCount, setFeedError, setFeedHealthy]);
+
+  // DVR playback data loop
+  const playbackModeState = useArgusStore((s) => s.playbackMode);
+  useEffect(() => {
+    if (playbackModeState !== "playback") return;
+
+    let animFrameId: number;
+    let lastFrameTime = performance.now();
+    let lastFetchTime = 0;
+    const FETCH_INTERVAL = 500;
+
+    const tick = async (now: number) => {
+      const state = useArgusStore.getState();
+      if (state.playbackMode !== "playback") return;
+
+      if (state.isPlaying && state.playbackTime) {
+        const delta = (now - lastFrameTime) / 1000;
+        const newTime = new Date(
+          state.playbackTime.getTime() + delta * state.playbackSpeed * 1000,
+        );
+        useArgusStore.setState({ playbackTime: newTime });
+      }
+      lastFrameTime = now;
+
+      if (now - lastFetchTime < FETCH_INTERVAL) {
+        animFrameId = requestAnimationFrame(tick);
+        return;
+      }
+      lastFetchTime = now;
+
+      const playbackTime = useArgusStore.getState().playbackTime;
+      if (!playbackTime || !viewerRef.current) {
+        animFrameId = requestAnimationFrame(tick);
+        return;
+      }
+
+      const ts = playbackTime.toISOString();
+
+      try {
+        const [flightsRes, milRes, quakeRes, outageRes, threatRes] =
+          await Promise.all([
+            fetch(`/api/playback/flights?ts=${ts}&window=30`).then((r) =>
+              r.json(),
+            ),
+            fetch(`/api/playback/military?ts=${ts}&window=30`).then((r) =>
+              r.json(),
+            ),
+            fetch(`/api/playback/quakes?ts=${ts}&window=30`).then((r) =>
+              r.json(),
+            ),
+            fetch(`/api/playback/outages?ts=${ts}&window=30`).then((r) =>
+              r.json(),
+            ),
+            fetch(`/api/playback/threats?ts=${ts}&window=30`).then((r) =>
+              r.json(),
+            ),
+          ]);
+
+        const { setCount } = useArgusStore.getState();
+
+        if (flightLayerRef.current && flightsRes.flights) {
+          flightLayerRef.current.upsertFlights(flightsRes.flights);
+          setCount("flights", flightsRes.flights.length);
+        }
+        if (militaryLayerRef.current && milRes.flights) {
+          militaryLayerRef.current.upsertFlights(milRes.flights);
+          setCount("military", milRes.flights.length);
+        }
+        if (seismicLayerRef.current && quakeRes.quakes) {
+          seismicLayerRef.current.upsertEarthquakes(quakeRes.quakes);
+          setCount("seismic", quakeRes.quakes.length);
+        }
+        if (outageLayerRef.current && outageRes.outages) {
+          outageLayerRef.current.update(outageRes.outages);
+          setCount("outages", outageRes.outages.length);
+        }
+        if (threatLayerRef.current && threatRes.threats) {
+          threatLayerRef.current.update(threatRes.threats);
+          setCount("threats", threatRes.threats.length);
+        }
+      } catch {
+        // Playback fetch errors are non-critical
+      }
+
+      animFrameId = requestAnimationFrame(tick);
+    };
+
+    animFrameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animFrameId);
+  }, [playbackModeState]);
 
   // Entity search — watches searchQuery in store, populates searchResults
   useEffect(() => {
