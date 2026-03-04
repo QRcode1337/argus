@@ -212,12 +212,13 @@ export function HudOverlay({
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [alertFilter, setAlertFilter] = useState<AlertSeverity | null>(null);
   const [enlargedStream, setEnlargedStream] = useState<{ src: string; title: string } | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
+  );
   const [mobileTab, setMobileTab] = useState<"intel" | "feeds" | "controls" | "status" | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
-    setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
@@ -240,6 +241,10 @@ export function HudOverlay({
     feedHealth.celestrak.lastSuccessAt ?? 0,
     feedHealth.usgs.lastSuccessAt ?? 0,
     feedHealth.tfl.lastSuccessAt ?? 0,
+    feedHealth.cfradar.lastSuccessAt ?? 0,
+    feedHealth.otx.lastSuccessAt ?? 0,
+    feedHealth.fred.lastSuccessAt ?? 0,
+    feedHealth.ais.lastSuccessAt ?? 0,
   );
 
   const modeSliders: SliderDef[] =
@@ -888,7 +893,7 @@ export function HudOverlay({
           </CollapsibleSection>
 
           {/* STATUS section */}
-          <CollapsibleSection title="Status" badge={`${activeFeedCount}/5`}>
+          <CollapsibleSection title="Status" badge={`${activeFeedCount}/9`}>
             <div className="space-y-1.5">
               <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
                 <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Feed Health</div>
@@ -897,6 +902,10 @@ export function HudOverlay({
                 <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
                 <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
                 <div>TFL: {feedHealth.tfl.status} @ {fmtDate(feedHealth.tfl.lastSuccessAt)}</div>
+                <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
+                <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
+                <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
+                <div>AISStream: {feedHealth.ais.status} @ {fmtDate(feedHealth.ais.lastSuccessAt)}</div>
               </div>
 
               <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
@@ -1300,6 +1309,10 @@ export function HudOverlay({
                       <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
                       <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
                       <div>TFL: {feedHealth.tfl.status} @ {fmtDate(feedHealth.tfl.lastSuccessAt)}</div>
+                      <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
+                      <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
+                      <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
+                      <div>AISStream: {feedHealth.ais.status} @ {fmtDate(feedHealth.ais.lastSuccessAt)}</div>
                     </div>
                     <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
                       <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Camera</div>

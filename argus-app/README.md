@@ -17,6 +17,10 @@ Real-time browser geospatial intelligence dashboard built with Next.js + CesiumJ
 - CelesTrak TLE satellites (`/api/feeds/celestrak`)
 - USGS earthquakes (`/api/feeds/usgs`)
 - TFL JamCam CCTV (`/api/feeds/tfl-cctv`)
+- FRED macro feed (`/api/feeds/fred`)
+- AISStream vessel snapshot (`/api/feeds/aisstream`)
+- Cloudflare Radar outages (`/api/feeds/cloudflare-radar`)
+- AlienVault OTX threat pulses (`/api/feeds/otx`)
 
 ## Visual Modes
 

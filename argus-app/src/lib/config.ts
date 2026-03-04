@@ -8,6 +8,8 @@ export const ARGUS_CONFIG = {
     webcams: process.env.NEXT_PUBLIC_WEBCAMS_ENDPOINT ?? "/api/feeds/webcams",
     cloudflareRadar: "/api/feeds/cloudflare-radar",
     otx: "/api/feeds/otx",
+    fred: "/api/feeds/fred",
+    aisstream: "/api/feeds/aisstream",
   },
   pollMs: {
     openSky: 10_000,
@@ -18,6 +20,8 @@ export const ARGUS_CONFIG = {
     webcams: 15 * 60_000,
     cloudflareRadar: 10 * 60_000,
     otx: 10 * 60_000,
+    fred: 15 * 60_000,
+    aisstream: 60_000,
   },
   limits: {
     maxFlights: 7000,

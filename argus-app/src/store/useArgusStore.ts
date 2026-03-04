@@ -117,6 +117,8 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     tfl: emptyFeed(),
     cfradar: emptyFeed(),
     otx: emptyFeed(),
+    fred: emptyFeed(),
+    ais: emptyFeed(),
   },
   activePoiId: null,
   camera: {

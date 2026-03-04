@@ -21,6 +21,8 @@ services:
       args:
         NEXT_PUBLIC_CESIUM_ION_TOKEN: ${CESIUM_ION_TOKEN}
         NEXT_PUBLIC_TITILER_URL: /tiles
+        NEXT_PUBLIC_GLITCHTIP_DSN: ${NEXT_PUBLIC_GLITCHTIP_DSN}
+        NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: ${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-0.05}
     container_name: argus_app
     expose:
       - "3000"
@@ -31,8 +33,16 @@ services:
       - NEXT_PUBLIC_TITILER_URL=/tiles
       - CLOUDFLARE_RADAR_TOKEN=${CLOUDFLARE_RADAR_TOKEN}
       - OTX_API_KEY=${OTX_API_KEY}
+      - FRED_API_KEY=${FRED_API_KEY}
+      - FRED_SERIES_ID=${FRED_SERIES_ID:-DFF}
+      - AISSTREAM_API_KEY=${AISSTREAM_API_KEY}
+      - AISSTREAM_ENDPOINT=${AISSTREAM_ENDPOINT:-https://api.aisstream.io/v0/vessels}
       - OPENSKY_CLIENT_ID=${OPENSKY_CLIENT_ID}
       - OPENSKY_CLIENT_SECRET=${OPENSKY_CLIENT_SECRET}
+      - GLITCHTIP_APP_DSN=${GLITCHTIP_APP_DSN}
+      - NEXT_PUBLIC_GLITCHTIP_DSN=${NEXT_PUBLIC_GLITCHTIP_DSN}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      - NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-0.05}
     depends_on:
       - argus-api
     networks:
@@ -50,8 +60,12 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_URL=postgresql://argus:argus_dev@postgis:5432/argus
+      - REDIS_URL=redis://redis:6379
+      - GLITCHTIP_API_DSN=${GLITCHTIP_API_DSN}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       - TILES_DIR=/data/tiles
       - TITILER_BASE_PATH=/tiles
+      - EVENTS_STREAM_PATH=/api/events/stream
     volumes:
       - ./data/tiles:/data/tiles:ro
     depends_on:
@@ -103,6 +117,7 @@ services:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://argus:argus_dev@postgis:5432/argus
+      - REDIS_URL=redis://redis:6379
       - TILES_DIR=/data/tiles
       - GFS_CRON=0 */6 * * *
       - LOG_LEVEL=INFO

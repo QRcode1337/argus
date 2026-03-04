@@ -43,6 +43,8 @@ import { PollingManager } from "@/lib/ingest/pollingManager";
 import { fetchTleRecords } from "@/lib/ingest/tle";
 import { fetchInternetOutages } from "@/lib/ingest/cloudflareRadar";
 import { fetchThreatPulses } from "@/lib/ingest/otx";
+import { fetchFredObservations } from "@/lib/ingest/fred";
+import { fetchAisSnapshotCount } from "@/lib/ingest/aisstream";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
 import {
   analyzeFlights,
@@ -319,6 +321,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const [showFullIntel, setShowFullIntel] = useState(false);
   const [analyticsStatus, setAnalyticsStatus] = useState<string | null>(null);
   const [collisionEnabled, setCollisionEnabled] = useState(false);
+  const collisionEnabledRef = useRef(collisionEnabled);
+  useEffect(() => {
+    collisionEnabledRef.current = collisionEnabled;
+  }, [collisionEnabled]);
 
   const layers = useArgusStore((s) => s.layers);
   const platformMode = useArgusStore((s) => s.platformMode);
@@ -509,7 +515,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       shouldAnimate: true,
     });
     const cameraController = viewer.scene.screenSpaceCameraController;
-    cameraController.enableCollisionDetection = collisionEnabled;
+    cameraController.enableCollisionDetection = collisionEnabledRef.current;
     cameraController.inertiaSpin = 0.82;
     cameraController.inertiaTranslate = 0.82;
     cameraController.inertiaZoom = 0.74;
@@ -807,6 +813,34 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
+    poller.add({
+      id: "fred",
+      intervalMs: ARGUS_CONFIG.pollMs.fred,
+      run: async () => {
+        if (platformModeRef.current === "analytics") return;
+        try {
+          await fetchFredObservations(ARGUS_CONFIG.endpoints.fred);
+          setFeedHealthy("fred");
+        } catch (error) {
+          setFeedError("fred", error instanceof Error ? error.message : "Failed to fetch FRED");
+        }
+      },
+    });
+
+    poller.add({
+      id: "aisstream",
+      intervalMs: ARGUS_CONFIG.pollMs.aisstream,
+      run: async () => {
+        if (platformModeRef.current === "analytics") return;
+        try {
+          await fetchAisSnapshotCount(ARGUS_CONFIG.endpoints.aisstream);
+          setFeedHealthy("ais");
+        } catch (error) {
+          setFeedError("ais", error instanceof Error ? error.message : "Failed to fetch AISStream");
+        }
+      },
+    });
+
     return () => {
       poller.stopAll();
       rasterLayer.unload();
@@ -836,7 +870,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       visualModeRef.current = null;
       pickerRef.current = null;
     };
-  }, [setCamera, setCount, setFeedError, setFeedHealthy]);
+  }, [setCamera, setCameras, setCount, setFeedError, setFeedHealthy]);
 
   // Entity search — watches searchQuery in store, populates searchResults
   useEffect(() => {
@@ -1001,7 +1035,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
   useEffect(() => {
     if (platformMode !== "analytics") {
-      setAnalyticsStatus(null);
       return;
     }
 
@@ -1107,7 +1140,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         onResetCamera={resetCamera}
         onToggleCollision={toggleCollisionDetection}
         collisionEnabled={collisionEnabled}
-        analyticsStatus={analyticsStatus}
+        analyticsStatus={platformMode !== "analytics" ? null : analyticsStatus}
         selectedIntel={selectedIntel}
         showFullIntel={showFullIntel}
         onToggleFullIntel={() => setShowFullIntel((current) => !current)}
