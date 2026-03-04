@@ -76,14 +76,14 @@ services:
     restart: unless-stopped
 
   postgis:
-    image: postgis/postgis:16-3.4
+    image: timescale/timescaledb-ha:pg16-latest
     container_name: argus_postgis
     environment:
       POSTGRES_DB: argus
       POSTGRES_USER: argus
       POSTGRES_PASSWORD: argus_dev
     volumes:
-      - postgis_data:/var/lib/postgresql/data
+      - /mnt/volume-nyc3-01/pgdata:/home/postgres/pgdata
       - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U argus -d argus"]
@@ -126,9 +126,6 @@ services:
     networks:
       - argus_network
     restart: unless-stopped
-
-volumes:
-  postgis_data:
 
 networks:
   argus_network:
