@@ -76,7 +76,7 @@ services:
     restart: unless-stopped
 
   postgis:
-    image: timescale/timescaledb-ha:pg16-latest
+    image: timescale/timescaledb-ha:pg16-all
     container_name: argus_postgis
     environment:
       POSTGRES_DB: argus
