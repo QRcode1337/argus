@@ -1,0 +1,7 @@
+tunnel: 46f64fdb-fc4a-487d-bc93-a0d5ea15de09
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: argusweb.space
+    service: http://nginx:80
+  - service: http_status:404

@@ -127,5 +127,18 @@ services:
       - argus_network
     restart: unless-stopped
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: argus_cloudflared
+    command: tunnel --no-autoupdate run
+    volumes:
+      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - ./cloudflared/credentials.json:/etc/cloudflared/credentials.json:ro
+    depends_on:
+      - nginx
+    networks:
+      - argus_network
+    restart: unless-stopped
+
 networks:
   argus_network:
