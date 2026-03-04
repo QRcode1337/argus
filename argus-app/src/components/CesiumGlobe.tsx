@@ -40,12 +40,13 @@ import { fetchCctvCameras } from "@/lib/ingest/cctv";
 import { fetchOpenSkyFlights } from "@/lib/ingest/opensky";
 import { fetchAircraftPhoto } from "@/lib/ingest/planespotters";
 import { PollingManager } from "@/lib/ingest/pollingManager";
-import { fetchTleRecords } from "@/lib/ingest/tle";
+import { computeSatellitePositions, fetchTleRecords } from "@/lib/ingest/tle";
 import { fetchInternetOutages } from "@/lib/ingest/cloudflareRadar";
 import { fetchThreatPulses } from "@/lib/ingest/otx";
 import { fetchFredObservations } from "@/lib/ingest/fred";
 import { fetchAisSnapshotCount } from "@/lib/ingest/aisstream";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
+import { recordFlights, recordMilitary, recordSatellites, recordQuakes, recordOutages, recordThreats } from "@/lib/ingest/recorder";
 import {
   analyzeFlights,
   analyzeMilitary,
@@ -686,6 +687,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setCount("flights", count);
           setFeedHealthy("opensky");
           flightAlertsRef.current = analyzeFlights(bounded);
+          recordFlights(bounded);
         } catch (error) {
           setFeedError(
             "opensky",
@@ -707,6 +709,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setCount("military", count);
           setFeedHealthy("adsb");
           militaryAlertsRef.current = analyzeMilitary(bounded);
+          recordMilitary(bounded);
         } catch (error) {
           setFeedError("adsb", error instanceof Error ? error.message : "Failed to fetch ADS-B");
         }
@@ -734,6 +737,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setCount("satellites", count);
           setFeedHealthy("celestrak");
           satelliteAlertsRef.current = analyzeSatellites(count);
+          const satPositions = computeSatellitePositions(
+            satLayer.getRecords(),
+            new Date(),
+          );
+          recordSatellites(satPositions.map((s) => ({
+            ...s,
+            tle1: satLayer.getRecords().find((r) => r.id === s.id)?.tle1,
+            tle2: satLayer.getRecords().find((r) => r.id === s.id)?.tle2,
+          })));
         } catch (error) {
           setFeedError(
             "celestrak",
@@ -754,6 +766,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setCount("seismic", count);
           setFeedHealthy("usgs");
           seismicAlertsRef.current = analyzeSeismic(count);
+          recordQuakes(quakes);
         } catch (error) {
           setFeedError("usgs", error instanceof Error ? error.message : "Failed to fetch USGS");
         }
@@ -791,6 +804,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           const count = outageLayer.update(outages);
           setCount("outages", count);
           setFeedHealthy("cfradar");
+          recordOutages(outages);
         } catch (error) {
           setFeedError("cfradar", error instanceof Error ? error.message : "Failed to fetch CF Radar");
         }
@@ -807,6 +821,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           const count = threatLayer.update(threats);
           setCount("threats", count);
           setFeedHealthy("otx");
+          recordThreats(threats);
         } catch (error) {
           setFeedError("otx", error instanceof Error ? error.message : "Failed to fetch OTX");
         }

@@ -32,6 +32,10 @@ export class SatelliteLayer {
     this.records = records;
   }
 
+  getRecords(): SatelliteRecord[] {
+    return this.records;
+  }
+
   update(at: Date, orbitSamples: number, orbitStepMinutes: number): number {
     const positions = computeSatellitePositions(this.records, at);
     const seen = new Set<string>();
