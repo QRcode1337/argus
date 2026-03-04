@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useArgusStore } from "@/store/useArgusStore";
+import type { PlaybackSpeed } from "@/types/intel";
 
-const SPEEDS = [1, 5, 15, 60];
+const SPEEDS: PlaybackSpeed[] = [1, 5, 15, 60];
 
 function formatTime(date: Date): string {
   return date.toLocaleTimeString("en-US", {
@@ -23,7 +24,7 @@ function formatDate(date: Date): string {
 }
 
 export function TimelineScrubber() {
-  const playbackMode = useArgusStore((s) => s.playbackMode);
+  const platformMode = useArgusStore((s) => s.platformMode);
   const playbackTime = useArgusStore((s) => s.playbackTime);
   const playbackSpeed = useArgusStore((s) => s.playbackSpeed);
   const isPlaying = useArgusStore((s) => s.isPlaying);
@@ -76,11 +77,11 @@ export function TimelineScrubber() {
         pct * (effectiveRange.end.getTime() - effectiveRange.start.getTime());
       const newTime = new Date(ms);
       setPlaybackTime(newTime);
-      if (playbackMode === "live") {
+      if (platformMode === "live") {
         enterPlayback(newTime);
       }
     },
-    [effectiveRange, playbackMode, setPlaybackTime, enterPlayback],
+    [effectiveRange, platformMode, setPlaybackTime, enterPlayback],
   );
 
   const handleMouseDown = useCallback(
@@ -132,7 +133,7 @@ export function TimelineScrubber() {
       <div className="flex items-center gap-1">
         <button
           onClick={stepBack}
-          disabled={noData || playbackMode === "live"}
+          disabled={noData || platformMode === "live"}
           className="px-1.5 py-0.5 border border-green-900/50 hover:bg-green-900/30 disabled:opacity-30"
           title="Step back 1 min"
         >
@@ -140,7 +141,7 @@ export function TimelineScrubber() {
         </button>
         <button
           onClick={() => {
-            if (playbackMode === "live" && effectiveRange) {
+            if (platformMode === "live" && effectiveRange) {
               enterPlayback(effectiveRange.end);
               setIsPlaying(true);
             } else {
@@ -151,11 +152,11 @@ export function TimelineScrubber() {
           className="px-2 py-0.5 border border-green-900/50 hover:bg-green-900/30 disabled:opacity-30 min-w-[28px]"
           title={isPlaying ? "Pause" : "Play"}
         >
-          {isPlaying && playbackMode === "playback" ? "||" : "\u25B6"}
+          {isPlaying && platformMode === "playback" ? "||" : "\u25B6"}
         </button>
         <button
           onClick={stepForward}
-          disabled={noData || playbackMode === "live"}
+          disabled={noData || platformMode === "live"}
           className="px-1.5 py-0.5 border border-green-900/50 hover:bg-green-900/30 disabled:opacity-30"
           title="Step forward 1 min"
         >
@@ -177,7 +178,7 @@ export function TimelineScrubber() {
           }}
         />
         {/* Scrub head */}
-        {playbackMode === "playback" && (
+        {platformMode === "playback" && (
           <div
             className="absolute top-[-2px] w-2 h-[calc(100%+4px)] bg-green-400"
             style={{
@@ -190,7 +191,7 @@ export function TimelineScrubber() {
 
       {/* Time display */}
       <div className="text-right min-w-[120px]">
-        {playbackMode === "playback" && playbackTime ? (
+        {platformMode === "playback" && playbackTime ? (
           <span>
             {formatDate(playbackTime)} {formatTime(playbackTime)}
           </span>
@@ -213,7 +214,7 @@ export function TimelineScrubber() {
       <button
         onClick={goLive}
         className={`px-2 py-0.5 border font-bold ${
-          playbackMode === "live"
+          platformMode === "live"
             ? "border-red-500 text-red-400 bg-red-950/30"
             : "border-green-900/50 text-green-600 hover:bg-green-900/30"
         }`}

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { CAMERA_PRESETS } from "@/lib/config";
 import type { IntelBriefing, AlertSeverity, IntelAlert, ThreatLevel } from "@/lib/intel/analysisEngine";
 import { useArgusStore } from "@/store/useArgusStore";
-import type { LayerKey, PlaybackSpeed, SelectedIntel, VisualMode } from "@/types/intel";
+import type { LayerKey, PlatformMode, PlaybackSpeed, SelectedIntel, VisualMode } from "@/types/intel";
 import { VideoOverlay } from "./VideoOverlay";
 
 type HudOverlayProps = {
