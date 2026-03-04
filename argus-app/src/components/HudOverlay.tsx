@@ -295,12 +295,12 @@ export function HudOverlay({
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 text-[12px] text-[#99ffca]">
-      {/* WORLDVIEW header */}
+      {/* ARGUS header */}
       <header className="absolute left-6 top-4 font-mono">
         <h1 className="text-[50px] font-semibold leading-none tracking-[0.34em] text-[#e8fcff]">
-          WORLD<span className="text-[#2ad4ff]">VIEW</span>
+          ARG<span className="text-[#2ad4ff]">US</span>
         </h1>
-        <p className="mt-1 text-[10px] uppercase tracking-[0.45em] text-[#4e9ca8]">No Place Left Behind</p>
+        <p className="mt-1 text-[10px] uppercase tracking-[0.45em] text-[#4e9ca8]">Epsilon LLC</p>
       </header>
 
       {/* Active style display (top-right) */}
