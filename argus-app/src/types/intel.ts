@@ -1,7 +1,7 @@
 export type LayerKey = "flights" | "military" | "satellites" | "seismic" | "cctv";
 export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "tfl";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
-export type PlatformMode = "live" | "analytics";
+export type PlatformMode = "live" | "playback" | "analytics";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";
 export type CameraCategory = "Traffic" | "Nature" | "Landmark" | "Wildlife" | "Scenic" | "Infrastructure";
 export type CameraProvider = "TFL" | "Windy" | "Hardcoded";
@@ -171,4 +171,21 @@ export interface SelectedIntel {
   fullFacts: IntelDatum[];
   imageUrl?: string;
   streamUrl?: string;
+}
+
+export type PlaybackSpeed = 1 | 3 | 5 | 15 | 60;
+
+export interface RecordedFlightFrame {
+  timestamp: number;
+  data: TrackedFlight[];
+}
+
+export interface RecordedMilitaryFrame {
+  timestamp: number;
+  data: MilitaryFlight[];
+}
+
+export interface RecordedSatelliteFrame {
+  timestamp: number;
+  data: SatellitePosition[];
 }
