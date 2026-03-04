@@ -45,6 +45,8 @@ import { fetchInternetOutages } from "@/lib/ingest/cloudflareRadar";
 import { fetchThreatPulses } from "@/lib/ingest/otx";
 import { fetchFredObservations } from "@/lib/ingest/fred";
 import { fetchAisSnapshotCount } from "@/lib/ingest/aisstream";
+import { PlaybackEngine } from "@/lib/playback/playbackEngine";
+import { RecordingBuffer } from "@/lib/playback/recordingBuffer";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
 import { recordFlights, recordMilitary, recordSatellites, recordQuakes, recordOutages, recordThreats } from "@/lib/ingest/recorder";
 import {
@@ -57,7 +59,7 @@ import {
 import type { IntelAlert } from "@/lib/intel/analysisEngine";
 import { useArgusStore } from "@/store/useArgusStore";
 import type { SearchResult } from "@/store/useArgusStore";
-import type { IntelDatum, IntelImportance, SelectedIntel } from "@/types/intel";
+import type { IntelDatum, IntelImportance, PlatformMode, SelectedIntel, SatelliteRecord } from "@/types/intel";
 
 import { HudOverlay } from "./HudOverlay";
 
@@ -308,7 +310,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const rasterLayerRef = useRef<RasterLayer | null>(null);
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
-  const platformModeRef = useRef<"live" | "analytics">("live");
+  const platformModeRef = useRef<PlatformMode>("live");
+  const recordingBufferRef = useRef<RecordingBuffer>(new RecordingBuffer());
+  const satRecordsRef = useRef<SatelliteRecord[]>([]);
+  const playbackEngineRef = useRef<PlaybackEngine | null>(null);
   const hoveredEntityRef = useRef<Entity | null>(null);
   const hoveredOriginalSizeRef = useRef<number | null>(null);
   const selectionRingRef = useRef<Entity | null>(null);
@@ -348,6 +353,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const sceneMode = useArgusStore((s) => s.sceneMode);
   const dayNight = useArgusStore((s) => s.dayNight);
   const setSearchResults = useArgusStore((s) => s.setSearchResults);
+  const setPlaybackTimeRange = useArgusStore((s) => s.setPlaybackTimeRange);
+  const setPlaybackCurrentTime = useArgusStore((s) => s.setPlaybackCurrentTime);
+  const setIsPlaying = useArgusStore((s) => s.setIsPlaying);
+  const playbackSpeed = useArgusStore((s) => s.playbackSpeed);
 
   const flyToPoi = useCallback((poiId: string) => {
     const viewer = viewerRef.current;
@@ -679,7 +688,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "opensky",
       intervalMs: ARGUS_CONFIG.pollMs.openSky,
       run: async () => {
-        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
+        if (platformModeRef.current !== "live") return;
         try {
           const flights = await fetchOpenSkyFlights(ARGUS_CONFIG.endpoints.openSky);
           const bounded = flights.slice(0, ARGUS_CONFIG.limits.maxFlights);
@@ -687,7 +696,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setCount("flights", count);
           setFeedHealthy("opensky");
           flightAlertsRef.current = analyzeFlights(bounded);
-          recordFlights(bounded);
+          recordingBufferRef.current.pushFlights(Date.now(), bounded);
         } catch (error) {
           setFeedError(
             "opensky",
@@ -701,7 +710,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "adsb-military",
       intervalMs: ARGUS_CONFIG.pollMs.adsbMilitary,
       run: async () => {
-        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
+        if (platformModeRef.current !== "live") return;
         try {
           const flights = await fetchMilitaryFlights(ARGUS_CONFIG.endpoints.adsbMilitary);
           const bounded = flights.slice(0, ARGUS_CONFIG.limits.maxMilitaryFlights);
@@ -709,7 +718,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setCount("military", count);
           setFeedHealthy("adsb");
           militaryAlertsRef.current = analyzeMilitary(bounded);
-          recordMilitary(bounded);
+          recordingBufferRef.current.pushMilitary(Date.now(), bounded);
         } catch (error) {
           setFeedError("adsb", error instanceof Error ? error.message : "Failed to fetch ADS-B");
         }
@@ -720,12 +729,14 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "satellites",
       intervalMs: ARGUS_CONFIG.pollMs.satellites,
       run: async () => {
-        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
+        if (platformModeRef.current !== "live") return;
         try {
           const now = Date.now();
           if (now - lastTleFetchAt > 60_000 || useArgusStore.getState().counts.satellites === 0) {
             const records = await fetchTleRecords(ARGUS_CONFIG.endpoints.celestrak);
-            satLayer.setRecords(records.slice(0, ARGUS_CONFIG.limits.maxSatellites));
+            const bounded = records.slice(0, ARGUS_CONFIG.limits.maxSatellites);
+            satLayer.setRecords(bounded);
+            satRecordsRef.current = bounded;
             lastTleFetchAt = now;
           }
 
@@ -737,15 +748,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setCount("satellites", count);
           setFeedHealthy("celestrak");
           satelliteAlertsRef.current = analyzeSatellites(count);
-          const satPositions = computeSatellitePositions(
-            satLayer.getRecords(),
-            new Date(),
-          );
-          recordSatellites(satPositions.map((s) => ({
-            ...s,
-            tle1: satLayer.getRecords().find((r) => r.id === s.id)?.tle1,
-            tle2: satLayer.getRecords().find((r) => r.id === s.id)?.tle2,
-          })));
+          if (satRecordsRef.current.length > 0) {
+            const positions = computeSatellitePositions(satRecordsRef.current, new Date());
+            recordingBufferRef.current.pushSatellites(Date.now(), positions);
+          }
         } catch (error) {
           setFeedError(
             "celestrak",
@@ -759,7 +765,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "usgs",
       intervalMs: ARGUS_CONFIG.pollMs.usgs,
       run: async () => {
-        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
+        if (platformModeRef.current !== "live") return;
         try {
           const quakes = await fetchUsgsQuakes(ARGUS_CONFIG.endpoints.usgs);
           const count = seismicLayer.upsertEarthquakes(quakes);
@@ -777,7 +783,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "cctv",
       intervalMs: ARGUS_CONFIG.pollMs.cctv,
       run: async () => {
-        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
+        if (platformModeRef.current !== "live") return;
         try {
           const cameras = await fetchCctvCameras(ARGUS_CONFIG.endpoints.cctv, ARGUS_CONFIG.endpoints.webcams);
           setCameras(cameras);
@@ -798,7 +804,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "cloudflare-radar",
       intervalMs: ARGUS_CONFIG.pollMs.cloudflareRadar,
       run: async () => {
-        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
+        if (platformModeRef.current !== "live") return;
         try {
           const outages = await fetchInternetOutages(ARGUS_CONFIG.endpoints.cloudflareRadar);
           const count = outageLayer.update(outages);
@@ -815,7 +821,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "otx",
       intervalMs: ARGUS_CONFIG.pollMs.otx,
       run: async () => {
-        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
+        if (platformModeRef.current !== "live") return;
         try {
           const threats = await fetchThreatPulses(ARGUS_CONFIG.endpoints.otx);
           const count = threatLayer.update(threats);
@@ -832,7 +838,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "fred",
       intervalMs: ARGUS_CONFIG.pollMs.fred,
       run: async () => {
-        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
+        if (platformModeRef.current !== "live") return;
         try {
           await fetchFredObservations(ARGUS_CONFIG.endpoints.fred);
           setFeedHealthy("fred");
@@ -846,7 +852,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "aisstream",
       intervalMs: ARGUS_CONFIG.pollMs.aisstream,
       run: async () => {
-        if (platformModeRef.current === "analytics" || useArgusStore.getState().playbackMode === "playback") return;
+        if (platformModeRef.current !== "live") return;
         try {
           await fetchAisSnapshotCount(ARGUS_CONFIG.endpoints.aisstream);
           setFeedHealthy("ais");
@@ -858,6 +864,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
     return () => {
       poller.stopAll();
+      playbackEngineRef.current?.clear();
       rasterLayer.unload();
       viewer.camera.changed.removeEventListener(onCameraChanged);
 
@@ -888,7 +895,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   }, [setCamera, setCameras, setCount, setFeedError, setFeedHealthy]);
 
   // DVR playback data loop
-  const playbackModeState = useArgusStore((s) => s.playbackMode);
+  const playbackModeState = useArgusStore((s) => s.platformMode);
   useEffect(() => {
     if (playbackModeState !== "playback") return;
 
@@ -899,7 +906,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
     const tick = async (now: number) => {
       const state = useArgusStore.getState();
-      if (state.playbackMode !== "playback") return;
+      if (state.platformMode !== "playback") return;
 
       if (state.isPlaying && state.playbackTime) {
         const delta = (now - lastFrameTime) / 1000;
@@ -1117,6 +1124,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     platformModeRef.current = platformMode;
 
     if (platformMode === "analytics") {
+      if (playbackEngineRef.current) {
+        playbackEngineRef.current.clear();
+        playbackEngineRef.current = null;
+      }
       flightLayerRef.current?.setVisible(false);
       militaryLayerRef.current?.setVisible(false);
       satLayerRef.current?.setVisible(false);
@@ -1125,7 +1136,46 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       basesLayerRef.current?.setVisible(false);
       outageLayerRef.current?.setVisible(false);
       threatLayerRef.current?.setVisible(false);
+    } else if (platformMode === "playback") {
+      flightLayerRef.current?.setVisible(false);
+      militaryLayerRef.current?.setVisible(false);
+      satLayerRef.current?.setVisible(false);
+      seismicLayerRef.current?.setVisible(false);
+      cctvLayerRef.current?.setVisible(false);
+      basesLayerRef.current?.setVisible(false);
+      outageLayerRef.current?.setVisible(false);
+      threatLayerRef.current?.setVisible(false);
+
+      const viewer = viewerRef.current;
+      if (viewer && !playbackEngineRef.current) {
+        playbackEngineRef.current = new PlaybackEngine(viewer);
+      }
+
+      const engine = playbackEngineRef.current;
+      if (engine) {
+        const buffer = recordingBufferRef.current;
+        const range = engine.load(
+          buffer.getFlightFrames(),
+          buffer.getMilitaryFrames(),
+          buffer.getSatelliteFrames(),
+        );
+        if (range) {
+          setPlaybackTimeRange(range);
+          setPlaybackCurrentTime(range.start);
+          engine.onTick((timestampMs) => {
+            setPlaybackCurrentTime(timestampMs);
+          });
+        }
+      }
     } else {
+      // "live" — clean up playback, restore live layers
+      if (playbackEngineRef.current) {
+        playbackEngineRef.current.clear();
+        playbackEngineRef.current = null;
+      }
+      setPlaybackTimeRange(null);
+      setIsPlaying(false);
+
       const { layers } = useArgusStore.getState();
       flightLayerRef.current?.setVisible(layers.flights);
       militaryLayerRef.current?.setVisible(layers.military);
@@ -1136,7 +1186,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       outageLayerRef.current?.setVisible(layers.outages);
       threatLayerRef.current?.setVisible(layers.threats);
     }
-  }, [platformMode]);
+  }, [platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTimeRange]);
 
   useEffect(() => {
     if (platformMode !== "analytics") {
@@ -1226,6 +1276,32 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     visualModeRef.current?.setParams(visualParams);
   }, [visualParams]);
 
+  useEffect(() => {
+    playbackEngineRef.current?.setSpeed(playbackSpeed);
+  }, [playbackSpeed]);
+
+  const handlePlayPause = useCallback(() => {
+    const engine = playbackEngineRef.current;
+    if (!engine) return;
+    const playing = useArgusStore.getState().isPlaying;
+    if (playing) {
+      engine.pause();
+      setIsPlaying(false);
+    } else {
+      engine.play();
+      setIsPlaying(true);
+    }
+  }, [setIsPlaying]);
+
+  const handleSeek = useCallback((timestampMs: number) => {
+    playbackEngineRef.current?.seekTo(timestampMs);
+    setPlaybackCurrentTime(timestampMs);
+  }, [setPlaybackCurrentTime]);
+
+  const handlePlaybackSpeedChange = useCallback((speed: number) => {
+    playbackEngineRef.current?.setSpeed(speed);
+  }, []);
+
   return (
     <div className={`relative h-screen w-screen overflow-hidden ${className ?? ""}`}>
       <div className="argus-noise pointer-events-none absolute inset-0 z-0" />
@@ -1268,6 +1344,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         onTiltDown={tiltDown}
         onRotateLeft={rotateLeft}
         onRotateRight={rotateRight}
+        onPlayPause={handlePlayPause}
+        onSeek={handleSeek}
+        onPlaybackSpeedChange={handlePlaybackSpeedChange}
       />
     </div>
   );

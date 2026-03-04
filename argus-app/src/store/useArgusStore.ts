@@ -9,7 +9,7 @@ import type {
   FeedHealth,
   FeedKey,
   LayerKey,
-  PlaybackMode,
+  PlaybackSpeed,
   PlatformMode,
   SceneMode,
   VisualMode,
@@ -79,16 +79,18 @@ type ArgusStore = {
   setSearchResults: (results: SearchResult[]) => void;
   sceneMode: SceneMode;
   // DVR Playback
-  playbackMode: PlaybackMode;
   playbackTime: Date | null;
-  playbackSpeed: number;
+  playbackSpeed: PlaybackSpeed;
   isPlaying: boolean;
   playbackRange: { start: Date; end: Date } | null;
-  setPlaybackMode: (mode: PlaybackMode) => void;
   setPlaybackTime: (time: Date | null) => void;
-  setPlaybackSpeed: (speed: number) => void;
+  setPlaybackSpeed: (speed: PlaybackSpeed) => void;
   setIsPlaying: (playing: boolean) => void;
   setPlaybackRange: (range: { start: Date; end: Date } | null) => void;
+  playbackTimeRange: { start: number; end: number } | null;
+  setPlaybackTimeRange: (range: { start: number; end: number } | null) => void;
+  playbackCurrentTime: number;
+  setPlaybackCurrentTime: (time: number) => void;
   goLive: () => void;
   enterPlayback: (time: Date) => void;
   setSceneMode: (mode: SceneMode) => void;
@@ -248,18 +250,20 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   sceneMode: "globe",
   setSceneMode: (mode) => set({ sceneMode: mode }),
   // DVR Playback
-  playbackMode: "live" as PlaybackMode,
   playbackTime: null,
   playbackSpeed: 1,
   isPlaying: false,
   playbackRange: null,
-  setPlaybackMode: (mode) => set({ playbackMode: mode }),
   setPlaybackTime: (time) => set({ playbackTime: time }),
   setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   setPlaybackRange: (range) => set({ playbackRange: range }),
-  goLive: () => set({ playbackMode: "live" as PlaybackMode, playbackTime: null, isPlaying: false }),
-  enterPlayback: (time) => set({ playbackMode: "playback" as PlaybackMode, playbackTime: time, isPlaying: false }),
+  playbackTimeRange: null,
+  setPlaybackTimeRange: (range) => set({ playbackTimeRange: range }),
+  playbackCurrentTime: 0,
+  setPlaybackCurrentTime: (time) => set({ playbackCurrentTime: time }),
+  goLive: () => set({ platformMode: "live", playbackTime: null, isPlaying: false }),
+  enterPlayback: (time) => set({ platformMode: "playback", playbackTime: time, isPlaying: false }),
   dayNight: false,
   toggleDayNight: () => set((state) => ({ dayNight: !state.dayNight })),
 }));
