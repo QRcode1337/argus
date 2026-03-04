@@ -9,6 +9,7 @@ import type {
   FeedHealth,
   FeedKey,
   LayerKey,
+  PlaybackSpeed,
   PlatformMode,
   VisualMode,
   VisualParams,
@@ -75,6 +76,14 @@ type ArgusStore = {
   setSearchQuery: (query: string) => void;
   searchResults: SearchResult[];
   setSearchResults: (results: SearchResult[]) => void;
+  playbackSpeed: PlaybackSpeed;
+  setPlaybackSpeed: (speed: PlaybackSpeed) => void;
+  isPlaying: boolean;
+  setIsPlaying: (playing: boolean) => void;
+  playbackTimeRange: { start: number; end: number } | null;
+  setPlaybackTimeRange: (range: { start: number; end: number } | null) => void;
+  playbackCurrentTime: number;
+  setPlaybackCurrentTime: (time: number) => void;
 };
 
 const emptyFeed = (): FeedHealth => ({
@@ -216,4 +225,12 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setSearchQuery: (query) => set({ searchQuery: query }),
   searchResults: [],
   setSearchResults: (results) => set({ searchResults: results }),
+  playbackSpeed: 1,
+  setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
+  isPlaying: false,
+  setIsPlaying: (playing) => set({ isPlaying: playing }),
+  playbackTimeRange: null,
+  setPlaybackTimeRange: (range) => set({ playbackTimeRange: range }),
+  playbackCurrentTime: 0,
+  setPlaybackCurrentTime: (time) => set({ playbackCurrentTime: time }),
 }));
