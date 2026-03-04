@@ -3,6 +3,7 @@ export type SceneMode = "globe" | "map";
 export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "tfl" | "cfradar" | "otx" | "fred" | "ais";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
 export type PlatformMode = "live" | "analytics";
+export type PlaybackMode = "live" | "playback";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";
 export type CameraCategory = "Traffic" | "Nature" | "Landmark" | "Wildlife" | "Scenic" | "Infrastructure";
 export type CameraProvider = "TFL" | "Windy" | "Hardcoded";

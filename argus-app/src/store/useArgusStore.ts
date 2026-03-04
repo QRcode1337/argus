@@ -9,6 +9,7 @@ import type {
   FeedHealth,
   FeedKey,
   LayerKey,
+  PlaybackMode,
   PlatformMode,
   SceneMode,
   VisualMode,
@@ -77,6 +78,19 @@ type ArgusStore = {
   searchResults: SearchResult[];
   setSearchResults: (results: SearchResult[]) => void;
   sceneMode: SceneMode;
+  // DVR Playback
+  playbackMode: PlaybackMode;
+  playbackTime: Date | null;
+  playbackSpeed: number;
+  isPlaying: boolean;
+  playbackRange: { start: Date; end: Date } | null;
+  setPlaybackMode: (mode: PlaybackMode) => void;
+  setPlaybackTime: (time: Date | null) => void;
+  setPlaybackSpeed: (speed: number) => void;
+  setIsPlaying: (playing: boolean) => void;
+  setPlaybackRange: (range: { start: Date; end: Date } | null) => void;
+  goLive: () => void;
+  enterPlayback: (time: Date) => void;
   setSceneMode: (mode: SceneMode) => void;
   dayNight: boolean;
   toggleDayNight: () => void;
@@ -233,6 +247,19 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setSearchResults: (results) => set({ searchResults: results }),
   sceneMode: "globe",
   setSceneMode: (mode) => set({ sceneMode: mode }),
+  // DVR Playback
+  playbackMode: "live" as PlaybackMode,
+  playbackTime: null,
+  playbackSpeed: 1,
+  isPlaying: false,
+  playbackRange: null,
+  setPlaybackMode: (mode) => set({ playbackMode: mode }),
+  setPlaybackTime: (time) => set({ playbackTime: time }),
+  setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
+  setIsPlaying: (playing) => set({ isPlaying: playing }),
+  setPlaybackRange: (range) => set({ playbackRange: range }),
+  goLive: () => set({ playbackMode: "live" as PlaybackMode, playbackTime: null, isPlaying: false }),
+  enterPlayback: (time) => set({ playbackMode: "playback" as PlaybackMode, playbackTime: time, isPlaying: false }),
   dayNight: false,
   toggleDayNight: () => set((state) => ({ dayNight: !state.dayNight })),
 }));
