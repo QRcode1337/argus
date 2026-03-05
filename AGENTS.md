@@ -71,6 +71,7 @@ docker compose config
 ### Final sanity
 ```bash
 git status --short
+./scripts/safe-push-check.sh
 ```
 
 Confirm no accidental files are staged (especially `.env*`, backups, credentials).
