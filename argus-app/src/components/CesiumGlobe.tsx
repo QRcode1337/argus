@@ -62,6 +62,7 @@ import type { SearchResult } from "@/store/useArgusStore";
 import type { IntelDatum, IntelImportance, PlatformMode, SelectedIntel, SatelliteRecord } from "@/types/intel";
 
 import { HudOverlay } from "./HudOverlay";
+import { FlatMapView } from "./FlatMapView";
 
 type CesiumGlobeProps = {
   className?: string;
@@ -316,6 +317,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const playbackEngineRef = useRef<PlaybackEngine | null>(null);
   const hoveredEntityRef = useRef<Entity | null>(null);
   const hoveredOriginalSizeRef = useRef<number | null>(null);
+  const hoveredOriginalScaleRef = useRef<number | null>(null);
   const selectionRingRef = useRef<Entity | null>(null);
 
   const flightAlertsRef = useRef<IntelAlert[]>([]);
@@ -638,18 +640,36 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         if (hoveredEntityRef.current.point && hoveredOriginalSizeRef.current !== null) {
           hoveredEntityRef.current.point.pixelSize = hoveredOriginalSizeRef.current as unknown as import("cesium").Property;
         }
+        if (hoveredEntityRef.current.billboard && hoveredOriginalScaleRef.current !== null) {
+          hoveredEntityRef.current.billboard.scale = hoveredOriginalScaleRef.current as unknown as import("cesium").Property;
+        }
         hoveredEntityRef.current = null;
         hoveredOriginalSizeRef.current = null;
+        hoveredOriginalScaleRef.current = null;
       }
 
-      if (newEntity && newEntity.point && newEntity !== hoveredEntityRef.current) {
-        const currentSize = newEntity.point.pixelSize;
-        const sizeValue = typeof currentSize === "object" && currentSize !== null && "getValue" in currentSize
-          ? (currentSize as { getValue: (time: JulianDate) => number }).getValue(JulianDate.now())
-          : (currentSize as unknown as number);
-        hoveredOriginalSizeRef.current = sizeValue;
-        newEntity.point.pixelSize = (sizeValue * 1.5) as unknown as import("cesium").Property;
-        hoveredEntityRef.current = newEntity;
+      if (newEntity && newEntity !== hoveredEntityRef.current) {
+        if (newEntity.point) {
+          const currentSize = newEntity.point.pixelSize;
+          const sizeValue =
+            typeof currentSize === "object" && currentSize !== null && "getValue" in currentSize
+              ? (currentSize as { getValue: (time: JulianDate) => number }).getValue(JulianDate.now())
+              : (currentSize as unknown as number);
+          hoveredOriginalSizeRef.current = sizeValue;
+          hoveredOriginalScaleRef.current = null;
+          newEntity.point.pixelSize = (sizeValue * 1.5) as unknown as import("cesium").Property;
+          hoveredEntityRef.current = newEntity;
+        } else if (newEntity.billboard) {
+          const currentScale = newEntity.billboard.scale;
+          const scaleValue =
+            typeof currentScale === "object" && currentScale !== null && "getValue" in currentScale
+              ? (currentScale as { getValue: (time: JulianDate) => number }).getValue(JulianDate.now())
+              : (currentScale as unknown as number);
+          hoveredOriginalScaleRef.current = scaleValue;
+          hoveredOriginalSizeRef.current = null;
+          newEntity.billboard.scale = (scaleValue * 1.3) as unknown as import("cesium").Property;
+          hoveredEntityRef.current = newEntity;
+        }
       }
     }, ScreenSpaceEventType.MOUSE_MOVE);
 
@@ -746,6 +766,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
             ARGUS_CONFIG.limits.orbitSampleStepMinutes,
           );
           setCount("satellites", count);
+          setCount("satelliteLinks", satLayer.getLinkCount());
           setFeedHealthy("celestrak");
           satelliteAlertsRef.current = analyzeSatellites(count);
           if (satRecordsRef.current.length > 0) {
@@ -874,6 +895,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       }
       hoveredEntityRef.current = null;
       hoveredOriginalSizeRef.current = null;
+      hoveredOriginalScaleRef.current = null;
 
       picker.destroy();
       visualController.destroy();
@@ -1131,6 +1153,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       flightLayerRef.current?.setVisible(false);
       militaryLayerRef.current?.setVisible(false);
       satLayerRef.current?.setVisible(false);
+      satLayerRef.current?.setLinkVisible(false);
       seismicLayerRef.current?.setVisible(false);
       cctvLayerRef.current?.setVisible(false);
       basesLayerRef.current?.setVisible(false);
@@ -1140,6 +1163,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       flightLayerRef.current?.setVisible(false);
       militaryLayerRef.current?.setVisible(false);
       satLayerRef.current?.setVisible(false);
+      satLayerRef.current?.setLinkVisible(false);
       seismicLayerRef.current?.setVisible(false);
       cctvLayerRef.current?.setVisible(false);
       basesLayerRef.current?.setVisible(false);
@@ -1180,6 +1204,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       flightLayerRef.current?.setVisible(layers.flights);
       militaryLayerRef.current?.setVisible(layers.military);
       satLayerRef.current?.setVisible(layers.satellites);
+      satLayerRef.current?.setLinkVisible(layers.satellites && layers.satelliteLinks);
       seismicLayerRef.current?.setVisible(layers.seismic);
       cctvLayerRef.current?.setVisible(layers.cctv);
       basesLayerRef.current?.setVisible(layers.bases);
@@ -1241,20 +1266,31 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     flightLayerRef.current?.setVisible(layers.flights);
     militaryLayerRef.current?.setVisible(layers.military);
     satLayerRef.current?.setVisible(layers.satellites);
+    satLayerRef.current?.setLinkVisible(layers.satellites && layers.satelliteLinks);
     seismicLayerRef.current?.setVisible(layers.seismic);
     cctvLayerRef.current?.setVisible(layers.cctv);
     basesLayerRef.current?.setVisible(layers.bases);
     outageLayerRef.current?.setVisible(layers.outages);
     threatLayerRef.current?.setVisible(layers.threats);
-  }, [layers.bases, layers.cctv, layers.flights, layers.military, layers.outages, layers.satellites, layers.seismic, layers.threats]);
+  }, [
+    layers.bases,
+    layers.cctv,
+    layers.flights,
+    layers.military,
+    layers.outages,
+    layers.satelliteLinks,
+    layers.satellites,
+    layers.seismic,
+    layers.threats,
+  ]);
 
   // Globe ↔ Map scene mode toggle
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
-    viewer.scene.mode = sceneMode === "map"
-      ? CesiumSceneMode.SCENE2D
-      : CesiumSceneMode.SCENE3D;
+    // Map mode uses a dedicated non-Cesium flat map panel.
+    // Keep Cesium in 3D for live ingest + smooth return to globe mode.
+    viewer.scene.mode = CesiumSceneMode.SCENE3D;
   }, [sceneMode]);
 
   // Day/Night terminator toggle
@@ -1308,9 +1344,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       <div className="argus-grid pointer-events-none absolute inset-0 z-0" />
 
       <div className="absolute inset-0 z-10 flex items-center justify-center">
-        <div className="argus-viewport">
-          <div ref={mountRef} className="h-full w-full" />
-          {visualMode === "crt" ? (
+        <div className={`argus-viewport ${sceneMode === "map" ? "argus-map-viewport" : ""}`}>
+          <div ref={mountRef} className={sceneMode === "map" ? "hidden" : "h-full w-full"} />
+          {sceneMode === "map" ? <FlatMapView /> : null}
+          {sceneMode !== "map" && visualMode === "crt" ? (
             <div className="argus-scanlines pointer-events-none absolute inset-0" />
           ) : null}
         </div>

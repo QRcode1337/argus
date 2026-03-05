@@ -3,7 +3,7 @@
 :root {
   --background: #01050a;
   --foreground: #c4efff;
-  --font-mono: var(--font-plex-mono);
+  --font-mono: var(--font-jetbrains-mono);
 }
 
 html,
@@ -20,7 +20,13 @@ body {
     radial-gradient(circle at 78% 18%, #0d1f30 0%, transparent 26%),
     linear-gradient(160deg, #02060c 0%, #04080f 52%, #02060b 100%);
   color: var(--foreground);
-  font-family: var(--font-mono), monospace;
+  font-family:
+    "JetBrainsMono Nerd Font",
+    "JetBrains Mono",
+    "FiraCode Nerd Font",
+    var(--font-mono),
+    monospace;
+  font-size: 11px;
   overflow: hidden;
 }
 
@@ -87,6 +93,12 @@ button {
   );
   mix-blend-mode: screen;
   opacity: 0.33;
+}
+
+.argus-map-viewport {
+  width: min(96vw, 1480px);
+  aspect-ratio: 16 / 9;
+  border-radius: 16px;
 }
 
 @media (max-width: 980px) {

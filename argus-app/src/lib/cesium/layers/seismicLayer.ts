@@ -1,12 +1,15 @@
 import {
   Cartesian3,
   Color,
+  ConstantProperty,
   ConstantPositionProperty,
   Entity,
-  HeightReference,
+  NearFarScalar,
+  VerticalOrigin,
   type Viewer,
 } from "cesium";
 
+import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
 import type { EarthquakeFeature } from "@/types/intel";
 
 const magColor = (magnitude: number): Color => {
@@ -52,12 +55,17 @@ export class SeismicLayer {
       const entity = this.viewer.entities.add({
         id: `quake-${quake.id}`,
         position,
-        point: {
-          pixelSize: magSize(quake.magnitude),
-          color: magColor(quake.magnitude),
-          outlineColor: Color.BLACK,
-          outlineWidth: 1,
-          heightReference: HeightReference.CLAMP_TO_GROUND,
+        billboard: {
+          image: new ConstantProperty(
+            createTacticalMarkerSvg({
+              fill: magColor(quake.magnitude).toCssColorString(),
+              glow: magColor(quake.magnitude).brighten(0.2, new Color()).toCssColorString(),
+              stroke: "#121820",
+            }),
+          ),
+          scale: Math.max(0.46, Math.min(1.24, magSize(quake.magnitude) / 8)),
+          verticalOrigin: VerticalOrigin.CENTER,
+          scaleByDistance: new NearFarScalar(1_000_000, 1.2, 20_000_000, 0.4),
         },
         description: `${quake.place} (M${quake.magnitude.toFixed(1)})`,
         properties: {

@@ -1,14 +1,15 @@
 import {
   Cartesian3,
   Color,
+  ConstantProperty,
   Entity,
-  HeightReference,
   LabelStyle,
   NearFarScalar,
   VerticalOrigin,
   type Viewer,
 } from "cesium";
 
+import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
 import type { ThreatPulse } from "@/lib/ingest/otx";
 
 export class ThreatLayer {
@@ -35,12 +36,16 @@ export class ThreatLayer {
       const entity = this.viewer.entities.add({
         id: entityId,
         position: Cartesian3.fromDegrees(threat.lon, threat.lat),
-        point: {
-          pixelSize: 8,
-          color: Color.fromCssColorString("#ff3366"),
-          outlineColor: Color.fromCssColorString("#ff99bb"),
-          outlineWidth: 1,
-          heightReference: HeightReference.CLAMP_TO_GROUND,
+        billboard: {
+          image: new ConstantProperty(
+            createTacticalMarkerSvg({
+              fill: "#ff3366",
+              glow: "#ff99bb",
+              stroke: "#2a101a",
+            }),
+          ),
+          scale: 0.85,
+          verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(1_000_000, 1.4, 25_000_000, 0.5),
         },
         label: {

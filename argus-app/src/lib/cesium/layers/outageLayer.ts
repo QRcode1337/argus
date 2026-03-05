@@ -1,14 +1,15 @@
 import {
   Cartesian3,
   Color,
+  ConstantProperty,
   Entity,
-  HeightReference,
   LabelStyle,
   NearFarScalar,
   VerticalOrigin,
   type Viewer,
 } from "cesium";
 
+import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
 import type { InternetOutage } from "@/lib/ingest/cloudflareRadar";
 
 const CAUSE_COLORS: Record<string, Color> = {
@@ -47,12 +48,16 @@ export class OutageLayer {
       const entity = this.viewer.entities.add({
         id: entityId,
         position: Cartesian3.fromDegrees(outage.lon, outage.lat),
-        point: {
-          pixelSize: isActive ? 10 : 7,
-          color: isActive ? color : color.withAlpha(0.5),
-          outlineColor: isActive ? Color.WHITE : Color.GRAY,
-          outlineWidth: isActive ? 2 : 1,
-          heightReference: HeightReference.CLAMP_TO_GROUND,
+        billboard: {
+          image: new ConstantProperty(
+            createTacticalMarkerSvg({
+              fill: (isActive ? color : color.withAlpha(0.6)).toCssColorString(),
+              glow: color.brighten(0.22, new Color()).toCssColorString(),
+              stroke: isActive ? "#d9f5ff" : "#4d5d68",
+            }),
+          ),
+          scale: isActive ? 0.95 : 0.72,
+          verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(1_000_000, 1.5, 25_000_000, 0.6),
         },
         label: {

@@ -1,6 +1,7 @@
 import {
   Cartesian3,
   Color,
+  ConstantProperty,
   Entity,
   LabelStyle,
   NearFarScalar,
@@ -9,6 +10,7 @@ import {
 } from "cesium";
 
 import { MILITARY_BASES } from "@/data/militaryBases";
+import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
 
 const BASE_COLORS: Record<string, Color> = {
   US: Color.fromCssColorString("#ff6b6b"),
@@ -36,6 +38,7 @@ export class BasesLayer {
   private viewer: Viewer;
   private entities: Entity[] = [];
   private loaded = false;
+  private markerByOperator = new Map<string, string>();
 
   constructor(viewer: Viewer) {
     this.viewer = viewer;
@@ -51,11 +54,10 @@ export class BasesLayer {
       const entity = this.viewer.entities.add({
         id: `base-${base.id}`,
         position: Cartesian3.fromDegrees(base.lon, base.lat),
-        point: {
-          pixelSize: 6,
-          color,
-          outlineColor: Color.BLACK,
-          outlineWidth: 1,
+        billboard: {
+          image: new ConstantProperty(this.markerForOperator(base.operator, color)),
+          scale: 0.7,
+          verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(1_000_000, 1.2, 20_000_000, 0.4),
         },
         label: {
@@ -88,5 +90,17 @@ export class BasesLayer {
     for (const entity of this.entities) {
       entity.show = visible;
     }
+  }
+
+  private markerForOperator(operator: string, color: Color): string {
+    const cached = this.markerByOperator.get(operator);
+    if (cached) return cached;
+    const marker = createTacticalMarkerSvg({
+      fill: color.toCssColorString(),
+      glow: color.brighten(0.25, new Color()).toCssColorString(),
+      stroke: "#121820",
+    });
+    this.markerByOperator.set(operator, marker);
+    return marker;
   }
 }

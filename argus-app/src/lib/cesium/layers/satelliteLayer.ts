@@ -6,10 +6,15 @@ import {
   ConstantPositionProperty,
   Entity,
   LabelStyle,
+  Math as CesiumMath,
   NearFarScalar,
+  PolylineGlowMaterialProperty,
+  VerticalOrigin,
   type Viewer,
 } from "cesium";
 
+import { buildSatelliteLinkTargets } from "@/data/satelliteLinkTargets";
+import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
 import { computeOrbitTrack, computeSatellitePositions } from "@/lib/ingest/tle";
 import type { SatelliteRecord } from "@/types/intel";
 
@@ -19,10 +24,18 @@ export class SatelliteLayer {
   private records: SatelliteRecord[] = [];
 
   private entities = new Map<string, Entity>();
+  private linkEntities = new Map<string, Entity>();
 
   private orbitEntity: Entity | null = null;
 
   private selectedSatId: string | null = null;
+  private linksVisible = true;
+  private linkCount = 0;
+  private readonly marker = createTacticalMarkerSvg({
+    fill: "#99ffca",
+    glow: "#ceffe4",
+    stroke: "#082015",
+  });
 
   constructor(viewer: Viewer) {
     this.viewer = viewer;
@@ -34,6 +47,26 @@ export class SatelliteLayer {
 
   getRecords(): SatelliteRecord[] {
     return this.records;
+  }
+
+  getLinkCount(): number {
+    return this.linkCount;
+  }
+
+  setLinkVisible(visible: boolean): void {
+    this.linksVisible = visible;
+    if (!visible) {
+      for (const entity of this.linkEntities.values()) {
+        this.viewer.entities.remove(entity);
+      }
+      this.linkEntities.clear();
+      this.linkCount = 0;
+      return;
+    }
+
+    for (const entity of this.linkEntities.values()) {
+      entity.show = true;
+    }
   }
 
   update(at: Date, orbitSamples: number, orbitStepMinutes: number): number {
@@ -62,11 +95,10 @@ export class SatelliteLayer {
       const entity = this.viewer.entities.add({
         id: `sat-${sat.id}`,
         position,
-        point: {
-          pixelSize: 4,
-          color: Color.LIME,
-          outlineColor: Color.BLACK,
-          outlineWidth: 1,
+        billboard: {
+          image: new ConstantProperty(this.marker),
+          scale: 0.72,
+          verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.5, 25_000_000, 0.45),
         },
         label: {
@@ -100,6 +132,12 @@ export class SatelliteLayer {
       if (seen.has(id)) continue;
       this.viewer.entities.remove(entity);
       this.entities.delete(id);
+    }
+
+    if (this.linksVisible) {
+      this.refreshUtilizationLinks(positions, at);
+    } else {
+      this.linkCount = 0;
     }
 
     // Refresh orbit trail for the selected satellite
@@ -154,12 +192,108 @@ export class SatelliteLayer {
     }
   }
 
+  private refreshUtilizationLinks(
+    positions: ReturnType<typeof computeSatellitePositions>,
+    at: Date,
+  ): void {
+    const seenLinks = new Set<string>();
+    const targets = buildSatelliteLinkTargets(at);
+
+    for (const sat of positions) {
+      const target = this.findClosestTarget(sat.latitude, sat.longitude, sat.altitudeKm, targets);
+      if (!target) continue;
+
+      const id = `satlink-${sat.id}-${target.id}`;
+      seenLinks.add(id);
+
+      const satPos = Cartesian3.fromDegrees(sat.longitude, sat.latitude, sat.altitudeKm * 1000);
+      const targetPos = Cartesian3.fromDegrees(target.lon, target.lat, 0);
+      const current = this.linkEntities.get(id);
+
+      if (current?.polyline) {
+        current.polyline.positions = new ConstantProperty([satPos, targetPos]);
+        continue;
+      }
+
+      const line = this.viewer.entities.add({
+        id,
+        polyline: {
+          positions: [satPos, targetPos],
+          width: target.kind === "carrier" ? 1.8 : 1.2,
+          material: new PolylineGlowMaterialProperty({
+            glowPower: target.kind === "carrier" ? 0.26 : 0.18,
+            color:
+              target.kind === "carrier"
+                ? Color.fromCssColorString("#ff85a9").withAlpha(0.72)
+                : Color.fromCssColorString("#9bcbff").withAlpha(0.62),
+          }),
+          arcType: ArcType.GEODESIC,
+        },
+        properties: {
+          kind: "satellite-link",
+          satName: sat.name,
+          targetName: target.name,
+          targetType: target.kind,
+        },
+      });
+
+      this.linkEntities.set(id, line);
+    }
+
+    for (const [id, entity] of this.linkEntities.entries()) {
+      if (!seenLinks.has(id)) {
+        this.viewer.entities.remove(entity);
+        this.linkEntities.delete(id);
+      }
+    }
+
+    this.linkCount = this.linkEntities.size;
+  }
+
+  private findClosestTarget(
+    satLat: number,
+    satLon: number,
+    satAltKm: number,
+    targets: ReturnType<typeof buildSatelliteLinkTargets>,
+  ): ReturnType<typeof buildSatelliteLinkTargets>[number] | null {
+    let best: ReturnType<typeof buildSatelliteLinkTargets>[number] | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    const maxRangeKm = satAltKm > 14_000 ? 5_600 : satAltKm > 3_500 ? 3_400 : 1_550;
+
+    for (const target of targets) {
+      const distanceKm = this.haversineKm(satLat, satLon, target.lat, target.lon);
+      const targetCapKm = target.kind === "carrier" ? maxRangeKm * 0.78 : maxRangeKm;
+      if (distanceKm > targetCapKm || distanceKm >= bestDistance) continue;
+      bestDistance = distanceKm;
+      best = target;
+    }
+
+    return best;
+  }
+
+  private haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const phi1 = CesiumMath.toRadians(lat1);
+    const phi2 = CesiumMath.toRadians(lat2);
+    const dPhi = CesiumMath.toRadians(lat2 - lat1);
+    const dLambda = CesiumMath.toRadians(lon2 - lon1);
+
+    const a =
+      Math.sin(dPhi / 2) ** 2 +
+      Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return 6371 * c;
+  }
+
   setVisible(visible: boolean): void {
     for (const entity of this.entities.values()) {
       entity.show = visible;
     }
     if (this.orbitEntity) {
       this.orbitEntity.show = visible;
+    }
+    for (const entity of this.linkEntities.values()) {
+      entity.show = visible && this.linksVisible;
     }
   }
 }
