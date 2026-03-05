@@ -1,0 +1,60 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: argus_redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - argus_network
+    restart: unless-stopped
+
+  # Optional web UI for Redis (enable with profile tools)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: argus_redis_commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - argus_network
+    restart: unless-stopped
+    profiles: ["tools"]
+
+  # Placeholder for real-time fanout worker (SSE/WebSocket publisher)
+  # Enable after adding ./workers/realtime-worker Dockerfile
+  realtime-worker:
+    build:
+      context: ./workers/realtime-worker
+      dockerfile: Dockerfile
+    container_name: argus_realtime_worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://argus:argus_dev@postgis:5432/argus
+      - LOG_LEVEL=info
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgis:
+        condition: service_healthy
+    networks:
+      - argus_network
+    restart: unless-stopped
+    profiles: ["workers"]
+
+volumes:
+  redis_data:
+
+networks:
+  argus_network:
+    external: true
+    name: argus_argus_network

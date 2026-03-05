@@ -8,7 +8,7 @@ import {
   type Viewer,
 } from "cesium";
 
-import { MILITARY_BASES, type MilitaryBase } from "@/data/militaryBases";
+import { MILITARY_BASES } from "@/data/militaryBases";
 
 const BASE_COLORS: Record<string, Color> = {
   US: Color.fromCssColorString("#ff6b6b"),

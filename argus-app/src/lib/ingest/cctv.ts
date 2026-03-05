@@ -330,7 +330,6 @@ type TflCamera = {
   additionalProperties?: TflAdditionalProperty[];
 };
 
-type TflResponse = TflCamera[] | { places?: TflCamera[] };
 
 const findImageUrl = (camera: TflCamera): string | null => {
   const pairs = camera.additionalProperties ?? [];
