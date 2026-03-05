@@ -11,6 +11,7 @@ export const ARGUS_CONFIG = {
     fred: "/api/feeds/fred",
     aisstream: "/api/feeds/aisstream",
     news: "/api/feeds/news",
+    gdelt: "/api/feeds/gdelt",
   },
   pollMs: {
     openSky: 10_000,
@@ -24,6 +25,7 @@ export const ARGUS_CONFIG = {
     fred: 15 * 60_000,
     aisstream: 60_000,
     news: Number(process.env.NEXT_PUBLIC_NEWS_POLL_MS ?? process.env.NEWS_POLL_MS ?? 300_000),
+    gdelt: 15 * 60_000,  // 15 minutes — matches GDELT update cadence
   },
   limits: {
     maxFlights: 7000,

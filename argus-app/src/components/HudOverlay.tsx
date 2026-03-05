@@ -52,6 +52,7 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "cctv", label: "CCTV Mesh", feed: "TFL + Windy" },
   { key: "outages", label: "Internet Outages", feed: "CF Radar" },
   { key: "threats", label: "Cyber Threats", feed: "OTX" },
+  { key: "gdelt", label: "GDELT Events", feed: "GDELT" },
 ];
 
 const modeDefs: { key: VisualMode; label: string }[] = [
@@ -450,7 +451,8 @@ export function HudOverlay({
     counts.cctv +
     counts.bases +
     counts.outages +
-    counts.threats;
+    counts.threats +
+    counts.gdelt;
 
   const activeFeedCount = Object.values(feedHealth).filter(
     (fh) => fh.status === "ok",
@@ -1117,6 +1119,7 @@ export function HudOverlay({
                     bases: counts.bases,
                     outages: counts.outages,
                     threats: counts.threats,
+                    gdelt: counts.gdelt,
                   };
                   const value = valueMap[layer.key];
 

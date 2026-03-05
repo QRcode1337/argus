@@ -34,6 +34,7 @@ import { OutageLayer } from "@/lib/cesium/layers/outageLayer";
 import { ThreatLayer } from "@/lib/cesium/layers/threatLayer";
 import { SatelliteLayer } from "@/lib/cesium/layers/satelliteLayer";
 import { SeismicLayer } from "@/lib/cesium/layers/seismicLayer";
+import { GdeltLayer } from "@/lib/cesium/layers/gdeltLayer";
 import { VisualModeController } from "@/lib/cesium/shaders/visualModes";
 import { fetchMilitaryFlights } from "@/lib/ingest/adsb";
 import { fetchCctvCameras } from "@/lib/ingest/cctv";
@@ -48,6 +49,7 @@ import { fetchAisSnapshotCount } from "@/lib/ingest/aisstream";
 import { PlaybackEngine } from "@/lib/playback/playbackEngine";
 import { RecordingBuffer } from "@/lib/playback/recordingBuffer";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
+import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import { recordFlights, recordMilitary, recordSatellites, recordQuakes, recordOutages, recordThreats } from "@/lib/ingest/recorder";
 import {
   analyzeFlights,
@@ -148,6 +150,7 @@ const PRIORITY_THRESHOLDS = {
 
 const classifyImportance = (kind: string, props: Record<string, unknown>): IntelImportance => {
   if (kind === "military" || kind === "threat") return "important";
+  if (kind === "gdelt" && toNumber(props.goldsteinScale) !== null && (toNumber(props.goldsteinScale)! <= -7)) return "important";
 
   const magnitude = toNumber(props.magnitude);
   if (
@@ -246,6 +249,16 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("TLP", props.tlp);
       pushQuick("Tags", props.tags);
       break;
+    case "gdelt":
+      pushQuick("Actor 1", `${props.actor1Name ?? ""} (${props.actor1Country ?? ""})`);
+      pushQuick("Actor 2", `${props.actor2Name ?? ""} (${props.actor2Country ?? ""})`);
+      pushQuick("Event Code", props.eventCode);
+      pushQuick("Goldstein", props.goldsteinScale);
+      pushQuick("Mentions", props.numMentions);
+      pushQuick("Tone", props.avgTone);
+      pushQuick("Location", props.actionGeoName);
+      pushQuick("Source", props.sourceUrl);
+      break;
     default:
       break;
   }
@@ -308,6 +321,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const basesLayerRef = useRef<BasesLayer | null>(null);
   const outageLayerRef = useRef<OutageLayer | null>(null);
   const threatLayerRef = useRef<ThreatLayer | null>(null);
+  const gdeltLayerRef = useRef<GdeltLayer | null>(null);
   const rasterLayerRef = useRef<RasterLayer | null>(null);
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
@@ -570,6 +584,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const basesLayer = new BasesLayer(viewer);
     const outageLayer = new OutageLayer(viewer);
     const threatLayer = new ThreatLayer(viewer);
+    const gdeltLayer = new GdeltLayer(viewer);
     const rasterLayer = new RasterLayer(viewer);
     const visualController = new VisualModeController(viewer);
     const picker = new ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -582,6 +597,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     basesLayerRef.current = basesLayer;
     outageLayerRef.current = outageLayer;
     threatLayerRef.current = threatLayer;
+    gdeltLayerRef.current = gdeltLayer;
     rasterLayerRef.current = rasterLayer;
 
     // Load static bases layer immediately
@@ -883,6 +899,22 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
+    poller.add({
+      id: "gdelt",
+      intervalMs: ARGUS_CONFIG.pollMs.gdelt,
+      run: async () => {
+        if (platformModeRef.current !== "live") return;
+        try {
+          const events = await fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt);
+          const count = gdeltLayer.update(events);
+          setCount("gdelt", count);
+          setFeedHealthy("gdelt");
+        } catch (error) {
+          setFeedError("gdelt", error instanceof Error ? error.message : "Failed to fetch GDELT");
+        }
+      },
+    });
+
     return () => {
       poller.stopAll();
       playbackEngineRef.current?.clear();
@@ -910,6 +942,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       basesLayerRef.current = null;
       outageLayerRef.current = null;
       threatLayerRef.current = null;
+      gdeltLayerRef.current = null;
       rasterLayerRef.current = null;
       visualModeRef.current = null;
       pickerRef.current = null;
@@ -1159,6 +1192,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       basesLayerRef.current?.setVisible(false);
       outageLayerRef.current?.setVisible(false);
       threatLayerRef.current?.setVisible(false);
+      gdeltLayerRef.current?.setVisible(false);
     } else if (platformMode === "playback") {
       flightLayerRef.current?.setVisible(false);
       militaryLayerRef.current?.setVisible(false);
@@ -1169,6 +1203,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       basesLayerRef.current?.setVisible(false);
       outageLayerRef.current?.setVisible(false);
       threatLayerRef.current?.setVisible(false);
+      gdeltLayerRef.current?.setVisible(false);
 
       const viewer = viewerRef.current;
       if (viewer && !playbackEngineRef.current) {
@@ -1272,10 +1307,12 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     basesLayerRef.current?.setVisible(layers.bases);
     outageLayerRef.current?.setVisible(layers.outages);
     threatLayerRef.current?.setVisible(layers.threats);
+    gdeltLayerRef.current?.setVisible(layers.gdelt);
   }, [
     layers.bases,
     layers.cctv,
     layers.flights,
+    layers.gdelt,
     layers.military,
     layers.outages,
     layers.satelliteLinks,

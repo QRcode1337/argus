@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useArgusStore } from "@/store/useArgusStore";
+import { ARGUS_CONFIG } from "@/lib/config";
+import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
+import type { GdeltEvent } from "@/types/gdelt";
+import { QUAD_CLASS_COLORS } from "@/types/gdelt";
 
 type Position = [number, number];
 
@@ -60,6 +65,26 @@ export function FlatMapView() {
   const [world, setWorld] = useState<GeoFeature[]>([]);
   const [states, setStates] = useState<GeoFeature[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [gdeltEvents, setGdeltEvents] = useState<GdeltEvent[]>([]);
+  const gdeltVisible = useArgusStore((s) => s.layers.gdelt);
+
+  useEffect(() => {
+    if (!gdeltVisible) return;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const events = await fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt);
+        if (!cancelled) setGdeltEvents(events);
+      } catch {
+        // silent — CesiumGlobe handles feed health
+      }
+    };
+
+    void poll();
+    const id = setInterval(poll, ARGUS_CONFIG.pollMs.gdelt);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [gdeltVisible]);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +162,25 @@ export function FlatMapView() {
             opacity={0.85}
           />
         ))}
+        {gdeltVisible && gdeltEvents.map((event) => {
+          const [x, y] = project([event.longitude, event.latitude]);
+          const color = QUAD_CLASS_COLORS[event.quadClass as keyof typeof QUAD_CLASS_COLORS] ?? "#888";
+          return (
+            <circle
+              key={event.id}
+              cx={x}
+              cy={y}
+              r={Math.min(4, 1.5 + event.numMentions * 0.15)}
+              fill={color}
+              fillOpacity={0.7}
+              stroke={color}
+              strokeWidth={0.3}
+              strokeOpacity={0.9}
+            >
+              <title>{`${event.actionGeoName} — ${event.actor1Name || event.actor1Country} → ${event.actor2Name || event.actor2Country} (${event.numMentions} mentions)`}</title>
+            </circle>
+          );
+        })}
       </svg>
 
       {error ? (
