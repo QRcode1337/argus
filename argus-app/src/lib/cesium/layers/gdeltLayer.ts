@@ -74,7 +74,7 @@ export class GdeltLayer {
           scaleByDistance: new NearFarScalar(1_000_000, 1.2, 20_000_000, 0.4),
         },
         label: {
-          text: `${event.actionGeoName}`,
+          text: event.actionGeoName.length > 9 ? `${event.actionGeoName.slice(0, 9)}…` : event.actionGeoName,
           font: "10px monospace",
           fillColor: labelColor,
         },

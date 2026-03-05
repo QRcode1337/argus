@@ -61,7 +61,7 @@ export class BasesLayer {
           scaleByDistance: new NearFarScalar(1_000_000, 1.2, 20_000_000, 0.4),
         },
         label: {
-          text: `${typeTag} ${base.name}`,
+          text: (() => { const t = `${typeTag} ${base.name}`; return t.length > 9 ? `${t.slice(0, 9)}…` : t; })(),
           font: "10px monospace",
           style: LabelStyle.FILL,
           fillColor: color,

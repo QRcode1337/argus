@@ -64,7 +64,7 @@ export class MilitaryLayer {
           scaleByDistance: new NearFarScalar(2_000_000, 1.4, 20_000_000, 0.4),
         },
         label: {
-          text: `MIL ${flight.callsign}`,
+          text: (() => { const t = `MIL ${flight.callsign}`; return t.length > 9 ? `${t.slice(0, 9)}…` : t; })(),
           font: "10px monospace",
           style: LabelStyle.FILL,
           fillColor: Color.ORANGE,

@@ -61,7 +61,7 @@ export class FlightLayer {
           scaleByDistance: new NearFarScalar(2_000_000, 1.3, 20_000_000, 0.4),
         },
         label: {
-          text: flight.callsign,
+          text: flight.callsign.length > 9 ? `${flight.callsign.slice(0, 9)}…` : flight.callsign,
           font: "10px monospace",
           style: LabelStyle.FILL,
           fillColor: Color.CYAN,

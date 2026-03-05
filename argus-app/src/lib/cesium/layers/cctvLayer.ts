@@ -61,7 +61,7 @@ export class CctvLayer {
           scaleByDistance: new NearFarScalar(1_000, 0.7, 2_500_000, 0.2),
         },
         label: {
-          text: camera.name,
+          text: camera.name.length > 9 ? `${camera.name.slice(0, 9)}…` : camera.name,
           font: "10px monospace",
           style: LabelStyle.FILL,
           fillColor: Color.LIME,

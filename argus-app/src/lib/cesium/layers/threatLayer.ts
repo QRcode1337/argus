@@ -49,7 +49,7 @@ export class ThreatLayer {
           scaleByDistance: new NearFarScalar(1_000_000, 1.4, 25_000_000, 0.5),
         },
         label: {
-          text: `${topLine}\n${threat.targetedCountry}`,
+          text: (() => { const t = topLine; return t.length > 9 ? `${t.slice(0, 9)}…` : t; })(),
           font: "10px monospace",
           style: LabelStyle.FILL,
           fillColor: Color.fromCssColorString("#ff99bb"),

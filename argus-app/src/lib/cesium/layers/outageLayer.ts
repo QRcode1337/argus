@@ -61,7 +61,7 @@ export class OutageLayer {
           scaleByDistance: new NearFarScalar(1_000_000, 1.5, 25_000_000, 0.6),
         },
         label: {
-          text: `${isActive ? "!! " : ""}${label}\n${causeLabel}`,
+          text: (() => { const t = `${isActive ? "!! " : ""}${label}`; return t.length > 9 ? `${t.slice(0, 9)}…` : t; })(),
           font: "10px monospace",
           style: LabelStyle.FILL,
           fillColor: isActive ? Color.WHITE : Color.LIGHTGRAY,
