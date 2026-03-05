@@ -2,14 +2,16 @@ import {
   Cartesian2,
   Cartesian3,
   Color,
+  ConstantProperty,
   ConstantPositionProperty,
   Entity,
-  HeightReference,
   LabelStyle,
   NearFarScalar,
+  VerticalOrigin,
   type Viewer,
 } from "cesium";
 
+import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
 import { lookupAircraftType } from "@/lib/data/aircraftTypes";
 import type { MilitaryFlight } from "@/types/intel";
 
@@ -17,6 +19,11 @@ export class MilitaryLayer {
   private viewer: Viewer;
 
   private entities = new Map<string, Entity>();
+  private readonly marker = createTacticalMarkerSvg({
+    fill: "#e3ad50",
+    glow: "#ffd088",
+    stroke: "#2f1b08",
+  });
 
   constructor(viewer: Viewer) {
     this.viewer = viewer;
@@ -50,12 +57,10 @@ export class MilitaryLayer {
       const entity = this.viewer.entities.add({
         id: `mil-${flight.id}`,
         position,
-        point: {
-          pixelSize: 5,
-          color: Color.ORANGE,
-          outlineColor: Color.BLACK,
-          outlineWidth: 1,
-          heightReference: HeightReference.NONE,
+        billboard: {
+          image: new ConstantProperty(this.marker),
+          scale: 0.72,
+          verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.4, 20_000_000, 0.4),
         },
         label: {

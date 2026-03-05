@@ -5,9 +5,9 @@ import {
   ConstantProperty,
   ConstantPositionProperty,
   Entity,
-  HeightReference,
   LabelStyle,
   NearFarScalar,
+  VerticalOrigin,
   type Viewer,
 } from "cesium";
 
@@ -57,15 +57,8 @@ export class CctvLayer {
         billboard: {
           image: new ConstantProperty(camera.imageUrl),
           scale: 0.4,
-          verticalOrigin: 1,
+          verticalOrigin: VerticalOrigin.BOTTOM,
           scaleByDistance: new NearFarScalar(1_000, 0.7, 2_500_000, 0.2),
-        },
-        point: {
-          pixelSize: 3,
-          color: Color.LIME,
-          outlineColor: Color.BLACK,
-          outlineWidth: 1,
-          heightReference: HeightReference.CLAMP_TO_GROUND,
         },
         label: {
           text: camera.name,

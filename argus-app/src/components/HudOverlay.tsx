@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { CAMERA_PRESETS } from "@/lib/config";
+import { useState, useEffect, useMemo } from "react";
+import { ARGUS_CONFIG, CAMERA_PRESETS } from "@/lib/config";
 import type { IntelBriefing, AlertSeverity, IntelAlert, ThreatLevel } from "@/lib/intel/analysisEngine";
+import { fetchNewsFeed, type NewsItem, type RegionDigest } from "@/lib/ingest/news";
 import { useArgusStore } from "@/store/useArgusStore";
 import type { LayerKey, PlatformMode, PlaybackSpeed, SelectedIntel, VisualMode } from "@/types/intel";
+import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
 import { VideoOverlay } from "./VideoOverlay";
 
 type HudOverlayProps = {
@@ -46,6 +48,7 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "bases", label: "Military Bases", feed: "Static Intel" },
   { key: "seismic", label: "Earthquakes (24h)", feed: "USGS" },
   { key: "satellites", label: "Satellites", feed: "CelesTrak" },
+  { key: "satelliteLinks", label: "Sat Link Lines", feed: "Derived" },
   { key: "cctv", label: "CCTV Mesh", feed: "TFL + Windy" },
   { key: "outages", label: "Internet Outages", feed: "CF Radar" },
   { key: "threats", label: "Cyber Threats", feed: "OTX" },
@@ -88,6 +91,34 @@ const severityIcons: Record<AlertSeverity, string> = {
   WARNING: "\u25B2",
   INFO: "\u25CB",
 };
+
+const workspaceDefs = [
+  { id: "intel", label: "Intel" },
+  { id: "news", label: "News" },
+  { id: "feeds", label: "Feeds" },
+  { id: "signal", label: "Signal" },
+  { id: "status", label: "Status" },
+] as const;
+
+type WorkspaceId = (typeof workspaceDefs)[number]["id"];
+type TimeRange = "1h" | "6h" | "24h" | "48h" | "7d" | "ALL";
+
+const timeRangeHours: Record<Exclude<TimeRange, "ALL">, number> = {
+  "1h": 1,
+  "6h": 6,
+  "24h": 24,
+  "48h": 48,
+  "7d": 168,
+};
+
+function TacticalGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className ?? "h-2.5 w-2.5"} aria-hidden>
+      <circle cx="10" cy="10" r="8" fill="#071a24" stroke="#2ad4ff" strokeWidth="1.2" />
+      <path d="M10 3L11.7 8.3L17 10L11.7 11.7L10 17L8.3 11.7L3 10L8.3 8.3Z" fill="#8fefff" />
+    </svg>
+  );
+}
 
 function SliderControl({ label, value, onChange }: SliderDef) {
   return (
@@ -221,18 +252,63 @@ export function HudOverlay({
   const playbackCurrentTime = useArgusStore((s) => s.playbackCurrentTime);
 
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [workspace, setWorkspace] = useState<WorkspaceId>("news");
   const [alertFilter, setAlertFilter] = useState<AlertSeverity | null>(null);
   const [enlargedStream, setEnlargedStream] = useState<{ src: string; title: string } | null>(null);
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
   );
   const [mobileTab, setMobileTab] = useState<"intel" | "feeds" | "controls" | "status" | null>(null);
+  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
+  const [newsSearch, setNewsSearch] = useState("");
+  const [newsSortMode, setNewsSortMode] = useState<"score" | "newest">("score");
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [newsRegions, setNewsRegions] = useState<Record<CommandRegion, RegionDigest> | null>(null);
+  const [newsSourceFilter, setNewsSourceFilter] = useState<string>("ALL");
+  const [newsRegionFilter, setNewsRegionFilter] = useState<CommandRegion>("WORLDCOM");
+  const [newsMeta, setNewsMeta] = useState<{ dedupedCount: number; fetchedAt: string } | null>(null);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsError, setNewsError] = useState<string | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadNews = async () => {
+      setNewsLoading(true);
+      try {
+        const payload = await fetchNewsFeed(ARGUS_CONFIG.endpoints.news);
+        if (cancelled) return;
+        setNewsItems(payload.items);
+        setNewsRegions(payload.regions);
+        setNewsMeta({
+          dedupedCount: payload.meta.dedupedCount,
+          fetchedAt: payload.meta.fetchedAt,
+        });
+        setNewsError(null);
+      } catch (error) {
+        if (cancelled) return;
+        setNewsError(error instanceof Error ? error.message : "Failed to load news feed");
+      } finally {
+        if (!cancelled) setNewsLoading(false);
+      }
+    };
+
+    void loadNews();
+    const timer = setInterval(() => {
+      void loadNews();
+    }, ARGUS_CONFIG.pollMs.news);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, []);
 
   const analyticsLayerDefs: {
@@ -246,6 +322,46 @@ export function HudOverlay({
   ];
 
   const modeLabel = modeDefs.find((mode) => mode.key === visualMode)?.label ?? "Normal";
+  const newsSources = useMemo(() => {
+    const set = new Set(newsItems.map((item) => item.source));
+    return ["ALL", ...Array.from(set).sort()];
+  }, [newsItems]);
+
+  const filteredNewsItems = useMemo(() => {
+    const now = Date.now();
+    let next = newsItems.filter((item) =>
+      newsRegionFilter === "WORLDCOM" ? true : item.region === newsRegionFilter,
+    );
+
+    if (timeRange !== "ALL") {
+      const horizon = now - timeRangeHours[timeRange] * 3_600_000;
+      next = next.filter((item) => new Date(item.publishedAt).getTime() >= horizon);
+    }
+
+    if (newsSourceFilter !== "ALL") {
+      next = next.filter((item) => item.source === newsSourceFilter);
+    }
+
+    const query = newsSearch.trim().toLowerCase();
+    if (query) {
+      next = next.filter(
+        (item) =>
+          item.title.toLowerCase().includes(query) ||
+          item.summary.toLowerCase().includes(query) ||
+          item.tags.some((tag) => tag.toLowerCase().includes(query)),
+      );
+    }
+
+    if (newsSortMode === "newest") {
+      return next.sort(
+        (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+      );
+    }
+
+    return next.sort((a, b) => b.score - a.score);
+  }, [newsItems, newsRegionFilter, newsSearch, newsSortMode, newsSourceFilter, timeRange]);
+
+  const activeRegionDigest = newsRegions?.[newsRegionFilter] ?? null;
   const recTimestamp = Math.max(
     feedHealth.opensky.lastSuccessAt ?? 0,
     feedHealth.adsb.lastSuccessAt ?? 0,
@@ -326,24 +442,64 @@ export function HudOverlay({
           : [];
 
   const totalLiveCount =
-    counts.flights + counts.military + counts.seismic + counts.satellites + counts.cctv;
+    counts.flights +
+    counts.military +
+    counts.seismic +
+    counts.satellites +
+    counts.satelliteLinks +
+    counts.cctv +
+    counts.bases +
+    counts.outages +
+    counts.threats;
 
   const activeFeedCount = Object.values(feedHealth).filter(
     (fh) => fh.status === "ok",
   ).length;
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 text-[12px] text-[#99ffca]">
+    <div className="pointer-events-none absolute inset-0 z-20 text-[10px] text-[#99ffca]">
+      {/* Top info strip */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] hidden h-8 items-center justify-between border-b border-[#113446] bg-[#040a12e6] px-4 font-mono uppercase tracking-[0.22em] text-[#6f93a5] md:flex">
+        <span>Global Situation</span>
+        <span>{new Date().toUTCString().replace("GMT", "UTC")}</span>
+      </div>
+
+      {/* Bottom info strip */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[25] hidden h-7 items-center justify-between border-t border-[#113446] bg-[#040a12e6] px-4 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6f93a5] md:flex">
+        <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: {activeFeedCount}/9</span>
+        <span>
+          Region {newsRegionFilter} · {activeRegionDigest?.posture ?? "STABLE"}
+        </span>
+      </div>
+
+      {/* Time range strip */}
+      <div className="pointer-events-auto absolute left-4 top-10 hidden rounded-md border border-[#123244] bg-[#040b17e0] p-1 md:flex">
+        {(["1h", "6h", "24h", "48h", "7d", "ALL"] as TimeRange[]).map((range) => (
+          <button
+            key={range}
+            type="button"
+            onClick={() => setTimeRange(range)}
+            className={`rounded-sm px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
+              timeRange === range
+                ? "bg-[#29efab] text-[#03120d]"
+                : "text-[#6f93a5] hover:bg-[#0a1a2e] hover:text-[#9ceaff]"
+            }`}
+          >
+            {range}
+          </button>
+        ))}
+      </div>
+
       {/* ARGUS header */}
-      <header className="absolute left-3 top-2 font-mono md:left-6 md:top-4">
-        <h1 className="text-[24px] font-semibold leading-none tracking-[0.34em] text-[#e8fcff] md:text-[50px]">
+      <header className="absolute left-3 top-2 font-mono md:left-6 md:top-10">
+        <h1 className="text-[20px] font-semibold leading-none tracking-[0.34em] text-[#e8fcff] md:text-[42px]">
           ARG<span className="text-[#2ad4ff]">US</span>
         </h1>
         <p className="mt-1 hidden text-[10px] uppercase tracking-[0.45em] text-[#4e9ca8] md:block">Epsilon LLC</p>
       </header>
 
       {/* Active style display (top-right) — desktop only */}
-      <div className="absolute right-8 top-7 hidden text-right font-mono uppercase tracking-[0.28em] text-[#4e9ca8] md:block">
+      <div className="absolute right-8 top-10 hidden text-right font-mono uppercase tracking-[0.28em] text-[#4e9ca8] md:block">
         <div className="text-[10px] text-[#6b8d97]">Active Style</div>
         <div className="text-[26px] text-[#2ad4ff]">{modeLabel}</div>
       </div>
@@ -498,8 +654,134 @@ export function HudOverlay({
             </button>
           </div>
 
+          <div className="grid grid-cols-5 gap-1 border-b border-[#113446] px-2 py-1.5">
+            {workspaceDefs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setWorkspace(tab.id)}
+                className={`rounded px-1 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
+                  workspace === tab.id
+                    ? "border border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
+                    : "border border-transparent text-[#6c8ea2] hover:border-[#284f63] hover:bg-[#081322]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {workspace === "news" && (
+            <section className="space-y-2 border-b border-[#113446] px-3 py-2.5">
+              <div className="flex items-center justify-between">
+                <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#e3ad50]">Live News</div>
+                <div className="font-mono text-[8px] text-[#6c8ea2]">
+                  {newsMeta ? `${newsMeta.dedupedCount} items` : "--"}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-1">
+                {COMMAND_REGIONS.map((region) => (
+                  <button
+                    key={region}
+                    type="button"
+                    onClick={() => setNewsRegionFilter(region)}
+                    className={`rounded-md border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] ${
+                      newsRegionFilter === region
+                        ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
+                        : "border-[#284f63] bg-[#081322] text-[#7298a8]"
+                    }`}
+                  >
+                    {region}
+                  </button>
+                ))}
+              </div>
+
+              <div className="rounded-md border border-[#123244] bg-[#040b17] px-2 py-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#6c8ea2]">AI Summary</span>
+                  <span className="font-mono text-[8px] text-[#2ad4ff]">{activeRegionDigest?.posture ?? "STABLE"}</span>
+                </div>
+                <p className="mt-1 font-mono text-[9px] leading-relaxed text-[#8bb8c9]">
+                  {activeRegionDigest?.summary ?? "Collecting source headlines for regional summary..."}
+                </p>
+              </div>
+
+              <input
+                type="text"
+                placeholder="Search headlines..."
+                value={newsSearch}
+                onChange={(e) => setNewsSearch(e.target.value)}
+                className="w-full rounded-md border border-[#284f63] bg-[#081322] px-2 py-1.5 font-mono text-[10px] text-[#d5f7ff] placeholder-[#4e6a7a] focus:border-[#2ad4ff] focus:outline-none"
+              />
+
+              <div className="flex gap-1">
+                <select
+                  value={newsSourceFilter}
+                  onChange={(e) => setNewsSourceFilter(e.target.value)}
+                  className="flex-1 rounded-md border border-[#284f63] bg-[#081322] px-2 py-1 font-mono text-[9px] text-[#d5f7ff] focus:border-[#2ad4ff] focus:outline-none"
+                >
+                  {newsSources.map((source) => (
+                    <option key={source} value={source}>{source}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setNewsSortMode((prev) => (prev === "score" ? "newest" : "score"))}
+                  className="rounded-md border border-[#284f63] bg-[#081322] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em] text-[#9ceaff]"
+                >
+                  {newsSortMode === "score" ? "Intel" : "Newest"}
+                </button>
+              </div>
+
+              {newsError ? (
+                <div className="rounded-md border border-[#712d2d] bg-[#2a1010] px-2 py-1.5 font-mono text-[9px] text-[#ff9191]">
+                  {newsError}
+                </div>
+              ) : null}
+
+              {newsLoading && filteredNewsItems.length === 0 ? (
+                <div className="rounded-md border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[9px] text-[#7faec0]">
+                  Pulling feeds...
+                </div>
+              ) : null}
+
+              <div className="max-h-[390px] space-y-1 overflow-y-auto pr-0.5">
+                {filteredNewsItems.slice(0, 60).map((item) => (
+                  <article
+                    key={item.id}
+                    className="rounded-md border border-[#123244] bg-[#040b17] px-2 py-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-mono text-[8px] uppercase tracking-[0.1em] text-[#6c8ea2]">
+                        {item.source}
+                      </span>
+                      <span className="font-mono text-[8px] text-[#4e6a7a]">
+                        {new Date(item.publishedAt).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 block font-mono text-[10px] leading-snug text-[#d5f7ff] hover:text-[#9ceaff]"
+                    >
+                      {item.title}
+                    </a>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className="truncate font-mono text-[8px] text-[#6c8ea2]">
+                        {item.tags.join(" · ")}
+                      </span>
+                      <span className="font-mono text-[8px] text-[#2ad4ff]">{item.score.toFixed(1)}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* INTEL BRIEF section */}
-          {platformMode === "live" && (
+          {workspace === "intel" && platformMode === "live" && (
             <CollapsibleSection
               title="Intel Brief"
               badge={
@@ -634,7 +916,7 @@ export function HudOverlay({
           )}
 
           {/* SEARCH section */}
-          {platformMode === "live" && (
+          {workspace === "intel" && platformMode === "live" && (
             <CollapsibleSection title="Search" badge={searchResults.length > 0 ? `${searchResults.length}` : null}>
               <div className="space-y-1.5">
                 <input
@@ -692,7 +974,7 @@ export function HudOverlay({
           )}
 
           {/* FEATURED FEEDS — curated live streams with thumbnails */}
-          {platformMode === "live" && cameras.length > 0 && (() => {
+          {workspace === "feeds" && platformMode === "live" && cameras.length > 0 && (() => {
             const filtered = cameras.filter((cam) => cctvCategoryFilter === "All" || cam.category === cctvCategoryFilter);
             const featured = filtered.filter((cam) => cam.streamUrl);
             const cctv = filtered.filter((cam) => !cam.streamUrl);
@@ -738,7 +1020,7 @@ export function HudOverlay({
                               <span className="font-mono text-[7px] text-red-400">LIVE</span>
                             </div>
                           </div>
-                          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#99ffca]" />
+                          <TacticalGlyph className="h-3 w-3 shrink-0" />
                         </button>
                       ))}
                     </div>
@@ -759,7 +1041,7 @@ export function HudOverlay({
                           }}
                           className="flex w-full items-center gap-1.5 border-b border-[#0d1f2d] px-1 py-[3px] text-left transition hover:bg-[#0a1a2e]"
                         >
-                          <span className="h-1 w-1 shrink-0 rounded-full bg-[#4e9ca8]" />
+                          <TacticalGlyph className="h-2.5 w-2.5 shrink-0" />
                           <span className="min-w-0 flex-1 truncate font-mono text-[8px] text-[#8eb8c8]">
                             {cam.name}
                           </span>
@@ -776,6 +1058,7 @@ export function HudOverlay({
           })()}
 
           {/* INTEL FEEDS section */}
+          {workspace === "feeds" && (
           <CollapsibleSection
             title="Intel Feeds"
             badge={platformMode === "analytics" ? "Raster" : `${compact(totalLiveCount)}`}
@@ -824,16 +1107,18 @@ export function HudOverlay({
             ) : (
               <div className="space-y-1">
                 {layerDefs.map((layer) => {
-                  const value =
-                    layer.key === "flights"
-                      ? counts.flights
-                      : layer.key === "military"
-                        ? counts.military
-                        : layer.key === "satellites"
-                          ? counts.satellites
-                          : layer.key === "seismic"
-                            ? counts.seismic
-                            : counts.cctv;
+                  const valueMap: Record<LayerKey, number> = {
+                    flights: counts.flights,
+                    military: counts.military,
+                    satellites: counts.satellites,
+                    satelliteLinks: counts.satelliteLinks,
+                    seismic: counts.seismic,
+                    cctv: counts.cctv,
+                    bases: counts.bases,
+                    outages: counts.outages,
+                    threats: counts.threats,
+                  };
+                  const value = valueMap[layer.key];
 
                   return (
                     <button
@@ -883,8 +1168,10 @@ export function HudOverlay({
               </div>
             )}
           </CollapsibleSection>
+          )}
 
           {/* SIGNAL section */}
+          {workspace === "signal" && (
           <CollapsibleSection title="Signal" badge={modeLabel}>
             <div className="space-y-1.5">
               <SliderControl
@@ -902,8 +1189,10 @@ export function HudOverlay({
               )}
             </div>
           </CollapsibleSection>
+          )}
 
           {/* STATUS section */}
+          {workspace === "status" && (
           <CollapsibleSection title="Status" badge={`${activeFeedCount}/9`}>
             <div className="space-y-1.5">
               <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
@@ -927,6 +1216,7 @@ export function HudOverlay({
               </div>
             </div>
           </CollapsibleSection>
+          )}
         </nav>
       ) : (
         <button
@@ -1196,7 +1486,7 @@ export function HudOverlay({
                                 }}
                                 className="flex w-full items-center gap-1.5 border-b border-[#0d1f2d] px-1 py-[3px] text-left"
                               >
-                                <span className="h-1 w-1 shrink-0 rounded-full bg-[#4e9ca8]" />
+                                <TacticalGlyph className="h-2.5 w-2.5 shrink-0" />
                                 <span className="min-w-0 flex-1 truncate font-mono text-[8px] text-[#8eb8c8]">{cam.name}</span>
                               </button>
                             ))}

@@ -10,6 +10,7 @@ export const ARGUS_CONFIG = {
     otx: "/api/feeds/otx",
     fred: "/api/feeds/fred",
     aisstream: "/api/feeds/aisstream",
+    news: "/api/feeds/news",
   },
   pollMs: {
     openSky: 10_000,
@@ -22,6 +23,7 @@ export const ARGUS_CONFIG = {
     otx: 10 * 60_000,
     fred: 15 * 60_000,
     aisstream: 60_000,
+    news: Number(process.env.NEXT_PUBLIC_NEWS_POLL_MS ?? process.env.NEWS_POLL_MS ?? 300_000),
   },
   limits: {
     maxFlights: 7000,

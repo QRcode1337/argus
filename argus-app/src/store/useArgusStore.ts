@@ -30,8 +30,12 @@ type ArgusStore = {
     flights: number;
     military: number;
     satellites: number;
+    satelliteLinks: number;
     seismic: number;
     cctv: number;
+    bases: number;
+    outages: number;
+    threats: number;
   };
   feedHealth: Record<FeedKey, FeedHealth>;
   activePoiId: string | null;
@@ -45,7 +49,16 @@ type ArgusStore = {
   toggleLayer: (layer: LayerKey) => void;
   setLayer: (layer: LayerKey, enabled: boolean) => void;
   setCount: (
-    key: "flights" | "military" | "satellites" | "seismic" | "cctv" | "bases" | "outages" | "threats",
+    key:
+      | "flights"
+      | "military"
+      | "satellites"
+      | "satelliteLinks"
+      | "seismic"
+      | "cctv"
+      | "bases"
+      | "outages"
+      | "threats",
     value: number,
   ) => void;
   setFeedHealthy: (key: FeedKey) => void;
@@ -109,6 +122,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     flights: false,
     military: true,
     satellites: false,
+    satelliteLinks: true,
     seismic: false,
     cctv: true,
     bases: true,
@@ -119,6 +133,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     flights: 0,
     military: 0,
     satellites: 0,
+    satelliteLinks: 0,
     seismic: 0,
     cctv: 0,
     bases: 0,
