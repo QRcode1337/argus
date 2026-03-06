@@ -3,9 +3,7 @@ import { create } from "zustand";
 import type { IntelBriefing } from "@/lib/intel/analysisEngine";
 import type {
   AnalyticsLayerKey,
-  CameraCategory,
   CameraReadout,
-  CctvCamera,
   FeedHealth,
   FeedKey,
   LayerKey,
@@ -82,8 +80,6 @@ type ArgusStore = {
   setIntelBriefing: (briefing: IntelBriefing | null) => void;
   trackedEntityId: string | null;
   setTrackedEntityId: (id: string | null) => void;
-  cameras: CctvCamera[];
-  setCameras: (cameras: CctvCamera[]) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   searchResults: SearchResult[];
@@ -252,8 +248,6 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setIntelBriefing: (briefing) => set({ intelBriefing: briefing }),
   trackedEntityId: null,
   setTrackedEntityId: (id) => set({ trackedEntityId: id }),
-  cameras: [],
-  setCameras: (cameras) => set({ cameras }),
   searchQuery: "",
   setSearchQuery: (query) => set({ searchQuery: query }),
   searchResults: [],
