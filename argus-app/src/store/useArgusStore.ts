@@ -145,7 +145,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     celestrak: emptyFeed(),
     usgs: emptyFeed(),
     adsb: emptyFeed(),
-    tfl: emptyFeed(),
+    cctv: emptyFeed(),
     cfradar: emptyFeed(),
     otx: emptyFeed(),
     fred: emptyFeed(),

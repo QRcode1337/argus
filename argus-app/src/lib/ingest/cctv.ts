@@ -50,16 +50,6 @@ const INTEL_CAMERAS: CctvCamera[] = [
     provider: "Hardcoded",
   },
   {
-    id: "intel-abbey-road",
-    name: "Abbey Road Crossing — London",
-    longitude: -0.1780,
-    latitude: 51.5320,
-    imageUrl: "/camera-placeholder.svg",
-    streamUrl: "https://www.youtube.com/embed/dqBs2x6AMXY?autoplay=1&mute=1",
-    category: "Landmark",
-    provider: "Hardcoded",
-  },
-  {
     id: "intel-jackson-hole",
     name: "Jackson Hole Town Square — Wyoming",
     longitude: -110.7624,
@@ -401,34 +391,12 @@ export async function fetchWindyWebcams(endpoint: string): Promise<CctvCamera[]>
   }
 }
 
-export async function fetchCctvCameras(tflEndpoint: string, webcamsEndpoint?: string): Promise<CctvCamera[]> {
-  const tflPromise = fetch(tflEndpoint, {
-    cache: "no-store",
-    headers: { Accept: "application/json" },
-  })
-    .then(async (response) => {
-      if (!response.ok) throw new Error(`CCTV HTTP ${response.status}`);
-      const raw = await response.json();
-      const places: TflCamera[] = Array.isArray(raw) ? raw : ((raw as { places?: TflCamera[] }).places ?? []);
-      return places
-        .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lon))
-        .map((item) => ({
-          id: item.id,
-          name: item.commonName,
-          longitude: item.lon as number,
-          latitude: item.lat as number,
-          imageUrl: findImageUrl(item) ?? "/camera-placeholder.svg",
-          category: "Traffic" as const,
-          provider: "TFL" as const,
-        }));
-    })
-    .catch(() => [] as CctvCamera[]);
-
+export async function fetchCctvCameras(webcamsEndpoint?: string): Promise<CctvCamera[]> {
   const windyPromise = webcamsEndpoint
     ? fetchWindyWebcams(webcamsEndpoint)
     : Promise.resolve([] as CctvCamera[]);
 
-  const [tflCameras, windyCameras] = await Promise.all([tflPromise, windyPromise]);
+  const windyCameras = await windyPromise;
 
-  return [...INTEL_CAMERAS, ...tflCameras, ...windyCameras];
+  return [...INTEL_CAMERAS, ...windyCameras];
 }

@@ -4,7 +4,7 @@ export const ARGUS_CONFIG = {
     celestrak: process.env.NEXT_PUBLIC_CELESTRAK_ENDPOINT ?? "/api/feeds/celestrak",
     usgs: process.env.NEXT_PUBLIC_USGS_ENDPOINT ?? "/api/feeds/usgs",
     adsbMilitary: process.env.NEXT_PUBLIC_ADSB_ENDPOINT ?? "/api/feeds/adsb-military",
-    cctv: process.env.NEXT_PUBLIC_CCTV_ENDPOINT ?? "/api/feeds/tfl-cctv",
+    cctv: process.env.NEXT_PUBLIC_CCTV_ENDPOINT ?? "",
     webcams: process.env.NEXT_PUBLIC_WEBCAMS_ENDPOINT ?? "/api/feeds/webcams",
     cloudflareRadar: "/api/feeds/cloudflare-radar",
     otx: "/api/feeds/otx",
@@ -38,7 +38,6 @@ export const ARGUS_CONFIG = {
 export const CAMERA_PRESETS = [
   { id: "pentagon", label: "Pentagon", lon: -77.0559, lat: 38.8719, height: 4200, heading: 0, pitch: -0.75, roll: 0 },
   { id: "burj-khalifa", label: "Burj Khalifa", lon: 55.2744, lat: 25.1972, height: 3500, heading: 0, pitch: -0.72, roll: 0 },
-  { id: "london-bridge", label: "London Bridge", lon: -0.0877, lat: 51.5079, height: 3000, heading: 0, pitch: -0.7, roll: 0 },
   { id: "eiffel-tower", label: "Eiffel Tower", lon: 2.2945, lat: 48.8584, height: 2500, heading: 0, pitch: -0.6, roll: 0 },
   { id: "mt-fuji", label: "Mount Fuji", lon: 138.7274, lat: 35.3606, height: 18000, heading: 0, pitch: -0.4, roll: 0 },
   { id: "times-square", label: "Times Square", lon: -73.9851, lat: 40.7580, height: 1800, heading: 0.1, pitch: -0.5, roll: 0 },

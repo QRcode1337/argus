@@ -806,7 +806,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       run: async () => {
         if (platformModeRef.current !== "live") return;
         try {
-          const cameras = await fetchCctvCameras(ARGUS_CONFIG.endpoints.cctv, ARGUS_CONFIG.endpoints.webcams);
+          const cameras = await fetchCctvCameras(ARGUS_CONFIG.endpoints.webcams);
           setCameras(cameras);
           const categoryFilter = useArgusStore.getState().cctvCategoryFilter;
           const filtered = categoryFilter === "All"
@@ -814,9 +814,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
             : cameras.filter((c) => c.category === categoryFilter);
           const count = cctvLayer.upsertCameras(filtered.slice(0, ARGUS_CONFIG.limits.maxCctv));
           setCount("cctv", count);
-          setFeedHealthy("tfl");
+          setFeedHealthy("cctv");
         } catch (error) {
-          setFeedError("tfl", error instanceof Error ? error.message : "Failed to fetch CCTV");
+          setFeedError("cctv", error instanceof Error ? error.message : "Failed to fetch CCTV");
         }
       },
     });

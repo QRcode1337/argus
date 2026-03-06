@@ -66,6 +66,8 @@ const fmtDate = (ts: number | null): string => {
   return new Date(ts).toLocaleTimeString();
 };
 
+const formatUtcTimestamp = (date: Date): string => date.toUTCString().replace("GMT", "UTC");
+
 const compact = (value: number): string => {
   if (value >= 1000) {
     return `${(value / 1000).toFixed(1)}K`;
@@ -255,9 +257,8 @@ export function HudOverlay({
   const [workspace, setWorkspace] = useState<WorkspaceId>("news");
   const [alertFilter, setAlertFilter] = useState<AlertSeverity | null>(null);
   const [enlargedStream, setEnlargedStream] = useState<{ src: string; title: string } | null>(null);
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
-  );
+  const [isMobile, setIsMobile] = useState(false);
+  const [utcTimestamp, setUtcTimestamp] = useState("");
   const [mobileTab, setMobileTab] = useState<"intel" | "feeds" | "controls" | "status" | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [newsSearch, setNewsSearch] = useState("");
@@ -272,9 +273,17 @@ export function HudOverlay({
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
+    const updateUtcTimestamp = () => setUtcTimestamp(formatUtcTimestamp(new Date()));
+    updateUtcTimestamp();
+    const timer = window.setInterval(updateUtcTimestamp, 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -367,7 +376,7 @@ export function HudOverlay({
     feedHealth.adsb.lastSuccessAt ?? 0,
     feedHealth.celestrak.lastSuccessAt ?? 0,
     feedHealth.usgs.lastSuccessAt ?? 0,
-    feedHealth.tfl.lastSuccessAt ?? 0,
+    feedHealth.cctv.lastSuccessAt ?? 0,
     feedHealth.cfradar.lastSuccessAt ?? 0,
     feedHealth.otx.lastSuccessAt ?? 0,
     feedHealth.fred.lastSuccessAt ?? 0,
@@ -461,7 +470,7 @@ export function HudOverlay({
       {/* Top info strip */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] hidden h-8 items-center justify-between border-b border-[#113446] bg-[#040a12e6] px-4 font-mono uppercase tracking-[0.22em] text-[#6f93a5] md:flex">
         <span>Global Situation</span>
-        <span>{new Date().toUTCString().replace("GMT", "UTC")}</span>
+        <span>{utcTimestamp}</span>
       </div>
 
       {/* Bottom info strip */}
@@ -1201,7 +1210,7 @@ export function HudOverlay({
                 <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
                 <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
                 <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
-                <div>TFL: {feedHealth.tfl.status} @ {fmtDate(feedHealth.tfl.lastSuccessAt)}</div>
+                <div>CCTV: {feedHealth.cctv.status} @ {fmtDate(feedHealth.cctv.lastSuccessAt)}</div>
                 <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
                 <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
                 <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
@@ -1615,7 +1624,7 @@ export function HudOverlay({
                       <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
                       <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
                       <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
-                      <div>TFL: {feedHealth.tfl.status} @ {fmtDate(feedHealth.tfl.lastSuccessAt)}</div>
+                      <div>CCTV: {feedHealth.cctv.status} @ {fmtDate(feedHealth.cctv.lastSuccessAt)}</div>
                       <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
                       <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
                       <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>

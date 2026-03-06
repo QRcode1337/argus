@@ -9,7 +9,7 @@ export type LayerKey =
   | "outages"
   | "threats";
 export type SceneMode = "globe" | "map";
-export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "tfl" | "cfradar" | "otx" | "fred" | "ais";
+export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "cctv" | "cfradar" | "otx" | "fred" | "ais";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
 export type PlatformMode = "live" | "playback" | "analytics";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";
