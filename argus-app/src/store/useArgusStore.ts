@@ -32,7 +32,6 @@ type ArgusStore = {
     satellites: number;
     satelliteLinks: number;
     seismic: number;
-    cctv: number;
     bases: number;
     outages: number;
     threats: number;
@@ -56,7 +55,6 @@ type ArgusStore = {
       | "satellites"
       | "satelliteLinks"
       | "seismic"
-      | "cctv"
       | "bases"
       | "outages"
       | "threats"
@@ -78,8 +76,6 @@ type ArgusStore = {
     key: P,
     value: number,
   ) => void;
-  cctvCategoryFilter: CameraCategory | "All";
-  setCctvCategoryFilter: (filter: CameraCategory | "All") => void;
   toggleAnalyticsLayer: (key: AnalyticsLayerKey) => void;
   setActiveGfsCogPath: (path: string | null) => void;
   intelBriefing: IntelBriefing | null;
@@ -126,7 +122,6 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     satellites: false,
     satelliteLinks: true,
     seismic: false,
-    cctv: true,
     bases: true,
     outages: true,
     threats: true,
@@ -138,7 +133,6 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     satellites: 0,
     satelliteLinks: 0,
     seismic: 0,
-    cctv: 0,
     bases: 0,
     outages: 0,
     threats: 0,
@@ -149,7 +143,6 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     celestrak: emptyFeed(),
     usgs: emptyFeed(),
     adsb: emptyFeed(),
-    tfl: emptyFeed(),
     cfradar: emptyFeed(),
     otx: emptyFeed(),
     fred: emptyFeed(),
@@ -170,8 +163,6 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     sentinel_imagery: false,
   },
   activeGfsCogPath: null,
-  cctvCategoryFilter: "All",
-  setCctvCategoryFilter: (filter) => set({ cctvCategoryFilter: filter }),
   visualParams: {
     nvg: {
       gain: 0.75,

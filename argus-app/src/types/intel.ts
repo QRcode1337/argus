@@ -4,13 +4,12 @@ export type LayerKey =
   | "satellites"
   | "satelliteLinks"
   | "seismic"
-  | "cctv"
   | "bases"
   | "outages"
   | "threats"
   | "gdelt";
 export type SceneMode = "globe" | "map";
-export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "tfl" | "cfradar" | "otx" | "fred" | "ais" | "gdelt";
+export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "cfradar" | "otx" | "fred" | "ais" | "gdelt";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
 export type PlatformMode = "live" | "playback" | "analytics";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";

@@ -49,7 +49,6 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "seismic", label: "Earthquakes (24h)", feed: "USGS" },
   { key: "satellites", label: "Satellites", feed: "CelesTrak" },
   { key: "satelliteLinks", label: "Sat Link Lines", feed: "Derived" },
-  { key: "cctv", label: "CCTV Mesh", feed: "TFL + Windy" },
   { key: "outages", label: "Internet Outages", feed: "CF Radar" },
   { key: "threats", label: "Cyber Threats", feed: "OTX" },
   { key: "gdelt", label: "GDELT Events", feed: "GDELT" },
@@ -234,15 +233,12 @@ export function HudOverlay({
     setPlatformMode,
     analyticsLayers,
     toggleAnalyticsLayer,
-    cctvCategoryFilter,
-    setCctvCategoryFilter,
     sceneMode,
     setSceneMode,
     dayNight,
     toggleDayNight,
   } = useArgusStore();
 
-  const cameras = useArgusStore((s) => s.cameras);
   const searchQuery = useArgusStore((s) => s.searchQuery);
   const setSearchQuery = useArgusStore((s) => s.setSearchQuery);
   const searchResults = useArgusStore((s) => s.searchResults);
@@ -368,7 +364,7 @@ export function HudOverlay({
     feedHealth.adsb.lastSuccessAt ?? 0,
     feedHealth.celestrak.lastSuccessAt ?? 0,
     feedHealth.usgs.lastSuccessAt ?? 0,
-    feedHealth.tfl.lastSuccessAt ?? 0,
+
     feedHealth.cfradar.lastSuccessAt ?? 0,
     feedHealth.otx.lastSuccessAt ?? 0,
     feedHealth.fred.lastSuccessAt ?? 0,
@@ -448,7 +444,6 @@ export function HudOverlay({
     counts.seismic +
     counts.satellites +
     counts.satelliteLinks +
-    counts.cctv +
     counts.bases +
     counts.outages +
     counts.threats +
@@ -468,7 +463,7 @@ export function HudOverlay({
 
       {/* Bottom info strip */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[25] hidden h-7 items-center justify-between border-t border-[#3c3836] bg-[#1d2021e6] px-4 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374] md:flex">
-        <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: {activeFeedCount}/9</span>
+        <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: {activeFeedCount}/8</span>
         <span>
           Region {newsRegionFilter} · {activeRegionDigest?.posture ?? "STABLE"}
         </span>
@@ -493,7 +488,7 @@ export function HudOverlay({
       </div>
 
       {/* ARGUS header */}
-      <header className="absolute left-3 top-2 font-mono md:left-6 md:top-[3.5rem]">
+      <header className="absolute left-3 top-2 font-mono md:left-6 md:top-[5.5rem]">
         <h1 className="text-[20px] font-semibold leading-none tracking-[0.34em] text-[#ebdbb2] md:text-[42px]">
           ARG<span className="text-[#83a598]">US</span>
         </h1>
@@ -581,12 +576,6 @@ export function HudOverlay({
                 className="mt-2 h-32 w-full rounded border border-[#504945] object-cover"
               />
             </>
-          ) : selectedIntel.kind === "cctv" ? (
-            <div className="mt-2 flex h-32 w-full items-center justify-center rounded border border-[#1a3040] bg-[#1d2021]">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-[#4e6a7a]">
-                No live feed
-              </span>
-            </div>
           ) : null}
 
           <div className="mt-2 flex gap-2">
@@ -631,6 +620,23 @@ export function HudOverlay({
               {showFullIntel ? "Hide Full Intel" : "Load Full Intel"}
             </button>
           ) : null}
+
+          <button
+            type="button"
+            onClick={() => {
+              const summary = [
+                `AI Analysis — ${selectedIntel.name}`,
+                `Type: ${selectedIntel.kind} | ${selectedIntel.importance === "important" ? "Priority" : "Standard"} Target`,
+                "",
+                ...selectedIntel.quickFacts.map((f) => `${f.label}: ${f.value}`),
+                ...(selectedIntel.fullFacts.length ? ["", ...selectedIntel.fullFacts.map((f) => `${f.label}: ${f.value}`)] : []),
+              ].join("\n");
+              alert(summary);
+            }}
+            className="mt-2 w-full rounded-lg border border-[#fabd2f]/40 bg-[#fabd2f]/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#fabd2f] transition hover:border-[#fabd2f] hover:bg-[#fabd2f]/20"
+          >
+            AI Analysis / Summary
+          </button>
         </section>
       ) : null}
 
@@ -641,7 +647,7 @@ export function HudOverlay({
 
       {/* LEFT SIDEBAR - Collapsible Accordion Panels — desktop only */}
       {sidebarVisible && !isMobile ? (
-        <nav className="pointer-events-auto absolute left-4 top-24 w-[260px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md">
+        <nav className="pointer-events-auto absolute left-4 top-[8.5rem] w-[260px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md">
           {/* Sidebar header with hide button */}
           <div className="flex items-center justify-between border-b border-[#3c3836] px-3 py-2">
             <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#a89984]">
@@ -936,7 +942,6 @@ export function HudOverlay({
                         military: "text-[#fabd2f]",
                         satellite: "text-[#b8bb26]",
                         earthquake: "text-[#ff6b6b]",
-                        cctv: "text-[#c4b5fd]",
                       };
                       return (
                         <button
@@ -975,89 +980,6 @@ export function HudOverlay({
             </CollapsibleSection>
           )}
 
-          {/* FEATURED FEEDS — curated live streams with thumbnails */}
-          {workspace === "feeds" && platformMode === "live" && cameras.length > 0 && (() => {
-            const filtered = cameras.filter((cam) => cctvCategoryFilter === "All" || cam.category === cctvCategoryFilter);
-            const featured = filtered.filter((cam) => cam.streamUrl);
-            const cctv = filtered.filter((cam) => !cam.streamUrl);
-            return (
-              <>
-                {featured.length > 0 && (
-                  <CollapsibleSection title="Featured Feeds" badge={`${featured.length} live`}>
-                    <div className="max-h-[400px] space-y-1.5 overflow-y-auto">
-                      {featured.map((cam) => (
-                        <button
-                          key={cam.id}
-                          type="button"
-                          onClick={() => {
-                            if (!layers.cctv) setLayer("cctv", true);
-                            onFlyToEntityById(`cctv-${cam.id}`);
-                            setEnlargedStream({ src: cam.streamUrl!, title: cam.name });
-                          }}
-                          className="flex w-full items-center gap-2 rounded-lg border border-[#3c3836] bg-[#1d2021] p-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
-                        >
-                          <div className="h-10 w-14 shrink-0 overflow-hidden rounded border border-[#1a3040]">
-                            {cam.imageUrl && cam.imageUrl !== "/camera-placeholder.svg" ? (
-                              /* eslint-disable-next-line @next/next/no-img-element */
-                              <img
-                                src={cam.imageUrl}
-                                alt={cam.name}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-[#282828] font-mono text-[9px] text-[#4e6a7a]">
-                                LIVE
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate font-mono text-[9px] text-[#ebdbb2]">
-                              {cam.name}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-[#928374]">
-                                {cam.category}
-                              </span>
-                              <span className="inline-block h-1 w-1 rounded-full bg-red-500 animate-pulse" />
-                              <span className="font-mono text-[7px] text-red-400">LIVE</span>
-                            </div>
-                          </div>
-                          <TacticalGlyph className="h-3 w-3 shrink-0" />
-                        </button>
-                      ))}
-                    </div>
-                  </CollapsibleSection>
-                )}
-
-                {/* CCTV MESH — compact list of all TFL/bulk cameras */}
-                {cctv.length > 0 && (
-                  <CollapsibleSection title="CCTV Mesh" badge={`${cctv.length}`}>
-                    <div className="max-h-[300px] overflow-y-auto">
-                      {cctv.map((cam) => (
-                        <button
-                          key={cam.id}
-                          type="button"
-                          onClick={() => {
-                            if (!layers.cctv) setLayer("cctv", true);
-                            onFlyToEntityById(`cctv-${cam.id}`);
-                          }}
-                          className="flex w-full items-center gap-1.5 border-b border-[#3c3836] px-1 py-[3px] text-left transition hover:bg-[#3c3836]"
-                        >
-                          <TacticalGlyph className="h-2.5 w-2.5 shrink-0" />
-                          <span className="min-w-0 flex-1 truncate font-mono text-[8px] text-[#8eb8c8]">
-                            {cam.name}
-                          </span>
-                          <span className="shrink-0 font-mono text-[7px] text-[#3a5a6a]">
-                            {cam.category}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </CollapsibleSection>
-                )}
-              </>
-            );
-          })()}
 
           {/* INTEL FEEDS section */}
           {workspace === "feeds" && (
@@ -1115,7 +1037,6 @@ export function HudOverlay({
                     satellites: counts.satellites,
                     satelliteLinks: counts.satelliteLinks,
                     seismic: counts.seismic,
-                    cctv: counts.cctv,
                     bases: counts.bases,
                     outages: counts.outages,
                     threats: counts.threats,
@@ -1150,24 +1071,6 @@ export function HudOverlay({
                   );
                 })}
 
-                {layers.cctv && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {(["All", "Traffic", "Nature", "Landmark", "Wildlife", "Scenic", "Infrastructure"] as const).map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setCctvCategoryFilter(cat)}
-                        className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] transition ${
-                          cctvCategoryFilter === cat
-                            ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
-                            : "border-[#504945] bg-[#282828] text-[#7298a8] hover:border-[#83a598]"
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </CollapsibleSection>
@@ -1204,7 +1107,7 @@ export function HudOverlay({
                 <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
                 <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
                 <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
-                <div>TFL: {feedHealth.tfl.status} @ {fmtDate(feedHealth.tfl.lastSuccessAt)}</div>
+
                 <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
                 <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
                 <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
@@ -1418,87 +1321,13 @@ export function HudOverlay({
                 )}
 
                 {/* FEEDS TAB */}
-                {mobileTab === "feeds" && (() => {
-                  const filtered = cameras.filter((cam) => cctvCategoryFilter === "All" || cam.category === cctvCategoryFilter);
-                  const featured = filtered.filter((cam) => cam.streamUrl);
-                  const cctvList = filtered.filter((cam) => !cam.streamUrl);
-                  return (
-                    <div className="space-y-3">
-                      {/* Category filter chips */}
-                      <div className="flex flex-wrap gap-1">
-                        {(["All", "Traffic", "Nature", "Landmark", "Wildlife", "Scenic", "Infrastructure"] as const).map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => setCctvCategoryFilter(cat)}
-                            className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] transition ${
-                              cctvCategoryFilter === cat
-                                ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
-                                : "border-[#504945] bg-[#282828] text-[#7298a8]"
-                            }`}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Featured streams */}
-                      {featured.length > 0 && (
-                        <div>
-                          <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.28em] text-[#a89984]">Featured Feeds ({featured.length})</div>
-                          <div className="space-y-1">
-                            {featured.map((cam) => (
-                              <button
-                                key={cam.id}
-                                type="button"
-                                onClick={() => {
-                                  if (!layers.cctv) setLayer("cctv", true);
-                                  onFlyToEntityById(`cctv-${cam.id}`);
-                                  setEnlargedStream({ src: cam.streamUrl!, title: cam.name });
-                                  setMobileTab(null);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg border border-[#3c3836] bg-[#1d2021] p-1.5 text-left"
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <div className="truncate font-mono text-[9px] text-[#ebdbb2]">{cam.name}</div>
-                                  <div className="flex items-center gap-1">
-                                    <span className="font-mono text-[7px] text-[#928374]">{cam.category}</span>
-                                    <span className="inline-block h-1 w-1 animate-pulse rounded-full bg-red-500" />
-                                    <span className="font-mono text-[7px] text-red-400">LIVE</span>
-                                  </div>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* CCTV list */}
-                      {cctvList.length > 0 && (
-                        <div>
-                          <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.28em] text-[#a89984]">CCTV Mesh ({cctvList.length})</div>
-                          <div className="max-h-[200px] overflow-y-auto">
-                            {cctvList.map((cam) => (
-                              <button
-                                key={cam.id}
-                                type="button"
-                                onClick={() => {
-                                  if (!layers.cctv) setLayer("cctv", true);
-                                  onFlyToEntityById(`cctv-${cam.id}`);
-                                  setMobileTab(null);
-                                }}
-                                className="flex w-full items-center gap-1.5 border-b border-[#3c3836] px-1 py-[3px] text-left"
-                              >
-                                <TacticalGlyph className="h-2.5 w-2.5 shrink-0" />
-                                <span className="min-w-0 flex-1 truncate font-mono text-[8px] text-[#8eb8c8]">{cam.name}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                {mobileTab === "feeds" && (
+                  <div className="space-y-3">
+                    <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">
+                      No camera feeds active
                     </div>
-                  );
-                })()}
+                  </div>
+                )}
 
                 {/* CONTROLS TAB */}
                 {mobileTab === "controls" && (
@@ -1618,7 +1447,7 @@ export function HudOverlay({
                       <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
                       <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
                       <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
-                      <div>TFL: {feedHealth.tfl.status} @ {fmtDate(feedHealth.tfl.lastSuccessAt)}</div>
+      
                       <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
                       <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
                       <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
@@ -1633,7 +1462,6 @@ export function HudOverlay({
                       <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Counts</div>
                       <div>Flights: {counts.flights} · Military: {counts.military}</div>
                       <div>Satellites: {counts.satellites} · Quakes: {counts.seismic}</div>
-                      <div>Cameras: {counts.cctv}</div>
                     </div>
                   </div>
                 )}

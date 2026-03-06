@@ -8,7 +8,8 @@ import { useArgusStore } from "@/store/useArgusStore";
 import { ARGUS_CONFIG } from "@/lib/config";
 import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import type { GdeltEvent } from "@/types/gdelt";
-import { QUAD_CLASS_COLORS } from "@/types/gdelt";
+import { QUAD_CLASS_COLORS, QUAD_CLASS_LABELS } from "@/types/gdelt";
+import type { SelectedIntel } from "@/types/intel";
 
 const WORLD_TOPO_URL =
   "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -16,7 +17,11 @@ const WORLD_TOPO_URL =
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 10;
 
-export function FlatMapView() {
+interface FlatMapViewProps {
+  onSelectIntel?: (intel: SelectedIntel | null) => void;
+}
+
+export function FlatMapView({ onSelectIntel }: FlatMapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -114,7 +119,28 @@ export function FlatMapView() {
           .attr("d", path)
           .attr("fill", "#282828")
           .attr("stroke", "#504945")
-          .attr("stroke-width", 0.6);
+          .attr("stroke-width", 0.6)
+          .style("cursor", "pointer")
+          .on("mouseenter", function () {
+            d3.select(this).attr("fill", "#3c3836").attr("stroke", "#83a598").attr("stroke-width", 1);
+          })
+          .on("mouseleave", function () {
+            d3.select(this).attr("fill", "#282828").attr("stroke", "#504945").attr("stroke-width", 0.6);
+          })
+          .on("click", function (_event, d) {
+            const name = (d.properties as { name?: string })?.name ?? "Unknown";
+            onSelectIntel?.({
+              id: `country-${d.id ?? name}`,
+              name,
+              kind: "country",
+              importance: "normal",
+              quickFacts: [
+                { label: "Type", value: "Country / Territory" },
+                { label: "Region", value: name },
+              ],
+              fullFacts: [],
+            });
+          });
 
         // borders
         const mesh = topojson.mesh(
@@ -128,6 +154,30 @@ export function FlatMapView() {
           .attr("fill", "none")
           .attr("stroke", "#665c54")
           .attr("stroke-width", 0.4);
+
+        // country labels at centroids
+        const labelGroup = sel.append("g").attr("class", "country-labels");
+        countries.features.forEach((feature) => {
+          const centroid = path.centroid(feature);
+          if (!centroid || isNaN(centroid[0]) || isNaN(centroid[1])) return;
+          const name = (feature.properties as { name?: string })?.name;
+          if (!name) return;
+          // compute rough area to skip tiny countries
+          const area = path.area(feature);
+          if (area < 400) return;
+          labelGroup.append("text")
+            .attr("x", centroid[0])
+            .attr("y", centroid[1])
+            .attr("text-anchor", "middle")
+            .attr("dominant-baseline", "central")
+            .attr("fill", "#a89984")
+            .attr("font-family", "'JetBrains Mono', monospace")
+            .attr("font-size", area > 8000 ? "7px" : area > 2000 ? "5px" : "4px")
+            .attr("letter-spacing", "0.08em")
+            .attr("opacity", area > 8000 ? 0.7 : 0.5)
+            .attr("pointer-events", "none")
+            .text(name.length > 14 ? name.slice(0, 12) + "…" : name);
+        });
 
         // Store projection for GDELT markers
         (svg as unknown as { __projection: d3.GeoProjection }).__projection = projection;
@@ -192,6 +242,33 @@ export function FlatMapView() {
     };
   }, [applyTransform]);
 
+  const [hoveredEvent, setHoveredEvent] = useState<string | null>(null);
+
+  const handleEventClick = useCallback((event: GdeltEvent) => {
+    const quadLabel = QUAD_CLASS_LABELS[event.quadClass] ?? "Unknown";
+    onSelectIntel?.({
+      id: `gdelt-${event.id}`,
+      name: event.actionGeoName || "GDELT Event",
+      kind: "gdelt-event",
+      importance: event.quadClass >= 3 ? "important" : "normal",
+      quickFacts: [
+        { label: "Classification", value: quadLabel },
+        { label: "Actors", value: `${event.actor1Name || event.actor1Country || "?"} → ${event.actor2Name || event.actor2Country || "?"}` },
+        { label: "Mentions", value: String(event.numMentions) },
+        { label: "Sources", value: String(event.numSources) },
+        { label: "Goldstein Scale", value: event.goldsteinScale.toFixed(1) },
+        { label: "Avg Tone", value: event.avgTone.toFixed(2) },
+      ],
+      fullFacts: [
+        { label: "Event Code", value: event.eventCode },
+        { label: "Location", value: `${event.latitude.toFixed(3)}, ${event.longitude.toFixed(3)}` },
+        { label: "Country", value: event.actionGeoCountry },
+        { label: "Date", value: event.dateAdded },
+        ...(event.sourceUrl ? [{ label: "Source", value: event.sourceUrl }] : []),
+      ],
+    });
+  }, [onSelectIntel]);
+
   // Render GDELT markers as SVG circles
   const projection = svgRef.current
     ? (svgRef.current as unknown as { __projection?: d3.GeoProjection }).__projection
@@ -223,12 +300,16 @@ export function FlatMapView() {
                 key={event.id}
                 cx={coords[0]}
                 cy={coords[1]}
-                r={Math.min(4, 1.5 + event.numMentions * 0.15)}
+                r={hoveredEvent === event.id ? Math.min(6, 2.5 + event.numMentions * 0.15) : Math.min(4, 1.5 + event.numMentions * 0.15)}
                 fill={color}
-                fillOpacity={0.7}
-                stroke={color}
-                strokeWidth={0.3}
+                fillOpacity={hoveredEvent === event.id ? 1 : 0.7}
+                stroke={hoveredEvent === event.id ? "#ebdbb2" : color}
+                strokeWidth={hoveredEvent === event.id ? 1 : 0.3}
                 strokeOpacity={0.9}
+                style={{ cursor: "pointer", transition: "r 0.15s, fill-opacity 0.15s, stroke-width 0.15s" }}
+                onMouseEnter={() => setHoveredEvent(event.id)}
+                onMouseLeave={() => setHoveredEvent(null)}
+                onClick={(e) => { e.stopPropagation(); handleEventClick(event); }}
               >
                 <title>{`${event.actionGeoName} — ${event.actor1Name || event.actor1Country} → ${event.actor2Name || event.actor2Country} (${event.numMentions} mentions)`}</title>
               </circle>

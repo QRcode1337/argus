@@ -25,7 +25,6 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ARGUS_CONFIG, CAMERA_PRESETS } from "@/lib/config";
-import { CctvLayer } from "@/lib/cesium/layers/cctvLayer";
 import { FlightLayer } from "@/lib/cesium/layers/flightLayer";
 import { MilitaryLayer } from "@/lib/cesium/layers/militaryLayer";
 import { RasterLayer } from "@/lib/cesium/layers/rasterLayer";
@@ -37,7 +36,6 @@ import { SeismicLayer } from "@/lib/cesium/layers/seismicLayer";
 import { GdeltLayer } from "@/lib/cesium/layers/gdeltLayer";
 import { VisualModeController } from "@/lib/cesium/shaders/visualModes";
 import { fetchMilitaryFlights } from "@/lib/ingest/adsb";
-import { fetchCctvCameras } from "@/lib/ingest/cctv";
 import { fetchOpenSkyFlights } from "@/lib/ingest/opensky";
 import { fetchAircraftPhoto } from "@/lib/ingest/planespotters";
 import { PollingManager } from "@/lib/ingest/pollingManager";
@@ -136,7 +134,7 @@ const inferKindFromId = (id: string): string => {
   if (id.startsWith("mil-")) return "military";
   if (id.startsWith("sat-")) return "satellite";
   if (id.startsWith("quake-")) return "earthquake";
-  if (id.startsWith("cctv-")) return "cctv";
+
   if (id.startsWith("base-")) return "base";
   if (id.startsWith("outage-")) return "outage";
   if (id.startsWith("threat-")) return "threat";
@@ -235,11 +233,6 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("Apogee (km)", props.apogeeKm);
       pushQuick("Perigee (km)", props.perigeeKm);
       break;
-    case "cctv":
-      pushQuick("Camera", props.name);
-      pushQuick("Category", props.category);
-      pushQuick("Provider", props.provider);
-      break;
     case "threat":
       pushQuick("Adversary", props.adversary);
       pushQuick("Malware", props.malware);
@@ -317,7 +310,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const militaryLayerRef = useRef<MilitaryLayer | null>(null);
   const satLayerRef = useRef<SatelliteLayer | null>(null);
   const seismicLayerRef = useRef<SeismicLayer | null>(null);
-  const cctvLayerRef = useRef<CctvLayer | null>(null);
   const basesLayerRef = useRef<BasesLayer | null>(null);
   const outageLayerRef = useRef<OutageLayer | null>(null);
   const threatLayerRef = useRef<ThreatLayer | null>(null);
@@ -364,7 +356,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const setIntelBriefing = useArgusStore((s) => s.setIntelBriefing);
   const trackedEntityId = useArgusStore((s) => s.trackedEntityId);
   const setTrackedEntityId = useArgusStore((s) => s.setTrackedEntityId);
-  const setCameras = useArgusStore((s) => s.setCameras);
   const searchQuery = useArgusStore((s) => s.searchQuery);
   const sceneMode = useArgusStore((s) => s.sceneMode);
   const dayNight = useArgusStore((s) => s.dayNight);
@@ -580,7 +571,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const militaryLayer = new MilitaryLayer(viewer);
     const satLayer = new SatelliteLayer(viewer);
     const seismicLayer = new SeismicLayer(viewer);
-    const cctvLayer = new CctvLayer(viewer);
     const basesLayer = new BasesLayer(viewer);
     const outageLayer = new OutageLayer(viewer);
     const threatLayer = new ThreatLayer(viewer);
@@ -593,7 +583,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     militaryLayerRef.current = militaryLayer;
     satLayerRef.current = satLayer;
     seismicLayerRef.current = seismicLayer;
-    cctvLayerRef.current = cctvLayer;
     basesLayerRef.current = basesLayer;
     outageLayerRef.current = outageLayer;
     threatLayerRef.current = threatLayer;
@@ -817,27 +806,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     });
 
     poller.add({
-      id: "cctv",
-      intervalMs: ARGUS_CONFIG.pollMs.cctv,
-      run: async () => {
-        if (platformModeRef.current !== "live") return;
-        try {
-          const cameras = await fetchCctvCameras(ARGUS_CONFIG.endpoints.cctv, ARGUS_CONFIG.endpoints.webcams);
-          setCameras(cameras);
-          const categoryFilter = useArgusStore.getState().cctvCategoryFilter;
-          const filtered = categoryFilter === "All"
-            ? cameras
-            : cameras.filter((c) => c.category === categoryFilter);
-          const count = cctvLayer.upsertCameras(filtered.slice(0, ARGUS_CONFIG.limits.maxCctv));
-          setCount("cctv", count);
-          setFeedHealthy("tfl");
-        } catch (error) {
-          setFeedError("tfl", error instanceof Error ? error.message : "Failed to fetch CCTV");
-        }
-      },
-    });
-
-    poller.add({
       id: "cloudflare-radar",
       intervalMs: ARGUS_CONFIG.pollMs.cloudflareRadar,
       run: async () => {
@@ -938,7 +906,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       militaryLayerRef.current = null;
       satLayerRef.current = null;
       seismicLayerRef.current = null;
-      cctvLayerRef.current = null;
       basesLayerRef.current = null;
       outageLayerRef.current = null;
       threatLayerRef.current = null;
@@ -947,7 +914,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       visualModeRef.current = null;
       pickerRef.current = null;
     };
-  }, [setCamera, setCameras, setCount, setFeedError, setFeedHealthy]);
+  }, [setCamera, setCount, setFeedError, setFeedHealthy]);
 
   // DVR playback data loop
   const playbackModeState = useArgusStore((s) => s.platformMode);
@@ -1188,7 +1155,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       satLayerRef.current?.setVisible(false);
       satLayerRef.current?.setLinkVisible(false);
       seismicLayerRef.current?.setVisible(false);
-      cctvLayerRef.current?.setVisible(false);
+
       basesLayerRef.current?.setVisible(false);
       outageLayerRef.current?.setVisible(false);
       threatLayerRef.current?.setVisible(false);
@@ -1199,7 +1166,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       satLayerRef.current?.setVisible(false);
       satLayerRef.current?.setLinkVisible(false);
       seismicLayerRef.current?.setVisible(false);
-      cctvLayerRef.current?.setVisible(false);
+
       basesLayerRef.current?.setVisible(false);
       outageLayerRef.current?.setVisible(false);
       threatLayerRef.current?.setVisible(false);
@@ -1241,7 +1208,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       satLayerRef.current?.setVisible(layers.satellites);
       satLayerRef.current?.setLinkVisible(layers.satellites && layers.satelliteLinks);
       seismicLayerRef.current?.setVisible(layers.seismic);
-      cctvLayerRef.current?.setVisible(layers.cctv);
+
       basesLayerRef.current?.setVisible(layers.bases);
       outageLayerRef.current?.setVisible(layers.outages);
       threatLayerRef.current?.setVisible(layers.threats);
@@ -1303,14 +1270,13 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     satLayerRef.current?.setVisible(layers.satellites);
     satLayerRef.current?.setLinkVisible(layers.satellites && layers.satelliteLinks);
     seismicLayerRef.current?.setVisible(layers.seismic);
-    cctvLayerRef.current?.setVisible(layers.cctv);
+
     basesLayerRef.current?.setVisible(layers.bases);
     outageLayerRef.current?.setVisible(layers.outages);
     threatLayerRef.current?.setVisible(layers.threats);
     gdeltLayerRef.current?.setVisible(layers.gdelt);
   }, [
     layers.bases,
-    layers.cctv,
     layers.flights,
     layers.gdelt,
     layers.military,
@@ -1383,7 +1349,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       <div className="absolute inset-0 z-10 flex items-center justify-center">
         <div className={`argus-viewport ${sceneMode === "map" ? "argus-map-viewport" : ""}`}>
           <div ref={mountRef} className={sceneMode === "map" ? "hidden" : "h-full w-full"} />
-          {sceneMode === "map" ? <FlatMapView /> : null}
+          {sceneMode === "map" ? <FlatMapView onSelectIntel={setSelectedIntel} /> : null}
           {sceneMode !== "map" && visualMode === "crt" ? (
             <div className="argus-scanlines pointer-events-none absolute inset-0" />
           ) : null}
