@@ -95,17 +95,11 @@ type ArgusStore = {
   playbackTime: Date | null;
   playbackSpeed: PlaybackSpeed;
   isPlaying: boolean;
-  playbackRange: { start: Date; end: Date } | null;
   setPlaybackTime: (time: Date | null) => void;
   setPlaybackSpeed: (speed: PlaybackSpeed) => void;
   setIsPlaying: (playing: boolean) => void;
-  setPlaybackRange: (range: { start: Date; end: Date } | null) => void;
   playbackTimeRange: { start: number; end: number } | null;
   setPlaybackTimeRange: (range: { start: number; end: number } | null) => void;
-  playbackCurrentTime: number;
-  setPlaybackCurrentTime: (time: number) => void;
-  goLive: () => void;
-  enterPlayback: (time: Date) => void;
   setSceneMode: (mode: SceneMode) => void;
   dayNight: boolean;
   toggleDayNight: () => void;
@@ -268,17 +262,11 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   playbackTime: null,
   playbackSpeed: 1,
   isPlaying: false,
-  playbackRange: null,
   setPlaybackTime: (time) => set({ playbackTime: time }),
   setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
-  setPlaybackRange: (range) => set({ playbackRange: range }),
   playbackTimeRange: null,
   setPlaybackTimeRange: (range) => set({ playbackTimeRange: range }),
-  playbackCurrentTime: 0,
-  setPlaybackCurrentTime: (time) => set({ playbackCurrentTime: time }),
-  goLive: () => set({ platformMode: "live", playbackTime: null, isPlaying: false }),
-  enterPlayback: (time) => set({ platformMode: "playback", playbackTime: time, isPlaying: false }),
   dayNight: false,
   toggleDayNight: () => set((state) => ({ dayNight: !state.dayNight })),
 }));

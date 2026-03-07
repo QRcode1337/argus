@@ -67,7 +67,7 @@ services:
       - TITILER_BASE_PATH=/tiles
       - EVENTS_STREAM_PATH=/api/events/stream
     volumes:
-      - ./data/tiles:/data/tiles:ro
+      - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/tiles:/data/tiles:ro
     depends_on:
       postgis:
         condition: service_healthy
@@ -83,7 +83,7 @@ services:
       POSTGRES_USER: argus
       POSTGRES_PASSWORD: argus_dev
     volumes:
-      - /mnt/volume-nyc3-01/pgdata:/home/postgres/pgdata
+      - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/pgdata:/home/postgres/pgdata
       - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U argus -d argus"]
@@ -102,7 +102,7 @@ services:
       - WORKERS_PER_CORE=1
       - WEB_CONCURRENCY=1
     volumes:
-      - ./data/tiles:/data/tiles:ro
+      - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/tiles:/data/tiles:ro
     networks:
       - argus_network
     restart: unless-stopped
@@ -122,7 +122,7 @@ services:
       - GFS_CRON=0 */6 * * *
       - LOG_LEVEL=INFO
     volumes:
-      - ./data/tiles:/data/tiles
+      - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/tiles:/data/tiles
     networks:
       - argus_network
     restart: unless-stopped

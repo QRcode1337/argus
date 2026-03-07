@@ -1,5 +1,8 @@
 import type {
   MilitaryFlight,
+  PlaybackFlightSnapshot,
+  PlaybackMilitarySnapshot,
+  PlaybackSatelliteSnapshot,
   RecordedFlightFrame,
   RecordedMilitaryFrame,
   RecordedSatelliteFrame,
@@ -7,7 +10,45 @@ import type {
   TrackedFlight,
 } from "@/types/intel";
 
-const MAX_FRAMES = 180; // ~30 min at 10s intervals
+const MAX_FLIGHT_SNAPSHOTS = 24_000;
+const MAX_MILITARY_SNAPSHOTS = 8_000;
+const MAX_SATELLITE_SNAPSHOTS = 12_000;
+
+const countSnapshots = <T extends { data: unknown[] }>(frames: T[]): number =>
+  frames.reduce((sum, frame) => sum + frame.data.length, 0);
+
+const trimToBudget = <T extends { data: unknown[] }>(frames: T[], maxSnapshots: number): void => {
+  let snapshotCount = countSnapshots(frames);
+
+  while (frames.length > 1 && snapshotCount > maxSnapshots) {
+    const removed = frames.shift();
+    snapshotCount -= removed?.data.length ?? 0;
+  }
+};
+
+const toPlaybackFlight = (flight: TrackedFlight): PlaybackFlightSnapshot => ({
+  id: flight.id,
+  callsign: flight.callsign,
+  longitude: flight.longitude,
+  latitude: flight.latitude,
+  altitudeMeters: flight.altitudeMeters,
+});
+
+const toPlaybackMilitary = (flight: MilitaryFlight): PlaybackMilitarySnapshot => ({
+  id: flight.id,
+  callsign: flight.callsign,
+  longitude: flight.longitude,
+  latitude: flight.latitude,
+  altitudeMeters: flight.altitudeMeters,
+});
+
+const toPlaybackSatellite = (satellite: SatellitePosition): PlaybackSatelliteSnapshot => ({
+  id: satellite.id,
+  name: satellite.name,
+  longitude: satellite.longitude,
+  latitude: satellite.latitude,
+  altitudeKm: satellite.altitudeKm,
+});
 
 export class RecordingBuffer {
   private flightFrames: RecordedFlightFrame[] = [];
@@ -15,24 +56,18 @@ export class RecordingBuffer {
   private satelliteFrames: RecordedSatelliteFrame[] = [];
 
   pushFlights(timestamp: number, data: TrackedFlight[]): void {
-    this.flightFrames.push({ timestamp, data });
-    if (this.flightFrames.length > MAX_FRAMES) {
-      this.flightFrames.shift();
-    }
+    this.flightFrames.push({ timestamp, data: data.map(toPlaybackFlight) });
+    trimToBudget(this.flightFrames, MAX_FLIGHT_SNAPSHOTS);
   }
 
   pushMilitary(timestamp: number, data: MilitaryFlight[]): void {
-    this.militaryFrames.push({ timestamp, data });
-    if (this.militaryFrames.length > MAX_FRAMES) {
-      this.militaryFrames.shift();
-    }
+    this.militaryFrames.push({ timestamp, data: data.map(toPlaybackMilitary) });
+    trimToBudget(this.militaryFrames, MAX_MILITARY_SNAPSHOTS);
   }
 
   pushSatellites(timestamp: number, data: SatellitePosition[]): void {
-    this.satelliteFrames.push({ timestamp, data });
-    if (this.satelliteFrames.length > MAX_FRAMES) {
-      this.satelliteFrames.shift();
-    }
+    this.satelliteFrames.push({ timestamp, data: data.map(toPlaybackSatellite) });
+    trimToBudget(this.satelliteFrames, MAX_SATELLITE_SNAPSHOTS);
   }
 
   getFlightFrames(): RecordedFlightFrame[] {

@@ -19,6 +19,10 @@ import type {
   RecordedSatelliteFrame,
 } from "@/types/intel";
 
+const GRUVBOX_FLIGHT = Color.fromCssColorString("#fabd2f");
+const GRUVBOX_MILITARY = Color.fromCssColorString("#fb4934");
+const GRUVBOX_SATELLITE = Color.fromCssColorString("#b8bb26");
+
 export class PlaybackEngine {
   private viewer: Viewer;
   private entities = new Map<string, Entity>();
@@ -99,7 +103,7 @@ export class PlaybackEngine {
         position: property,
         point: {
           pixelSize: 5,
-          color: Color.CYAN,
+          color: GRUVBOX_FLIGHT,
           outlineColor: Color.BLACK,
           outlineWidth: 1,
           scaleByDistance: new NearFarScalar(2_000_000, 1.4, 20_000_000, 0.4),
@@ -108,7 +112,7 @@ export class PlaybackEngine {
           text: callsign || id,
           font: "10px monospace",
           style: LabelStyle.FILL,
-          fillColor: Color.CYAN,
+          fillColor: GRUVBOX_FLIGHT,
           showBackground: true,
           backgroundColor: Color.BLACK.withAlpha(0.65),
           pixelOffset: new Cartesian2(0, -16),
@@ -116,7 +120,7 @@ export class PlaybackEngine {
         },
         path: new PathGraphics({
           width: 1,
-          material: Color.CYAN.withAlpha(0.4),
+          material: GRUVBOX_FLIGHT.withAlpha(0.4),
           leadTime: 0,
           trailTime: 600,
         }),
@@ -160,7 +164,7 @@ export class PlaybackEngine {
         position: property,
         point: {
           pixelSize: 5,
-          color: Color.ORANGE,
+          color: GRUVBOX_MILITARY,
           outlineColor: Color.BLACK,
           outlineWidth: 1,
           scaleByDistance: new NearFarScalar(2_000_000, 1.4, 20_000_000, 0.4),
@@ -169,7 +173,7 @@ export class PlaybackEngine {
           text: `MIL ${callsign}`,
           font: "10px monospace",
           style: LabelStyle.FILL,
-          fillColor: Color.ORANGE,
+          fillColor: GRUVBOX_MILITARY,
           showBackground: true,
           backgroundColor: Color.BLACK.withAlpha(0.65),
           pixelOffset: new Cartesian2(0, -16),
@@ -177,7 +181,7 @@ export class PlaybackEngine {
         },
         path: new PathGraphics({
           width: 1,
-          material: Color.ORANGE.withAlpha(0.4),
+          material: GRUVBOX_MILITARY.withAlpha(0.4),
           leadTime: 0,
           trailTime: 600,
         }),
@@ -221,7 +225,7 @@ export class PlaybackEngine {
         position: property,
         point: {
           pixelSize: 4,
-          color: Color.LIME,
+          color: GRUVBOX_SATELLITE,
           outlineColor: Color.BLACK,
           outlineWidth: 1,
           scaleByDistance: new NearFarScalar(2_000_000, 1.5, 25_000_000, 0.45),
@@ -230,14 +234,14 @@ export class PlaybackEngine {
           text: name,
           font: "10px monospace",
           style: LabelStyle.FILL,
-          fillColor: Color.LIME,
+          fillColor: GRUVBOX_SATELLITE,
           showBackground: true,
           backgroundColor: Color.BLACK.withAlpha(0.65),
           scaleByDistance: new NearFarScalar(3_000_000, 0.9, 10_000_000, 0),
         },
         path: new PathGraphics({
           width: 1,
-          material: Color.LIME.withAlpha(0.3),
+          material: GRUVBOX_SATELLITE.withAlpha(0.3),
           leadTime: 0,
           trailTime: 300,
         }),

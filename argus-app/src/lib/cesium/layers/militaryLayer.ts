@@ -20,9 +20,9 @@ export class MilitaryLayer {
 
   private entities = new Map<string, Entity>();
   private readonly marker = createTacticalMarkerSvg({
-    fill: "#e3ad50",
-    glow: "#ffd088",
-    stroke: "#2f1b08",
+    fill: "#cc241d",
+    glow: "#fb4934",
+    stroke: "#3c3836",
   });
 
   constructor(viewer: Viewer) {
@@ -67,7 +67,7 @@ export class MilitaryLayer {
           text: `MIL ${flight.callsign}`,
           font: "10px monospace",
           style: LabelStyle.FILL,
-          fillColor: Color.ORANGE,
+          fillColor: Color.fromCssColorString("#fb4934"),
           showBackground: true,
           backgroundColor: Color.BLACK.withAlpha(0.65),
           pixelOffset: new Cartesian2(0, -16),

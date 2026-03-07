@@ -216,17 +216,27 @@ router.get("/threats", async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /range  ->  earliest & latest ts across the most active tables
+// GET /range  ->  earliest & latest ts across all recorded playback tables
 // ---------------------------------------------------------------------------
 router.get("/range", async (_req, res, next) => {
   try {
     const sql = `
       SELECT
-        LEAST(f.earliest, m.earliest)    AS earliest,
-        GREATEST(f.latest, m.latest)     AS latest
-      FROM
-        (SELECT MIN(ts) AS earliest, MAX(ts) AS latest FROM recorded_flights)  f,
-        (SELECT MIN(ts) AS earliest, MAX(ts) AS latest FROM recorded_military) m`;
+        MIN(ts) AS earliest,
+        MAX(ts) AS latest
+      FROM (
+        SELECT ts FROM recorded_flights
+        UNION ALL
+        SELECT ts FROM recorded_military
+        UNION ALL
+        SELECT ts FROM recorded_satellites
+        UNION ALL
+        SELECT ts FROM recorded_quakes
+        UNION ALL
+        SELECT ts FROM recorded_outages
+        UNION ALL
+        SELECT ts FROM recorded_threats
+      ) AS recorded`;
 
     const { rows } = await pool.query(sql);
     const { earliest, latest } = rows[0] || {};

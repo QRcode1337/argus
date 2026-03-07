@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #01050a;
-  --foreground: #c4efff;
+  --background: #1d2021;
+  --foreground: #ebdbb2;
   --font-mono: var(--font-jetbrains-mono);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -21,9 +21,10 @@ body {
   margin: 0;
   min-height: 100dvh;
   background:
-    radial-gradient(circle at 18% 16%, #0a2134 0%, transparent 30%),
-    radial-gradient(circle at 78% 18%, #0d1f30 0%, transparent 26%),
-    linear-gradient(160deg, #02060c 0%, #04080f 52%, #02060b 100%);
+    radial-gradient(circle at 18% 16%, rgba(215, 153, 33, 0.16) 0%, transparent 32%),
+    radial-gradient(circle at 78% 18%, rgba(184, 187, 38, 0.12) 0%, transparent 28%),
+    radial-gradient(circle at 50% 100%, rgba(146, 131, 116, 0.1) 0%, transparent 44%),
+    linear-gradient(160deg, #1d2021 0%, #222528 52%, #141617 100%);
   color: var(--foreground);
   font-family:
     "JetBrainsMono Nerd Font",
@@ -41,15 +42,15 @@ button {
 }
 
 .argus-noise {
-  background-image: radial-gradient(rgba(75, 210, 255, 0.11) 0.5px, transparent 0.5px);
+  background-image: radial-gradient(rgba(235, 219, 178, 0.08) 0.5px, transparent 0.5px);
   background-size: 3px 3px;
   opacity: 0.18;
 }
 
 .argus-grid {
   background-image:
-    linear-gradient(rgba(48, 140, 180, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(48, 140, 180, 0.08) 1px, transparent 1px);
+    linear-gradient(rgba(168, 153, 132, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 153, 132, 0.09) 1px, transparent 1px);
   background-size: 84px 84px;
   opacity: 0.2;
 }
@@ -58,12 +59,12 @@ button {
   position: relative;
   width: min(1220px, 80vw);
   aspect-ratio: 1 / 1;
-  border: 1px solid rgba(61, 196, 255, 0.4);
+  border: 1px solid rgba(214, 153, 33, 0.42);
   border-radius: 999px;
   overflow: hidden;
   box-shadow:
-    inset 0 0 140px rgba(6, 21, 38, 0.84),
-    0 0 110px rgba(34, 121, 180, 0.42);
+    inset 0 0 140px rgba(20, 18, 16, 0.88),
+    0 0 110px rgba(215, 153, 33, 0.18);
 }
 
 .argus-viewport::before {
@@ -81,10 +82,10 @@ button {
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
-  border: 1px solid rgba(40, 214, 255, 0.3);
+  border: 1px solid rgba(184, 187, 38, 0.24);
   box-shadow:
-    inset 0 0 0 1px rgba(20, 98, 125, 0.48),
-    inset 0 0 60px rgba(41, 215, 255, 0.14);
+    inset 0 0 0 1px rgba(80, 73, 69, 0.68),
+    inset 0 0 60px rgba(215, 153, 33, 0.12);
   z-index: 3;
 }
 
@@ -92,8 +93,8 @@ button {
   z-index: 4;
   background: repeating-linear-gradient(
     to bottom,
-    rgba(170, 223, 255, 0.05) 0px,
-    rgba(170, 223, 255, 0.05) 1px,
+    rgba(235, 219, 178, 0.04) 0px,
+    rgba(235, 219, 178, 0.04) 1px,
     rgba(0, 0, 0, 0) 2px,
     rgba(0, 0, 0, 0) 4px
   );

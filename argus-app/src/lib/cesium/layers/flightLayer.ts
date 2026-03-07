@@ -19,9 +19,9 @@ export class FlightLayer {
 
   private entities = new Map<string, Entity>();
   private readonly marker = createTacticalMarkerSvg({
-    fill: "#2ad4ff",
-    glow: "#87f0ff",
-    stroke: "#0f1f2c",
+    fill: "#fabd2f",
+    glow: "#f9e2af",
+    stroke: "#3c3836",
   });
 
   constructor(viewer: Viewer) {
@@ -64,7 +64,7 @@ export class FlightLayer {
           text: flight.callsign,
           font: "10px monospace",
           style: LabelStyle.FILL,
-          fillColor: Color.CYAN,
+          fillColor: Color.fromCssColorString("#fabd2f"),
           showBackground: true,
           backgroundColor: Color.BLACK.withAlpha(0.65),
           pixelOffset: new Cartesian2(0, -16),

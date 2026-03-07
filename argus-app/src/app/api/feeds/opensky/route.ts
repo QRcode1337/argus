@@ -5,6 +5,15 @@ export const dynamic = "force-dynamic";
 let cachedBody: string | null = null;
 let cachedAt = 0;
 const CACHE_TTL_MS = 30_000;
+const TOKEN_EXPIRY_SKEW_MS = 60_000;
+
+let cachedAccessToken: string | null = null;
+let cachedAccessTokenExpiresAt = 0;
+
+type OpenSkyTokenResponse = {
+  access_token?: string;
+  expires_in?: number;
+};
 
 interface AdsbLolAircraft {
   hex: string;
@@ -62,6 +71,57 @@ function adsbLolToOpenSky(aircraft: AdsbLolAircraft[]): object {
   return { time: now, states };
 }
 
+async function getOpenSkyAccessToken(): Promise<string | null> {
+  const clientId = process.env.OPENSKY_CLIENT_ID;
+  const clientSecret = process.env.OPENSKY_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    return null;
+  }
+
+  const now = Date.now();
+  if (
+    cachedAccessToken &&
+    now < cachedAccessTokenExpiresAt - TOKEN_EXPIRY_SKEW_MS
+  ) {
+    return cachedAccessToken;
+  }
+
+  const authUrl =
+    process.env.OPENSKY_AUTH_URL ??
+    "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token";
+
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+  });
+
+  const response = await fetch(authUrl, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+    signal: AbortSignal.timeout(8_000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenSky token HTTP ${response.status}`);
+  }
+
+  const payload = (await response.json()) as OpenSkyTokenResponse;
+  if (!payload.access_token) {
+    throw new Error("OpenSky token response missing access_token");
+  }
+
+  cachedAccessToken = payload.access_token;
+  cachedAccessTokenExpiresAt = now + Math.max(60, payload.expires_in ?? 300) * 1000;
+  return cachedAccessToken;
+}
+
 export async function GET() {
   const now = Date.now();
   if (cachedBody && now - cachedAt < CACHE_TTL_MS) {
@@ -77,10 +137,9 @@ export async function GET() {
 
   try {
     const headers: Record<string, string> = { Accept: "application/json" };
-    const clientId = process.env.OPENSKY_CLIENT_ID;
-    const clientSecret = process.env.OPENSKY_CLIENT_SECRET;
-    if (clientId && clientSecret) {
-      headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+    const accessToken = await getOpenSkyAccessToken();
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
     }
 
     const response = await fetch(openSkyUrl, {
@@ -102,26 +161,32 @@ export async function GET() {
     // OpenSky unreachable or rate-limited, fall through
   }
 
-  // Fallback: adsb.lol (free, no auth, no rate limit)
-  try {
-    const response = await fetch("https://api.adsb.lol/v2/ladd", {
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-    });
-
-    if (response.ok) {
-      const data = (await response.json()) as { ac: AdsbLolAircraft[] };
-      const converted = adsbLolToOpenSky(data.ac ?? []);
-      const body = JSON.stringify(converted);
-      cachedBody = body;
-      cachedAt = now;
-      return new NextResponse(body, {
-        status: 200,
-        headers: { "Content-Type": "application/json", "X-Cache": "MISS", "X-Source": "adsb.lol" },
+  const fallbackUrl = process.env.OPENSKY_FALLBACK_ENDPOINT?.trim();
+  if (fallbackUrl) {
+    try {
+      const response = await fetch(fallbackUrl, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
       });
+
+      if (response.ok) {
+        const data = (await response.json()) as { ac: AdsbLolAircraft[] };
+        const converted = adsbLolToOpenSky(data.ac ?? []);
+        const body = JSON.stringify(converted);
+        cachedBody = body;
+        cachedAt = now;
+        return new NextResponse(body, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Cache": "MISS",
+            "X-Source": "fallback",
+          },
+        });
+      }
+    } catch {
+      // explicit fallback also failed
     }
-  } catch {
-    // adsb.lol also failed
   }
 
   if (cachedBody) {

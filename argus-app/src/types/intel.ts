@@ -100,6 +100,14 @@ export interface TrackedFlight {
   squawk: string | null;
 }
 
+export interface PlaybackFlightSnapshot {
+  id: string;
+  callsign: string;
+  longitude: number;
+  latitude: number;
+  altitudeMeters: number;
+}
+
 export interface MilitaryFlight {
   id: string;
   callsign: string;
@@ -109,6 +117,14 @@ export interface MilitaryFlight {
   trueTrack: number;
   velocity: number;
   type: string | null;
+}
+
+export interface PlaybackMilitarySnapshot {
+  id: string;
+  callsign: string;
+  longitude: number;
+  latitude: number;
+  altitudeMeters: number;
 }
 
 export type OrbitType = "LEO" | "MEO" | "GEO" | "HEO" | "SSO" | "Unknown";
@@ -137,6 +153,14 @@ export interface SatelliteRecord {
 }
 
 export interface SatellitePosition {
+  id: string;
+  name: string;
+  longitude: number;
+  latitude: number;
+  altitudeKm: number;
+}
+
+export interface PlaybackSatelliteSnapshot {
   id: string;
   name: string;
   longitude: number;
@@ -187,15 +211,15 @@ export type PlaybackSpeed = 1 | 3 | 5 | 15 | 60;
 
 export interface RecordedFlightFrame {
   timestamp: number;
-  data: TrackedFlight[];
+  data: PlaybackFlightSnapshot[];
 }
 
 export interface RecordedMilitaryFrame {
   timestamp: number;
-  data: MilitaryFlight[];
+  data: PlaybackMilitarySnapshot[];
 }
 
 export interface RecordedSatelliteFrame {
   timestamp: number;
-  data: SatellitePosition[];
+  data: PlaybackSatelliteSnapshot[];
 }

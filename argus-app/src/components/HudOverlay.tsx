@@ -77,15 +77,15 @@ const compact = (value: number): string => {
 };
 
 const threatLevelColors: Record<ThreatLevel, { text: string; border: string; bg: string }> = {
-  GREEN: { text: "text-[#99ffca]", border: "border-[#3b9b6b]", bg: "bg-[#001a0f]" },
-  AMBER: { text: "text-[#e3ad50]", border: "border-[#e3ad50]", bg: "bg-[#1a0f00]" },
+  GREEN: { text: "text-[#b8bb26]", border: "border-[#3b9b6b]", bg: "bg-[#001a0f]" },
+  AMBER: { text: "text-[#fabd2f]", border: "border-[#fabd2f]", bg: "bg-[#1a0f00]" },
   RED: { text: "text-[#ff4444]", border: "border-[#ff4444]", bg: "bg-[#1a0000]" },
 };
 
 const severityColors: Record<AlertSeverity, string> = {
   CRITICAL: "text-[#ff4444]",
-  WARNING: "text-[#e3ad50]",
-  INFO: "text-[#2ad4ff]",
+  WARNING: "text-[#fabd2f]",
+  INFO: "text-[#d79921]",
 };
 
 const severityIcons: Record<AlertSeverity, string> = {
@@ -125,18 +125,18 @@ const timeRangeHours: Record<Exclude<TimeRange, "ALL">, number> = {
 function TacticalGlyph({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" className={className ?? "h-2.5 w-2.5"} aria-hidden>
-      <circle cx="10" cy="10" r="8" fill="#071a24" stroke="#2ad4ff" strokeWidth="1.2" />
-      <path d="M10 3L11.7 8.3L17 10L11.7 11.7L10 17L8.3 11.7L3 10L8.3 8.3Z" fill="#8fefff" />
+      <circle cx="10" cy="10" r="8" fill="#1d2021" stroke="#d79921" strokeWidth="1.2" />
+      <path d="M10 3L11.7 8.3L17 10L11.7 11.7L10 17L8.3 11.7L3 10L8.3 8.3Z" fill="#ebdbb2" />
     </svg>
   );
 }
 
 function SliderControl({ label, value, onChange }: SliderDef) {
   return (
-    <div className="rounded-lg border border-[#17374c] bg-[#071020] px-2 py-1.5">
-      <div className="mb-1 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.24em] text-[#6c8ea2]">
+    <div className="rounded-lg border border-[#665c54] bg-[#1d2021] px-2 py-1.5">
+      <div className="mb-1 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.24em] text-[#928374]">
         <span>{label}</span>
-        <span className="text-[#9be3ff]">{Math.round(value * 100)}%</span>
+        <span className="text-[#ebdbb2]">{Math.round(value * 100)}%</span>
       </div>
       <input
         type="range"
@@ -145,7 +145,7 @@ function SliderControl({ label, value, onChange }: SliderDef) {
         step={0.01}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full accent-[#2ad4ff]"
+        className="w-full accent-[#d79921]"
       />
     </div>
   );
@@ -165,22 +165,22 @@ function CollapsibleSection({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-b border-[#113446] last:border-b-0">
+    <div className="border-b border-[#3c3836] last:border-b-0">
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between px-3 py-2.5 transition hover:bg-[#0a1a2e]"
+        className="flex w-full items-center justify-between px-3 py-2.5 transition hover:bg-[#282828]"
       >
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-[#4e9ca8]">
+          <span className="font-mono text-[10px] text-[#7c6f64]">
             {isOpen ? "\u25BE" : "\u25B8"}
           </span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#e3ad50]">
+          <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#fabd2f]">
             {title}
           </span>
         </div>
         {badge ? (
-          <span className="rounded-md border border-[#284f63] bg-[#081322] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#6c8ea2]">
+          <span className="rounded-md border border-[#665c54] bg-[#1d2021] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#928374]">
             {badge}
           </span>
         ) : null}
@@ -191,13 +191,13 @@ function CollapsibleSection({
 }
 
 const controlInputClass =
-  "w-full rounded-lg border border-[#284f63] bg-[#081322] px-3 py-2 font-mono text-[12px] text-[#d5f7ff] focus:border-[#2ad4ff] focus:outline-none";
+  "w-full rounded-lg border border-[#665c54] bg-[#1d2021] px-3 py-2 font-mono text-[12px] text-[#ebdbb2] focus:border-[#d79921] focus:outline-none";
 
 const actionButtonClass =
-  "rounded-lg border border-[#284f63] bg-[#081322] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[#9ceaff] transition hover:border-[#2ad4ff]";
+  "rounded-lg border border-[#665c54] bg-[#1d2021] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[#ebdbb2] transition hover:border-[#d79921]";
 
 const camBtnClass =
-  "flex h-8 w-8 items-center justify-center rounded-lg border border-[#1a3a4f] bg-[#050b17d9] font-mono text-[14px] text-[#9ceaff] shadow-[0_0_12px_rgba(10,145,223,0.15)] backdrop-blur-md transition hover:border-[#2ad4ff] hover:text-white active:bg-[#0a2a44]";
+  "flex h-8 w-8 items-center justify-center rounded-lg border border-[#665c54] bg-[#1d2021d9] font-mono text-[14px] text-[#ebdbb2] shadow-[0_0_12px_rgba(10,145,223,0.15)] backdrop-blur-md transition hover:border-[#d79921] hover:text-white active:bg-[#3c3836]";
 
 export function HudOverlay({
   onFlyToPoi,
@@ -259,8 +259,8 @@ export function HudOverlay({
   const isPlaying = useArgusStore((s) => s.isPlaying);
   const playbackSpeed = useArgusStore((s) => s.playbackSpeed);
   const setPlaybackSpeed = useArgusStore((s) => s.setPlaybackSpeed);
+  const playbackTime = useArgusStore((s) => s.playbackTime);
   const playbackTimeRange = useArgusStore((s) => s.playbackTimeRange);
-  const playbackCurrentTime = useArgusStore((s) => s.playbackCurrentTime);
 
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [workspace, setWorkspace] = useState<WorkspaceId>("news");
@@ -279,6 +279,8 @@ export function HudOverlay({
   const [newsMeta, setNewsMeta] = useState<{ dedupedCount: number; fetchedAt: string } | null>(null);
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsError, setNewsError] = useState<string | null>(null);
+
+  const currentPlaybackTimeMs = playbackTime?.getTime() ?? playbackTimeRange?.end ?? 0;
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -481,15 +483,15 @@ export function HudOverlay({
   ).length;
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 text-[10px] text-[#99ffca]">
+    <div className="pointer-events-none absolute inset-0 z-20 text-[10px] text-[#b8bb26]">
       {/* Top info strip */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] hidden h-8 items-center justify-between border-b border-[#113446] bg-[#040a12e6] px-4 font-mono uppercase tracking-[0.22em] text-[#6f93a5] md:flex">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] hidden h-8 items-center justify-between border-b border-[#3c3836] bg-[#1d2021e6] px-4 font-mono uppercase tracking-[0.22em] text-[#928374] md:flex">
         <span>Global Situation</span>
         <span>{utcTimestamp}</span>
       </div>
 
       {/* Bottom info strip */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[25] hidden h-7 items-center justify-between border-t border-[#113446] bg-[#040a12e6] px-4 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6f93a5] md:flex">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[25] hidden h-7 items-center justify-between border-t border-[#3c3836] bg-[#1d2021e6] px-4 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374] md:flex">
         <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: {activeFeedCount}/9</span>
         <span>
           Region {newsRegionFilter} · {activeRegionDigest?.posture ?? "STABLE"}
@@ -497,7 +499,7 @@ export function HudOverlay({
       </div>
 
       {/* Time range strip */}
-      <div className="pointer-events-auto absolute left-4 top-10 hidden rounded-md border border-[#123244] bg-[#040b17e0] p-1 md:flex">
+      <div className="pointer-events-auto absolute left-4 top-10 hidden rounded-md border border-[#504945] bg-[#1d2021e0] p-1 md:flex">
         {(["1h", "6h", "24h", "48h", "7d", "ALL"] as TimeRange[]).map((range) => (
           <button
             key={range}
@@ -505,8 +507,8 @@ export function HudOverlay({
             onClick={() => setTimeRange(range)}
             className={`rounded-sm px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
               timeRange === range
-                ? "bg-[#29efab] text-[#03120d]"
-                : "text-[#6f93a5] hover:bg-[#0a1a2e] hover:text-[#9ceaff]"
+                ? "bg-[#b8bb26] text-[#1d2021]"
+                : "text-[#928374] hover:bg-[#282828] hover:text-[#ebdbb2]"
             }`}
           >
             {range}
@@ -516,40 +518,40 @@ export function HudOverlay({
 
       {/* ARGUS header */}
       <header className="absolute left-3 top-2 hidden font-mono md:left-6 md:top-10 md:block">
-        <h1 className="text-[20px] font-semibold leading-none tracking-[0.34em] text-[#e8fcff] md:text-[42px]">
-          ARG<span className="text-[#2ad4ff]">US</span>
+        <h1 className="text-[20px] font-semibold leading-none tracking-[0.34em] text-[#fbf1c7] md:text-[42px]">
+          ARG<span className="text-[#d79921]">US</span>
         </h1>
-        <p className="mt-1 hidden text-[10px] uppercase tracking-[0.45em] text-[#4e9ca8] md:block">Epsilon LLC</p>
+        <p className="mt-1 hidden text-[10px] uppercase tracking-[0.45em] text-[#7c6f64] md:block">Epsilon LLC</p>
       </header>
 
       {/* Active style display (top-right) — desktop only */}
-      <div className="absolute right-8 top-10 hidden text-right font-mono uppercase tracking-[0.28em] text-[#4e9ca8] md:block">
-        <div className="text-[10px] text-[#6b8d97]">Active Style</div>
-        <div className="text-[26px] text-[#2ad4ff]">{modeLabel}</div>
+      <div className="absolute right-8 top-10 hidden text-right font-mono uppercase tracking-[0.28em] text-[#7c6f64] md:block">
+        <div className="text-[10px] text-[#928374]">Active Style</div>
+        <div className="text-[26px] text-[#d79921]">{modeLabel}</div>
       </div>
 
       {/* Selected intel panel (right side) — desktop only */}
       {selectedIntel && !isMobile ? (
-        <section className="pointer-events-auto absolute right-8 top-[5.5rem] w-[348px] rounded-2xl border border-[#113446] bg-[#050b17d9] p-4 shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
+        <section className="pointer-events-auto absolute right-8 top-[5.5rem] w-[348px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] p-4 shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
           <div className="flex items-center justify-between">
-            <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#e3ad50]">Target Intel</div>
+            <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#fabd2f]">Target Intel</div>
             <button
               type="button"
               onClick={onCloseIntel}
-              className="rounded-md border border-[#284f63] bg-[#081322] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#7aa1b3] hover:border-[#2ad4ff]"
+              className="rounded-md border border-[#665c54] bg-[#1d2021] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#d79921]"
             >
               Clear
             </button>
           </div>
 
-          <div className="mt-2 rounded-xl border border-[#123244] bg-[#040b17] p-3 font-mono">
-            <div className="text-[15px] text-[#d5f7ff]">{selectedIntel.name}</div>
-            <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[#6c8ea2]">
+          <div className="mt-2 rounded-xl border border-[#504945] bg-[#1d2021] p-3 font-mono">
+            <div className="text-[15px] text-[#ebdbb2]">{selectedIntel.name}</div>
+            <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[#928374]">
               {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority Target" : "Standard Target"}
             </div>
           </div>
 
-          <div className="mt-2 rounded-xl border border-[#123244] bg-[#040b17] p-3 font-mono text-[11px] text-[#7fb4c5]">
+          <div className="mt-2 rounded-xl border border-[#504945] bg-[#1d2021] p-3 font-mono text-[11px] text-[#a89984]">
             {selectedIntel.quickFacts.map((fact) => (
               <div key={`quick-${fact.label}`}>
                 {fact.label}: {fact.value}
@@ -558,7 +560,7 @@ export function HudOverlay({
           </div>
 
           {selectedIntel.importance === "important" || showFullIntel ? (
-            <div className="mt-2 max-h-[180px] overflow-auto rounded-xl border border-[#123244] bg-[#040b17] p-3 font-mono text-[11px] text-[#7fb4c5]">
+            <div className="mt-2 max-h-[180px] overflow-auto rounded-xl border border-[#504945] bg-[#1d2021] p-3 font-mono text-[11px] text-[#a89984]">
               {selectedIntel.fullFacts.map((fact) => (
                 <div key={`full-${fact.label}`}>
                   {fact.label}: {fact.value}
@@ -572,7 +574,7 @@ export function HudOverlay({
               <iframe
                 src={selectedIntel.streamUrl}
                 title={selectedIntel.name}
-                className="h-44 w-full rounded border border-[#284f63]"
+                className="h-44 w-full rounded border border-[#665c54]"
                 allow="autoplay; encrypted-media"
                 allowFullScreen
                 sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
@@ -585,7 +587,7 @@ export function HudOverlay({
                     title: selectedIntel.name,
                   })
                 }
-                className="absolute right-1.5 top-1.5 rounded border border-[#284f63] bg-[#081322]/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#2ad4ff] transition hover:border-[#2ad4ff] hover:bg-[#081322]"
+                className="absolute right-1.5 top-1.5 rounded border border-[#665c54] bg-[#1d2021]/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#d79921] transition hover:border-[#d79921] hover:bg-[#1d2021]"
               >
                 Enlarge
               </button>
@@ -600,12 +602,12 @@ export function HudOverlay({
               <img
                 src={selectedIntel.imageUrl}
                 alt={selectedIntel.name}
-                className="mt-2 h-32 w-full rounded border border-[#284f63] object-cover"
+                className="mt-2 h-32 w-full rounded border border-[#665c54] object-cover"
               />
             </>
           ) : selectedIntel.kind === "cctv" ? (
-            <div className="mt-2 flex h-32 w-full items-center justify-center rounded border border-[#1a3040] bg-[#040b17]">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-[#4e6a7a]">
+            <div className="mt-2 flex h-32 w-full items-center justify-center rounded border border-[#504945] bg-[#1d2021]">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-[#7c6f64]">
                 No live feed
               </span>
             </div>
@@ -629,8 +631,8 @@ export function HudOverlay({
                 }
                 className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition ${
                   trackedEntityId === selectedIntel.id
-                    ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
-                    : "border-[#284f63] bg-[#081322] text-[#9ceaff] hover:border-[#2ad4ff]"
+                    ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
+                    : "border-[#665c54] bg-[#1d2021] text-[#ebdbb2] hover:border-[#d79921]"
                 }`}
               >
                 {trackedEntityId === selectedIntel.id ? "Stop Tracking" : "Track"}
@@ -639,7 +641,7 @@ export function HudOverlay({
           </div>
 
           {trackedEntityId === selectedIntel.id && (
-            <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#2ad4ff]">
+            <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#d79921]">
               Tracking Active
             </div>
           )}
@@ -648,7 +650,7 @@ export function HudOverlay({
             <button
               type="button"
               onClick={onToggleFullIntel}
-              className="mt-2 w-full rounded-lg border border-[#284f63] bg-[#081322] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#7aa1b3] hover:border-[#2ad4ff]"
+              className="mt-2 w-full rounded-lg border border-[#665c54] bg-[#1d2021] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#d79921]"
             >
               {showFullIntel ? "Hide Full Intel" : "Load Full Intel"}
             </button>
@@ -657,28 +659,28 @@ export function HudOverlay({
       ) : null}
 
       {/* Decorative side text — desktop only */}
-      <div className="absolute right-3 top-1/2 hidden -translate-y-1/2 rotate-90 font-mono text-[10px] uppercase tracking-[0.45em] text-[#2f5467] md:block">
+      <div className="absolute right-3 top-1/2 hidden -translate-y-1/2 rotate-90 font-mono text-[10px] uppercase tracking-[0.45em] text-[#665c54] md:block">
         BAND-PAN BITS: 11 LVL: 1A
       </div>
 
       {/* LEFT SIDEBAR - Collapsible Accordion Panels — desktop only */}
       {sidebarVisible && !isMobile ? (
-        <nav className="pointer-events-auto absolute left-4 top-24 w-[260px] rounded-2xl border border-[#113446] bg-[#050b17d9] shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
+        <nav className="pointer-events-auto absolute left-4 top-24 w-[260px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
           {/* Sidebar header with hide button */}
-          <div className="flex items-center justify-between border-b border-[#113446] px-3 py-2">
-            <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#6c8ea2]">
+          <div className="flex items-center justify-between border-b border-[#3c3836] px-3 py-2">
+            <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#928374]">
               {platformMode === "analytics" ? "Analytics" : platformMode === "playback" ? "Playback" : "Live"} Panels
             </span>
             <button
               type="button"
               onClick={() => setSidebarVisible(false)}
-              className="rounded border border-[#284f63] bg-[#081322] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#7298a8] transition hover:border-[#2ad4ff] hover:text-[#9ceaff]"
+              className="rounded border border-[#665c54] bg-[#1d2021] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984] transition hover:border-[#d79921] hover:text-[#ebdbb2]"
             >
               Hide
             </button>
           </div>
 
-          <div className="grid grid-cols-5 gap-1 border-b border-[#113446] px-2 py-1.5">
+          <div className="grid grid-cols-5 gap-1 border-b border-[#3c3836] px-2 py-1.5">
             {workspaceDefs.map((tab) => (
               <button
                 key={tab.id}
@@ -686,8 +688,8 @@ export function HudOverlay({
                 onClick={() => setWorkspace(tab.id)}
                 className={`rounded px-1 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
                   workspace === tab.id
-                    ? "border border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
-                    : "border border-transparent text-[#6c8ea2] hover:border-[#284f63] hover:bg-[#081322]"
+                    ? "border border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
+                    : "border border-transparent text-[#928374] hover:border-[#665c54] hover:bg-[#1d2021]"
                 }`}
               >
                 {tab.label}
@@ -696,10 +698,10 @@ export function HudOverlay({
           </div>
 
           {workspace === "news" && (
-            <section className="space-y-2 border-b border-[#113446] px-3 py-2.5">
+            <section className="space-y-2 border-b border-[#3c3836] px-3 py-2.5">
               <div className="flex items-center justify-between">
-                <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#e3ad50]">Live News</div>
-                <div className="font-mono text-[8px] text-[#6c8ea2]">
+                <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#fabd2f]">Live News</div>
+                <div className="font-mono text-[8px] text-[#928374]">
                   {newsMeta ? `${newsMeta.dedupedCount} items` : "--"}
                 </div>
               </div>
@@ -712,8 +714,8 @@ export function HudOverlay({
                     onClick={() => setNewsRegionFilter(region)}
                     className={`rounded-md border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] ${
                       newsRegionFilter === region
-                        ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
-                        : "border-[#284f63] bg-[#081322] text-[#7298a8]"
+                        ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
+                        : "border-[#665c54] bg-[#1d2021] text-[#a89984]"
                     }`}
                   >
                     {region}
@@ -721,12 +723,12 @@ export function HudOverlay({
                 ))}
               </div>
 
-              <div className="rounded-md border border-[#123244] bg-[#040b17] px-2 py-1.5">
+              <div className="rounded-md border border-[#504945] bg-[#1d2021] px-2 py-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#6c8ea2]">AI Summary</span>
-                  <span className="font-mono text-[8px] text-[#2ad4ff]">{activeRegionDigest?.posture ?? "STABLE"}</span>
+                  <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#928374]">AI Summary</span>
+                  <span className="font-mono text-[8px] text-[#d79921]">{activeRegionDigest?.posture ?? "STABLE"}</span>
                 </div>
-                <p className="mt-1 font-mono text-[9px] leading-relaxed text-[#8bb8c9]">
+                <p className="mt-1 font-mono text-[9px] leading-relaxed text-[#d5c4a1]">
                   {activeRegionDigest?.summary ?? "Collecting source headlines for regional summary..."}
                 </p>
               </div>
@@ -736,14 +738,14 @@ export function HudOverlay({
                 placeholder="Search headlines..."
                 value={newsSearch}
                 onChange={(e) => setNewsSearch(e.target.value)}
-                className="w-full rounded-md border border-[#284f63] bg-[#081322] px-2 py-1.5 font-mono text-[10px] text-[#d5f7ff] placeholder-[#4e6a7a] focus:border-[#2ad4ff] focus:outline-none"
+                className="w-full rounded-md border border-[#665c54] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#ebdbb2] placeholder-[#7c6f64] focus:border-[#d79921] focus:outline-none"
               />
 
               <div className="flex gap-1">
                 <select
                   value={newsSourceFilter}
                   onChange={(e) => setNewsSourceFilter(e.target.value)}
-                  className="flex-1 rounded-md border border-[#284f63] bg-[#081322] px-2 py-1 font-mono text-[9px] text-[#d5f7ff] focus:border-[#2ad4ff] focus:outline-none"
+                  className="flex-1 rounded-md border border-[#665c54] bg-[#1d2021] px-2 py-1 font-mono text-[9px] text-[#ebdbb2] focus:border-[#d79921] focus:outline-none"
                 >
                   {newsSources.map((source) => (
                     <option key={source} value={source}>{source}</option>
@@ -752,7 +754,7 @@ export function HudOverlay({
                 <button
                   type="button"
                   onClick={() => setNewsSortMode((prev) => (prev === "score" ? "newest" : "score"))}
-                  className="rounded-md border border-[#284f63] bg-[#081322] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em] text-[#9ceaff]"
+                  className="rounded-md border border-[#665c54] bg-[#1d2021] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em] text-[#ebdbb2]"
                 >
                   {newsSortMode === "score" ? "Intel" : "Newest"}
                 </button>
@@ -765,7 +767,7 @@ export function HudOverlay({
               ) : null}
 
               {newsLoading && filteredNewsItems.length === 0 ? (
-                <div className="rounded-md border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[9px] text-[#7faec0]">
+                <div className="rounded-md border border-[#504945] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#a89984]">
                   Pulling feeds...
                 </div>
               ) : null}
@@ -774,13 +776,13 @@ export function HudOverlay({
                 {filteredNewsItems.slice(0, 60).map((item) => (
                   <article
                     key={item.id}
-                    className="rounded-md border border-[#123244] bg-[#040b17] px-2 py-1.5"
+                    className="rounded-md border border-[#504945] bg-[#1d2021] px-2 py-1.5"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-mono text-[8px] uppercase tracking-[0.1em] text-[#6c8ea2]">
+                      <span className="truncate font-mono text-[8px] uppercase tracking-[0.1em] text-[#928374]">
                         {item.source}
                       </span>
-                      <span className="font-mono text-[8px] text-[#4e6a7a]">
+                      <span className="font-mono text-[8px] text-[#7c6f64]">
                         {new Date(item.publishedAt).toLocaleTimeString()}
                       </span>
                     </div>
@@ -788,15 +790,15 @@ export function HudOverlay({
                       href={item.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-1 block font-mono text-[10px] leading-snug text-[#d5f7ff] hover:text-[#9ceaff]"
+                      className="mt-1 block font-mono text-[10px] leading-snug text-[#ebdbb2] hover:text-[#ebdbb2]"
                     >
                       {item.title}
                     </a>
                     <div className="mt-1 flex items-center justify-between gap-2">
-                      <span className="truncate font-mono text-[8px] text-[#6c8ea2]">
+                      <span className="truncate font-mono text-[8px] text-[#928374]">
                         {item.tags.join(" · ")}
                       </span>
-                      <span className="font-mono text-[8px] text-[#2ad4ff]">{item.score.toFixed(1)}</span>
+                      <span className="font-mono text-[8px] text-[#d79921]">{item.score.toFixed(1)}</span>
                     </div>
                   </article>
                 ))}
@@ -822,7 +824,7 @@ export function HudOverlay({
                     className={`rounded-lg border px-2.5 py-2 font-mono ${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg}`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[9px] uppercase tracking-[0.28em] text-[#6c8ea2]">
+                      <span className="text-[9px] uppercase tracking-[0.28em] text-[#928374]">
                         Threat Level
                       </span>
                       <span
@@ -831,7 +833,7 @@ export function HudOverlay({
                         {intelBriefing.threatLevel}
                       </span>
                     </div>
-                    <div className="mt-1.5 text-[10px] text-[#7fb4c5]">
+                    <div className="mt-1.5 text-[10px] text-[#a89984]">
                       {intelBriefing.summary}
                     </div>
                   </div>
@@ -840,8 +842,8 @@ export function HudOverlay({
                   <div className="flex gap-1.5">
                     {([
                       { sev: "CRITICAL" as const, label: "Crit", count: intelBriefing.criticalCount, color: "#ff4444" },
-                      { sev: "WARNING" as const, label: "Warn", count: intelBriefing.warningCount, color: "#e3ad50" },
-                      { sev: "INFO" as const, label: "Info", count: intelBriefing.infoCount, color: "#2ad4ff" },
+                      { sev: "WARNING" as const, label: "Warn", count: intelBriefing.warningCount, color: "#fabd2f" },
+                      { sev: "INFO" as const, label: "Info", count: intelBriefing.infoCount, color: "#d79921" },
                     ] as const).map(({ sev, label, count, color }) => (
                       <button
                         key={sev}
@@ -879,12 +881,12 @@ export function HudOverlay({
                           <button
                             type="button"
                             onClick={() => setAlertFilter(null)}
-                            className="mb-1 rounded border border-[#284f63] bg-[#081322] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.14em] text-[#7298a8] transition hover:border-[#2ad4ff]"
+                            className="mb-1 rounded border border-[#665c54] bg-[#1d2021] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.14em] text-[#a89984] transition hover:border-[#d79921]"
                           >
                             Clear Filter ({filtered.length})
                           </button>
                         )}
-                        <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#284f63]">
+                        <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#665c54]">
                           {filtered.map((alert: IntelAlert) => (
                             <button
                               key={alert.id}
@@ -896,9 +898,9 @@ export function HudOverlay({
                                   onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
                                 }
                               }}
-                              className={`w-full rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 text-left transition ${
+                              className={`w-full rounded-lg border border-[#504945] bg-[#1d2021] px-2 py-1.5 text-left transition ${
                                 alert.coordinates || alert.entityId
-                                  ? "cursor-pointer hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
+                                  ? "cursor-pointer hover:border-[#d79921] hover:bg-[#282828]"
                                   : "cursor-default"
                               }`}
                             >
@@ -914,11 +916,11 @@ export function HudOverlay({
                                   >
                                     {alert.title}
                                   </div>
-                                  <div className="mt-0.5 font-mono text-[9px] leading-relaxed text-[#6c8ea2]">
+                                  <div className="mt-0.5 font-mono text-[9px] leading-relaxed text-[#928374]">
                                     {alert.detail}
                                   </div>
                                   {alert.coordinates && (
-                                    <div className="mt-0.5 font-mono text-[8px] text-[#2ad4ff]/60">
+                                    <div className="mt-0.5 font-mono text-[8px] text-[#d79921]/60">
                                       {alert.coordinates.lat.toFixed(2)}N {alert.coordinates.lon.toFixed(2)}E
                                     </div>
                                   )}
@@ -932,7 +934,7 @@ export function HudOverlay({
                   })()}
                 </div>
               ) : (
-                <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2.5 py-2 font-mono text-[10px] text-[#4e9ca8]">
+                <div className="rounded-lg border border-[#504945] bg-[#1d2021] px-2.5 py-2 font-mono text-[10px] text-[#7c6f64]">
                   Awaiting first intelligence cycle...
                 </div>
               )}
@@ -948,15 +950,15 @@ export function HudOverlay({
                   placeholder="Search entities..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-[#284f63] bg-[#081322] px-2.5 py-1.5 font-mono text-[11px] text-[#d5f7ff] placeholder-[#4e6a7a] focus:border-[#2ad4ff] focus:outline-none"
+                  className="w-full rounded-lg border border-[#665c54] bg-[#1d2021] px-2.5 py-1.5 font-mono text-[11px] text-[#ebdbb2] placeholder-[#7c6f64] focus:border-[#d79921] focus:outline-none"
                 />
                 {searchResults.length > 0 && (
                   <div className="max-h-[180px] space-y-1 overflow-y-auto">
                     {searchResults.map((result) => {
                       const kindColors: Record<string, string> = {
-                        flight: "text-[#9ceaff]",
-                        military: "text-[#e3ad50]",
-                        satellite: "text-[#99ffca]",
+                        flight: "text-[#ebdbb2]",
+                        military: "text-[#fabd2f]",
+                        satellite: "text-[#b8bb26]",
                         earthquake: "text-[#ff6b6b]",
                         cctv: "text-[#c4b5fd]",
                       };
@@ -968,17 +970,17 @@ export function HudOverlay({
                             onFlyToEntityById(result.id);
                             setSearchQuery("");
                           }}
-                          className="w-full rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 text-left transition hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
+                          className="w-full rounded-lg border border-[#504945] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#d79921] hover:bg-[#282828]"
                         >
-                          <div className="truncate font-mono text-[10px] text-[#d5f7ff]">
+                          <div className="truncate font-mono text-[10px] text-[#ebdbb2]">
                             {result.name}
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <span className={`font-mono text-[8px] uppercase tracking-[0.14em] ${kindColors[result.kind] ?? "text-[#6c8ea2]"}`}>
+                            <span className={`font-mono text-[8px] uppercase tracking-[0.14em] ${kindColors[result.kind] ?? "text-[#928374]"}`}>
                               {result.kind}
                             </span>
                             {result.lat !== null && result.lon !== null && (
-                              <span className="font-mono text-[8px] text-[#4e6a7a]">
+                              <span className="font-mono text-[8px] text-[#7c6f64]">
                                 {result.lat.toFixed(1)}N {result.lon.toFixed(1)}E
                               </span>
                             )}
@@ -989,7 +991,7 @@ export function HudOverlay({
                   </div>
                 )}
                 {searchQuery.trim() && searchResults.length === 0 && (
-                  <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2.5 py-2 font-mono text-[10px] text-[#4e9ca8]">
+                  <div className="rounded-lg border border-[#504945] bg-[#1d2021] px-2.5 py-2 font-mono text-[10px] text-[#7c6f64]">
                     No entities found
                   </div>
                 )}
@@ -1016,9 +1018,9 @@ export function HudOverlay({
                             onFlyToEntityById(`cctv-${cam.id}`);
                             setEnlargedStream({ src: cam.streamUrl!, title: cam.name });
                           }}
-                          className="flex w-full items-center gap-2 rounded-lg border border-[#123244] bg-[#040b17] p-1.5 text-left transition hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
+                          className="flex w-full items-center gap-2 rounded-lg border border-[#504945] bg-[#1d2021] p-1.5 text-left transition hover:border-[#d79921] hover:bg-[#282828]"
                         >
-                          <div className="h-10 w-14 shrink-0 overflow-hidden rounded border border-[#1a3040]">
+                          <div className="h-10 w-14 shrink-0 overflow-hidden rounded border border-[#504945]">
                             {cam.imageUrl && cam.imageUrl !== "/camera-placeholder.svg" ? (
                               /* eslint-disable-next-line @next/next/no-img-element */
                               <img
@@ -1027,17 +1029,17 @@ export function HudOverlay({
                                 className="h-full w-full object-cover"
                               />
                             ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-[#071020] font-mono text-[9px] text-[#4e6a7a]">
+                              <div className="flex h-full w-full items-center justify-center bg-[#1d2021] font-mono text-[9px] text-[#7c6f64]">
                                 LIVE
                               </div>
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate font-mono text-[9px] text-[#d5f7ff]">
+                            <div className="truncate font-mono text-[9px] text-[#ebdbb2]">
                               {cam.name}
                             </div>
                             <div className="flex items-center gap-1">
-                              <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-[#4e9ca8]">
+                              <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-[#7c6f64]">
                                 {cam.category}
                               </span>
                               <span className="inline-block h-1 w-1 rounded-full bg-red-500 animate-pulse" />
@@ -1063,13 +1065,13 @@ export function HudOverlay({
                             if (!layers.cctv) setLayer("cctv", true);
                             onFlyToEntityById(`cctv-${cam.id}`);
                           }}
-                          className="flex w-full items-center gap-1.5 border-b border-[#0d1f2d] px-1 py-[3px] text-left transition hover:bg-[#0a1a2e]"
+                          className="flex w-full items-center gap-1.5 border-b border-[#3c3836] px-1 py-[3px] text-left transition hover:bg-[#282828]"
                         >
                           <TacticalGlyph className="h-2.5 w-2.5 shrink-0" />
-                          <span className="min-w-0 flex-1 truncate font-mono text-[8px] text-[#8eb8c8]">
+                          <span className="min-w-0 flex-1 truncate font-mono text-[8px] text-[#d5c4a1]">
                             {cam.name}
                           </span>
-                          <span className="shrink-0 font-mono text-[7px] text-[#3a5a6a]">
+                          <span className="shrink-0 font-mono text-[7px] text-[#665c54]">
                             {cam.category}
                           </span>
                         </button>
@@ -1096,25 +1098,25 @@ export function HudOverlay({
                     onClick={() => layer.available && toggleAnalyticsLayer(layer.key)}
                     className={`flex w-full items-center justify-between rounded-lg border px-2.5 py-1.5 text-left transition ${
                       !layer.available
-                        ? "cursor-not-allowed border-[#1a2a35] bg-[#030a10] opacity-40"
+                        ? "cursor-not-allowed border-[#3c3836] bg-[#1d2021] opacity-40"
                         : analyticsLayers[layer.key]
-                          ? "border-[#e3ad50] bg-[#1a0f00]"
-                          : "border-[#123244] bg-[#040b17] hover:border-[#2eb8d4]"
+                          ? "border-[#fabd2f] bg-[#1a0f00]"
+                          : "border-[#504945] bg-[#1d2021] hover:border-[#d79921]"
                     }`}
                   >
                     <div className="min-w-0">
-                      <div className="truncate font-mono text-[11px] text-[#d5f7ff]">{layer.label}</div>
-                      <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#6c8ea2]">
+                      <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
+                      <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#928374]">
                         {layer.source}{!layer.available ? " \u00B7 Phase 4" : ""}
                       </div>
                     </div>
                     <span
                       className={`ml-2 shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
                         !layer.available
-                          ? "border-[#415f70] bg-[#071321] text-[#668092]"
+                          ? "border-[#665c54] bg-[#1d2021] text-[#928374]"
                           : analyticsLayers[layer.key]
-                            ? "border-[#e3ad50] bg-[#1a0f00] text-[#e3ad50]"
-                            : "border-[#415f70] bg-[#071321] text-[#668092]"
+                            ? "border-[#fabd2f] bg-[#1a0f00] text-[#fabd2f]"
+                            : "border-[#665c54] bg-[#1d2021] text-[#928374]"
                       }`}
                     >
                       {!layer.available ? "Soon" : analyticsLayers[layer.key] ? "On" : "Off"}
@@ -1123,7 +1125,7 @@ export function HudOverlay({
                 ))}
 
                 {analyticsStatus ? (
-                  <div className="rounded-lg border border-[#1f3f52] bg-[#071020] px-2 py-1.5 font-mono text-[9px] text-[#7fb4c5]">
+                  <div className="rounded-lg border border-[#504945] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#a89984]">
                     {analyticsStatus}
                   </div>
                 ) : null}
@@ -1149,19 +1151,19 @@ export function HudOverlay({
                       key={layer.key}
                       type="button"
                       onClick={() => toggleLayer(layer.key)}
-                      className="flex w-full items-center justify-between rounded-lg border border-[#123244] bg-[#040b17] px-2.5 py-1.5 text-left transition hover:border-[#2eb8d4]"
+                      className="flex w-full items-center justify-between rounded-lg border border-[#504945] bg-[#1d2021] px-2.5 py-1.5 text-left transition hover:border-[#d79921]"
                     >
                       <div className="min-w-0">
-                        <div className="truncate font-mono text-[11px] text-[#d5f7ff]">{layer.label}</div>
-                        <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#6c8ea2]">{layer.feed}</div>
+                        <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
+                        <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#928374]">{layer.feed}</div>
                       </div>
                       <div className="ml-2 flex shrink-0 items-center gap-2 text-right font-mono">
-                        <span className="text-[11px] text-[#a5f0ff]">{compact(value)}</span>
+                        <span className="text-[11px] text-[#ebdbb2]">{compact(value)}</span>
                         <span
                           className={`rounded-md border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] ${
                             layers[layer.key]
-                              ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
-                              : "border-[#415f70] bg-[#071321] text-[#668092]"
+                              ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
+                              : "border-[#665c54] bg-[#1d2021] text-[#928374]"
                           }`}
                         >
                           {layers[layer.key] ? "On" : "Off"}
@@ -1180,8 +1182,8 @@ export function HudOverlay({
                         onClick={() => setCctvCategoryFilter(cat)}
                         className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] transition ${
                           cctvCategoryFilter === cat
-                            ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
-                            : "border-[#284f63] bg-[#081322] text-[#7298a8] hover:border-[#2ad4ff]"
+                            ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
+                            : "border-[#665c54] bg-[#1d2021] text-[#a89984] hover:border-[#d79921]"
                         }`}
                       >
                         {cat}
@@ -1207,7 +1209,7 @@ export function HudOverlay({
               {modeSliders.length > 0 ? (
                 modeSliders.map((slider) => <SliderControl key={slider.label} {...slider} />)
               ) : (
-                <div className="rounded-lg border border-[#17374c] bg-[#071020] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-[#66889b]">
+                <div className="rounded-lg border border-[#665c54] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">
                   Normal mode has no active shader params.
                 </div>
               )}
@@ -1219,8 +1221,8 @@ export function HudOverlay({
           {workspace === "status" && (
           <CollapsibleSection title="Status" badge={`${activeFeedCount}/9`}>
             <div className="space-y-1.5">
-              <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
-                <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Feed Health</div>
+              <div className="rounded-lg border border-[#504945] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#a89984]">
+                <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Feed Health</div>
                 <div>OpenSky: {feedHealth.opensky.status} @ {fmtDate(feedHealth.opensky.lastSuccessAt)}</div>
                 <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
                 <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
@@ -1232,8 +1234,8 @@ export function HudOverlay({
                 <div>AISStream: {feedHealth.ais.status} @ {fmtDate(feedHealth.ais.lastSuccessAt)}</div>
               </div>
 
-              <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
-                <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Camera</div>
+              <div className="rounded-lg border border-[#504945] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#a89984]">
+                <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Camera</div>
                 <div>REC 2026-02-12 {fmtDate(recTimestamp || null)}</div>
                 <div>ALT {camera.altMeters.toFixed(0)}m</div>
                 <div>{camera.lat.toFixed(4)}N {camera.lon.toFixed(4)}E</div>
@@ -1246,16 +1248,16 @@ export function HudOverlay({
         <button
           type="button"
           onClick={() => setSidebarVisible(true)}
-          className="pointer-events-auto absolute left-4 top-24 hidden rounded-lg border border-[#113446] bg-[#050b17d9] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#6c8ea2] shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md transition hover:border-[#2ad4ff] hover:text-[#9ceaff] md:block"
+          className="pointer-events-auto absolute left-4 top-24 hidden rounded-lg border border-[#3c3836] bg-[#1d2021d9] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#928374] shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md transition hover:border-[#d79921] hover:text-[#ebdbb2] md:block"
         >
           Panels
         </button>
       )}
 
       {/* Bottom control bar — desktop only */}
-      <section className="pointer-events-auto absolute bottom-4 left-1/2 hidden w-[min(95vw,900px)] -translate-x-1/2 rounded-2xl border border-[#113446] bg-[#050b17d9] p-3 shadow-[0_0_30px_rgba(10,171,255,0.18)] backdrop-blur-md md:block">
+      <section className="pointer-events-auto absolute bottom-4 left-1/2 hidden w-[min(95vw,900px)] -translate-x-1/2 rounded-2xl border border-[#3c3836] bg-[#1d2021d9] p-3 shadow-[0_0_30px_rgba(10,171,255,0.18)] backdrop-blur-md md:block">
         <div className="grid gap-2 md:grid-cols-5">
-          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
             Location
             <select
               className={`${controlInputClass} mt-1`}
@@ -1277,7 +1279,7 @@ export function HudOverlay({
             </select>
           </label>
 
-          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
             <span className="flex items-center gap-1.5">
               Platform
               {platformMode === "live" && (
@@ -1295,7 +1297,7 @@ export function HudOverlay({
             </select>
           </label>
 
-          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
             Camera Mode
             <select
               className={`${controlInputClass} mt-1`}
@@ -1310,7 +1312,7 @@ export function HudOverlay({
             </select>
           </label>
 
-          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
             View
             <select
               className={`${controlInputClass} mt-1`}
@@ -1322,7 +1324,7 @@ export function HudOverlay({
             </select>
           </label>
 
-          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
             Lighting
             <select
               className={`${controlInputClass} mt-1`}
@@ -1361,7 +1363,7 @@ export function HudOverlay({
       <div className="pointer-events-auto absolute right-4 top-1/2 hidden -translate-y-1/2 flex-col items-center gap-1 md:flex">
         <button type="button" onClick={onZoomIn} className={camBtnClass} title="Zoom In">+</button>
         <button type="button" onClick={onZoomOut} className={camBtnClass} title="Zoom Out">&minus;</button>
-        <div className="my-1 h-px w-6 bg-[#1a3a4f]" />
+        <div className="my-1 h-px w-6 bg-[#665c54]" />
         <button type="button" onClick={onTiltUp} className={camBtnClass} title="Tilt Up">&uarr;</button>
         <div className="flex gap-1">
           <button type="button" onClick={onRotateLeft} className={camBtnClass} title="Rotate Left">&larr;</button>
@@ -1381,14 +1383,14 @@ export function HudOverlay({
               paddingRight: "calc(0.75rem + env(safe-area-inset-right))",
             }}
           >
-            <div className="rounded-[26px] border border-[#113446] bg-[#040b17dd] p-3 shadow-[0_0_34px_rgba(10,145,223,0.18)] backdrop-blur-xl">
+            <div className="rounded-[26px] border border-[#3c3836] bg-[#1d2021dd] p-3 shadow-[0_0_34px_rgba(10,145,223,0.18)] backdrop-blur-xl">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="font-mono text-[9px] uppercase tracking-[0.34em] text-[#4e9ca8]">Argus // Field Handset</div>
-                  <div className="mt-1 font-mono text-[24px] font-semibold leading-none tracking-[0.28em] text-[#e8fcff]">
-                    ARG<span className="text-[#2ad4ff]">US</span>
+                  <div className="font-mono text-[9px] uppercase tracking-[0.34em] text-[#7c6f64]">Argus // Field Handset</div>
+                  <div className="mt-1 font-mono text-[24px] font-semibold leading-none tracking-[0.28em] text-[#fbf1c7]">
+                    ARG<span className="text-[#d79921]">US</span>
                   </div>
-                  <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-[#6c8ea2]">
+                  <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-[#928374]">
                     {platformMode} · {sceneMode === "globe" ? "3D Globe" : "Map"} · {modeLabel}
                   </div>
                 </div>
@@ -1398,12 +1400,12 @@ export function HudOverlay({
                     className={`inline-flex rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.2em] ${
                       intelBriefing
                         ? `${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg} ${threatLevelColors[intelBriefing.threatLevel].text}`
-                        : "border-[#284f63] bg-[#081322] text-[#9ceaff]"
+                        : "border-[#665c54] bg-[#1d2021] text-[#ebdbb2]"
                     }`}
                   >
                     {intelBriefing?.threatLevel ?? activeRegionDigest?.posture ?? "Stable"}
                   </div>
-                  <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#7fb4c5]">
+                  <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">
                     {utcTimestamp || "Syncing UTC"}
                   </div>
                 </div>
@@ -1416,37 +1418,37 @@ export function HudOverlay({
                   { label: "Region", value: newsRegionFilter },
                   { label: "View", value: sceneMode === "globe" ? "3D" : "MAP" },
                 ].map((stat) => (
-                  <div key={stat.label} className="rounded-2xl border border-[#123244] bg-[#040b17] px-2 py-2">
-                    <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#4e6a7a]">{stat.label}</div>
-                    <div className="mt-1 truncate font-mono text-[11px] text-[#d5f7ff]">{stat.value}</div>
+                  <div key={stat.label} className="rounded-2xl border border-[#504945] bg-[#1d2021] px-2 py-2">
+                    <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#7c6f64]">{stat.label}</div>
+                    <div className="mt-1 truncate font-mono text-[11px] text-[#ebdbb2]">{stat.value}</div>
                   </div>
                 ))}
               </div>
 
               <div className="mt-3 space-y-2">
-                <label className="block font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">
+                <label className="block font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">
                   Command Search
-                  <div className="mt-1 flex items-center gap-2 rounded-2xl border border-[#284f63] bg-[#081322] px-3 py-2.5">
-                    <span className="font-mono text-[12px] text-[#2ad4ff]">⌕</span>
+                  <div className="mt-1 flex items-center gap-2 rounded-2xl border border-[#665c54] bg-[#1d2021] px-3 py-2.5">
+                    <span className="font-mono text-[12px] text-[#d79921]">⌕</span>
                     <input
                       type="text"
                       placeholder="Entity, callsign, camera..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full border-0 bg-transparent font-mono text-[13px] text-[#d5f7ff] placeholder-[#4e6a7a] outline-none"
+                      className="w-full border-0 bg-transparent font-mono text-[13px] text-[#ebdbb2] placeholder-[#7c6f64] outline-none"
                     />
                   </div>
                 </label>
 
                 {searchQuery.trim() ? (
-                  <div className="max-h-32 overflow-y-auto rounded-2xl border border-[#123244] bg-[#040b17] p-2">
+                  <div className="max-h-32 overflow-y-auto rounded-2xl border border-[#504945] bg-[#1d2021] p-2">
                     {searchResults.length > 0 ? (
                       <div className="space-y-1">
                         {searchResults.slice(0, 5).map((result) => {
                           const kindColors: Record<string, string> = {
-                            flight: "text-[#9ceaff]",
-                            military: "text-[#e3ad50]",
-                            satellite: "text-[#99ffca]",
+                            flight: "text-[#ebdbb2]",
+                            military: "text-[#fabd2f]",
+                            satellite: "text-[#b8bb26]",
                             earthquake: "text-[#ff6b6b]",
                             cctv: "text-[#c4b5fd]",
                           };
@@ -1460,15 +1462,15 @@ export function HudOverlay({
                                 setSearchQuery("");
                                 setMobileTab(null);
                               }}
-                              className="w-full rounded-xl border border-[#123244] bg-[#071020] px-2.5 py-2 text-left transition hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
+                              className="w-full rounded-xl border border-[#504945] bg-[#1d2021] px-2.5 py-2 text-left transition hover:border-[#d79921] hover:bg-[#282828]"
                             >
-                              <div className="truncate font-mono text-[11px] text-[#d5f7ff]">{result.name}</div>
+                              <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{result.name}</div>
                               <div className="mt-1 flex items-center gap-2">
-                                <span className={`font-mono text-[8px] uppercase tracking-[0.16em] ${kindColors[result.kind] ?? "text-[#6c8ea2]"}`}>
+                                <span className={`font-mono text-[8px] uppercase tracking-[0.16em] ${kindColors[result.kind] ?? "text-[#928374]"}`}>
                                   {result.kind}
                                 </span>
                                 {result.lat !== null && result.lon !== null ? (
-                                  <span className="font-mono text-[8px] text-[#4e6a7a]">
+                                  <span className="font-mono text-[8px] text-[#7c6f64]">
                                     {result.lat.toFixed(1)}N {result.lon.toFixed(1)}E
                                   </span>
                                 ) : null}
@@ -1478,7 +1480,7 @@ export function HudOverlay({
                         })}
                       </div>
                     ) : (
-                      <div className="rounded-xl border border-[#123244] bg-[#071020] px-2.5 py-2 font-mono text-[10px] text-[#6c8ea2]">
+                      <div className="rounded-xl border border-[#504945] bg-[#1d2021] px-2.5 py-2 font-mono text-[10px] text-[#928374]">
                         No entities found.
                       </div>
                     )}
@@ -1490,16 +1492,16 @@ export function HudOverlay({
 
           {mobileTab && (
             <div
-              className="pointer-events-auto fixed inset-x-0 z-50 mx-2 overflow-hidden rounded-[28px] border border-[#113446] bg-[#050b17f2] shadow-[0_12px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
+              className="pointer-events-auto fixed inset-x-0 z-50 mx-2 overflow-hidden rounded-[28px] border border-[#3c3836] bg-[#1d2021f2] shadow-[0_12px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
               style={{
                 top: "calc(13rem + env(safe-area-inset-top))",
                 bottom: "calc(6.15rem + env(safe-area-inset-bottom))",
               }}
             >
-              <div className="sticky top-0 z-10 border-b border-[#113446] bg-[#050b17f2] px-4 py-3 backdrop-blur-2xl">
+              <div className="sticky top-0 z-10 border-b border-[#3c3836] bg-[#1d2021f2] px-4 py-3 backdrop-blur-2xl">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-mono text-[10px] uppercase tracking-[0.32em] text-[#e3ad50]">
+                    <div className="font-mono text-[10px] uppercase tracking-[0.32em] text-[#fabd2f]">
                       {mobileTab === "intel"
                         ? "Intel Deck"
                         : mobileTab === "news"
@@ -1510,7 +1512,7 @@ export function HudOverlay({
                               ? "Ops Console"
                               : "System Status"}
                     </div>
-                    <div className="mt-1 font-mono text-[10px] text-[#6c8ea2]">
+                    <div className="mt-1 font-mono text-[10px] text-[#928374]">
                       {mobileTab === "intel"
                         ? "Threat posture, alerts, and active target actions."
                         : mobileTab === "news"
@@ -1526,7 +1528,7 @@ export function HudOverlay({
                   <button
                     type="button"
                     onClick={() => setMobileTab(null)}
-                    className="rounded-full border border-[#284f63] bg-[#081322] px-3 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#9ceaff]"
+                    className="rounded-full border border-[#665c54] bg-[#1d2021] px-3 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#ebdbb2]"
                   >
                     Close
                   </button>
@@ -1537,12 +1539,12 @@ export function HudOverlay({
                 {mobileTab === "intel" && (
                   <div className="space-y-3">
                     {selectedIntel ? (
-                      <div className="rounded-2xl border border-[#123244] bg-[#040b17] p-3">
+                      <div className="rounded-2xl border border-[#504945] bg-[#1d2021] p-3">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#6c8ea2]">Active Target</div>
-                            <div className="mt-1 font-mono text-[15px] text-[#d5f7ff]">{selectedIntel.name}</div>
-                            <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#4e9ca8]">
+                            <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#928374]">Active Target</div>
+                            <div className="mt-1 font-mono text-[15px] text-[#ebdbb2]">{selectedIntel.name}</div>
+                            <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#7c6f64]">
                               {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority" : "Standard"}
                             </div>
                           </div>
@@ -1550,13 +1552,13 @@ export function HudOverlay({
                           <button
                             type="button"
                             onClick={onCloseIntel}
-                            className="rounded border border-[#284f63] bg-[#081322] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-[#9ceaff]"
+                            className="rounded border border-[#665c54] bg-[#1d2021] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-[#ebdbb2]"
                           >
                             Clear
                           </button>
                         </div>
 
-                        <div className="mt-3 space-y-1 rounded-xl border border-[#123244] bg-[#071020] p-2.5 font-mono text-[10px] text-[#7fb4c5]">
+                        <div className="mt-3 space-y-1 rounded-xl border border-[#504945] bg-[#1d2021] p-2.5 font-mono text-[10px] text-[#a89984]">
                           {selectedIntel.quickFacts.slice(0, 4).map((fact) => (
                             <div key={`mobile-quick-${fact.label}`}>
                               {fact.label}: {fact.value}
@@ -1565,7 +1567,7 @@ export function HudOverlay({
                         </div>
 
                         {selectedIntel.importance === "important" || showFullIntel ? (
-                          <div className="mt-2 space-y-1 rounded-xl border border-[#123244] bg-[#071020] p-2.5 font-mono text-[10px] text-[#7fb4c5]">
+                          <div className="mt-2 space-y-1 rounded-xl border border-[#504945] bg-[#1d2021] p-2.5 font-mono text-[10px] text-[#a89984]">
                             {selectedIntel.fullFacts.slice(0, 8).map((fact) => (
                               <div key={`mobile-full-${fact.label}`}>
                                 {fact.label}: {fact.value}
@@ -1592,8 +1594,8 @@ export function HudOverlay({
                               onClick={() => onTrackEntity(trackedEntityId === selectedIntel.id ? null : selectedIntel.id)}
                               className={`flex-1 rounded-lg border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
                                 trackedEntityId === selectedIntel.id
-                                  ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
-                                  : "border-[#284f63] bg-[#081322] text-[#9ceaff] hover:border-[#2ad4ff]"
+                                  ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
+                                  : "border-[#665c54] bg-[#1d2021] text-[#ebdbb2] hover:border-[#d79921]"
                               }`}
                             >
                               {trackedEntityId === selectedIntel.id ? "Stop Track" : "Track"}
@@ -1615,7 +1617,7 @@ export function HudOverlay({
                           <button
                             type="button"
                             onClick={onToggleFullIntel}
-                            className="mt-2 w-full rounded-lg border border-[#284f63] bg-[#081322] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7aa1b3]"
+                            className="mt-2 w-full rounded-lg border border-[#665c54] bg-[#1d2021] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#a89984]"
                           >
                             {showFullIntel ? "Hide Full Intel" : "Load Full Intel"}
                           </button>
@@ -1627,19 +1629,19 @@ export function HudOverlay({
                       <>
                         <div className={`rounded-2xl border px-3 py-3 font-mono ${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg}`}>
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[9px] uppercase tracking-[0.24em] text-[#6c8ea2]">Threat Level</span>
+                            <span className="text-[9px] uppercase tracking-[0.24em] text-[#928374]">Threat Level</span>
                             <span className={`text-[15px] font-bold tracking-[0.18em] ${threatLevelColors[intelBriefing.threatLevel].text}`}>
                               {intelBriefing.threatLevel}
                             </span>
                           </div>
-                          <div className="mt-2 text-[10px] leading-relaxed text-[#7fb4c5]">{intelBriefing.summary}</div>
+                          <div className="mt-2 text-[10px] leading-relaxed text-[#a89984]">{intelBriefing.summary}</div>
                         </div>
 
                         <div className="grid grid-cols-3 gap-2">
                           {([
                             { sev: "CRITICAL" as const, label: "Critical", count: intelBriefing.criticalCount, color: "#ff4444" },
-                            { sev: "WARNING" as const, label: "Warning", count: intelBriefing.warningCount, color: "#e3ad50" },
-                            { sev: "INFO" as const, label: "Info", count: intelBriefing.infoCount, color: "#2ad4ff" },
+                            { sev: "WARNING" as const, label: "Warning", count: intelBriefing.warningCount, color: "#fabd2f" },
+                            { sev: "INFO" as const, label: "Info", count: intelBriefing.infoCount, color: "#d79921" },
                           ] as const).map(({ sev, label, count, color }) => (
                             <button
                               key={sev}
@@ -1674,9 +1676,9 @@ export function HudOverlay({
                                 }
                                 setMobileTab(null);
                               }}
-                              className={`w-full rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-2 text-left transition ${
+                              className={`w-full rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2 text-left transition ${
                                 alert.coordinates || alert.entityId
-                                  ? "cursor-pointer hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
+                                  ? "cursor-pointer hover:border-[#d79921] hover:bg-[#282828]"
                                   : "cursor-default"
                               }`}
                             >
@@ -1686,7 +1688,7 @@ export function HudOverlay({
                                   <div className={`font-mono text-[10px] font-bold uppercase tracking-[0.14em] ${severityColors[alert.severity]}`}>
                                     {alert.title}
                                   </div>
-                                  <div className="mt-1 font-mono text-[10px] leading-relaxed text-[#6c8ea2]">{alert.detail}</div>
+                                  <div className="mt-1 font-mono text-[10px] leading-relaxed text-[#928374]">{alert.detail}</div>
                                 </div>
                               </div>
                             </button>
@@ -1694,7 +1696,7 @@ export function HudOverlay({
                         </div>
                       </>
                     ) : (
-                      <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3 font-mono text-[10px] text-[#4e9ca8]">
+                      <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3 font-mono text-[10px] text-[#7c6f64]">
                         Awaiting first intelligence cycle...
                       </div>
                     )}
@@ -1711,8 +1713,8 @@ export function HudOverlay({
                           onClick={() => setNewsRegionFilter(region)}
                           className={`rounded-full border px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] ${
                             newsRegionFilter === region
-                              ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
-                              : "border-[#284f63] bg-[#081322] text-[#7298a8]"
+                              ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
+                              : "border-[#665c54] bg-[#1d2021] text-[#a89984]"
                           }`}
                         >
                           {region}
@@ -1720,12 +1722,12 @@ export function HudOverlay({
                       ))}
                     </div>
 
-                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3">
+                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">AI Summary</span>
-                        <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#2ad4ff]">{activeRegionDigest?.posture ?? "STABLE"}</span>
+                        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">AI Summary</span>
+                        <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#d79921]">{activeRegionDigest?.posture ?? "STABLE"}</span>
                       </div>
-                      <p className="mt-2 font-mono text-[10px] leading-relaxed text-[#8bb8c9]">
+                      <p className="mt-2 font-mono text-[10px] leading-relaxed text-[#d5c4a1]">
                         {activeRegionDigest?.summary ?? "Collecting source headlines for regional summary..."}
                       </p>
                     </div>
@@ -1738,8 +1740,8 @@ export function HudOverlay({
                           onClick={() => setTimeRange(range)}
                           className={`rounded-full px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.14em] ${
                             timeRange === range
-                              ? "bg-[#29efab] text-[#03120d]"
-                              : "border border-[#284f63] bg-[#081322] text-[#6f93a5]"
+                              ? "bg-[#b8bb26] text-[#1d2021]"
+                              : "border border-[#665c54] bg-[#1d2021] text-[#928374]"
                           }`}
                         >
                           {range}
@@ -1752,7 +1754,7 @@ export function HudOverlay({
                       placeholder="Search headlines..."
                       value={newsSearch}
                       onChange={(e) => setNewsSearch(e.target.value)}
-                      className="w-full rounded-2xl border border-[#284f63] bg-[#081322] px-3 py-3 font-mono text-[13px] text-[#d5f7ff] placeholder-[#4e6a7a] focus:border-[#2ad4ff] focus:outline-none"
+                      className="w-full rounded-2xl border border-[#665c54] bg-[#1d2021] px-3 py-3 font-mono text-[13px] text-[#ebdbb2] placeholder-[#7c6f64] focus:border-[#d79921] focus:outline-none"
                     />
 
                     <div className="flex gap-2">
@@ -1769,7 +1771,7 @@ export function HudOverlay({
                       <button
                         type="button"
                         onClick={() => setNewsSortMode((prev) => (prev === "score" ? "newest" : "score"))}
-                        className="rounded-2xl border border-[#284f63] bg-[#081322] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#9ceaff]"
+                        className="rounded-2xl border border-[#665c54] bg-[#1d2021] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#ebdbb2]"
                       >
                         {newsSortMode === "score" ? "Intel" : "Newest"}
                       </button>
@@ -1782,29 +1784,29 @@ export function HudOverlay({
                     ) : null}
 
                     {newsLoading && filteredNewsItems.length === 0 ? (
-                      <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-2 font-mono text-[10px] text-[#7faec0]">
+                      <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2 font-mono text-[10px] text-[#a89984]">
                         Pulling feeds...
                       </div>
                     ) : null}
 
                     <div className="space-y-2">
                       {filteredNewsItems.slice(0, 40).map((item) => (
-                        <article key={item.id} className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-2.5">
+                        <article key={item.id} className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2.5">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="truncate font-mono text-[8px] uppercase tracking-[0.14em] text-[#6c8ea2]">{item.source}</span>
-                            <span className="font-mono text-[8px] text-[#4e6a7a]">{new Date(item.publishedAt).toLocaleTimeString()}</span>
+                            <span className="truncate font-mono text-[8px] uppercase tracking-[0.14em] text-[#928374]">{item.source}</span>
+                            <span className="font-mono text-[8px] text-[#7c6f64]">{new Date(item.publishedAt).toLocaleTimeString()}</span>
                           </div>
                           <a
                             href={item.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="mt-1.5 block font-mono text-[11px] leading-snug text-[#d5f7ff] hover:text-[#9ceaff]"
+                            className="mt-1.5 block font-mono text-[11px] leading-snug text-[#ebdbb2] hover:text-[#ebdbb2]"
                           >
                             {item.title}
                           </a>
                           <div className="mt-1.5 flex items-center justify-between gap-2">
-                            <span className="truncate font-mono text-[8px] text-[#6c8ea2]">{item.tags.join(" · ")}</span>
-                            <span className="font-mono text-[8px] text-[#2ad4ff]">{item.score.toFixed(1)}</span>
+                            <span className="truncate font-mono text-[8px] text-[#928374]">{item.tags.join(" · ")}</span>
+                            <span className="font-mono text-[8px] text-[#d79921]">{item.score.toFixed(1)}</span>
                           </div>
                         </article>
                       ))}
@@ -1828,24 +1830,24 @@ export function HudOverlay({
                               onClick={() => layer.available && toggleAnalyticsLayer(layer.key)}
                               className={`flex w-full items-center justify-between rounded-2xl border px-3 py-2.5 text-left transition ${
                                 !layer.available
-                                  ? "cursor-not-allowed border-[#1a2a35] bg-[#030a10] opacity-40"
+                                  ? "cursor-not-allowed border-[#3c3836] bg-[#1d2021] opacity-40"
                                   : analyticsLayers[layer.key]
-                                    ? "border-[#e3ad50] bg-[#1a0f00]"
-                                    : "border-[#123244] bg-[#040b17] hover:border-[#2eb8d4]"
+                                    ? "border-[#fabd2f] bg-[#1a0f00]"
+                                    : "border-[#504945] bg-[#1d2021] hover:border-[#d79921]"
                               }`}
                             >
                               <div>
-                                <div className="font-mono text-[11px] text-[#d5f7ff]">{layer.label}</div>
-                                <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#6c8ea2]">{layer.source}</div>
+                                <div className="font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
+                                <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#928374]">{layer.source}</div>
                               </div>
-                              <span className="rounded-full border border-[#415f70] bg-[#071321] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-[#668092]">
+                              <span className="rounded-full border border-[#665c54] bg-[#1d2021] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-[#928374]">
                                 {!layer.available ? "Soon" : analyticsLayers[layer.key] ? "On" : "Off"}
                               </span>
                             </button>
                           ))}
 
                           {analyticsStatus ? (
-                            <div className="rounded-2xl border border-[#1f3f52] bg-[#071020] px-3 py-2 font-mono text-[10px] text-[#7fb4c5]">
+                            <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2 font-mono text-[10px] text-[#a89984]">
                               {analyticsStatus}
                             </div>
                           ) : null}
@@ -1870,18 +1872,18 @@ export function HudOverlay({
                                 key={layer.key}
                                 type="button"
                                 onClick={() => toggleLayer(layer.key)}
-                                className="flex w-full items-center justify-between rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-2.5 text-left transition hover:border-[#2eb8d4]"
+                                className="flex w-full items-center justify-between rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2.5 text-left transition hover:border-[#d79921]"
                               >
                                 <div>
-                                  <div className="font-mono text-[11px] text-[#d5f7ff]">{layer.label}</div>
-                                  <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#6c8ea2]">{layer.feed}</div>
+                                  <div className="font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
+                                  <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#928374]">{layer.feed}</div>
                                 </div>
                                 <div className="ml-2 flex items-center gap-2 font-mono">
-                                  <span className="text-[11px] text-[#a5f0ff]">{compact(valueMap[layer.key])}</span>
+                                  <span className="text-[11px] text-[#ebdbb2]">{compact(valueMap[layer.key])}</span>
                                   <span className={`rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.12em] ${
                                     layers[layer.key]
-                                      ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
-                                      : "border-[#415f70] bg-[#071321] text-[#668092]"
+                                      ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
+                                      : "border-[#665c54] bg-[#1d2021] text-[#928374]"
                                   }`}>
                                     {layers[layer.key] ? "On" : "Off"}
                                   </span>
@@ -1900,8 +1902,8 @@ export function HudOverlay({
                             onClick={() => setCctvCategoryFilter(cat)}
                             className={`rounded-full border px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] ${
                               cctvCategoryFilter === cat
-                                ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
-                                : "border-[#284f63] bg-[#081322] text-[#7298a8]"
+                                ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
+                                : "border-[#665c54] bg-[#1d2021] text-[#a89984]"
                             }`}
                           >
                             {cat}
@@ -1911,7 +1913,7 @@ export function HudOverlay({
 
                       {featured.length > 0 ? (
                         <div className="space-y-2">
-                          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Featured Feeds ({featured.length})</div>
+                          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Featured Feeds ({featured.length})</div>
                           {featured.map((cam) => (
                             <button
                               key={cam.id}
@@ -1922,12 +1924,12 @@ export function HudOverlay({
                                 setEnlargedStream({ src: cam.streamUrl!, title: cam.name });
                                 setMobileTab(null);
                               }}
-                              className="flex w-full items-center gap-3 rounded-2xl border border-[#123244] bg-[#040b17] p-2.5 text-left"
+                              className="flex w-full items-center gap-3 rounded-2xl border border-[#504945] bg-[#1d2021] p-2.5 text-left"
                             >
                               <div className="min-w-0 flex-1">
-                                <div className="truncate font-mono text-[11px] text-[#d5f7ff]">{cam.name}</div>
+                                <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{cam.name}</div>
                                 <div className="mt-1 flex items-center gap-2">
-                                  <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#4e9ca8]">{cam.category}</span>
+                                  <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#7c6f64]">{cam.category}</span>
                                   <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
                                   <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-red-400">Live</span>
                                 </div>
@@ -1940,7 +1942,7 @@ export function HudOverlay({
 
                       {cctvList.length > 0 ? (
                         <div className="space-y-1.5">
-                          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">CCTV Mesh ({cctvList.length})</div>
+                          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">CCTV Mesh ({cctvList.length})</div>
                           {cctvList.map((cam) => (
                             <button
                               key={cam.id}
@@ -1950,11 +1952,11 @@ export function HudOverlay({
                                 onFlyToEntityById(`cctv-${cam.id}`);
                                 setMobileTab(null);
                               }}
-                              className="flex w-full items-center gap-2 rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-2 text-left"
+                              className="flex w-full items-center gap-2 rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2 text-left"
                             >
                               <TacticalGlyph className="h-3 w-3 shrink-0" />
-                              <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-[#8eb8c8]">{cam.name}</span>
-                              <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#3a5a6a]">{cam.category}</span>
+                              <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-[#d5c4a1]">{cam.name}</span>
+                              <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#665c54]">{cam.category}</span>
                             </button>
                           ))}
                         </div>
@@ -1965,7 +1967,7 @@ export function HudOverlay({
 
                 {mobileTab === "ops" && (
                   <div className="space-y-3">
-                    <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+                    <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
                       Location
                       <select
                         className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
@@ -1987,7 +1989,7 @@ export function HudOverlay({
                     </label>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
                         Platform
                         <select
                           className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
@@ -2000,7 +2002,7 @@ export function HudOverlay({
                         </select>
                       </label>
 
-                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
                         Camera Mode
                         <select
                           className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
@@ -2015,7 +2017,7 @@ export function HudOverlay({
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
                         View
                         <select
                           className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
@@ -2027,7 +2029,7 @@ export function HudOverlay({
                         </select>
                       </label>
 
-                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
                         Lighting
                         <select
                           className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
@@ -2049,8 +2051,8 @@ export function HudOverlay({
                       </button>
                     </div>
 
-                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3">
-                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Camera Controls</div>
+                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3">
+                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Camera Controls</div>
                       <div className="flex flex-col items-center gap-2">
                         <div className="flex items-center gap-2">
                           <button type="button" onClick={onZoomIn} className={`${camBtnClass} h-10 w-10 text-[16px]`}>+</button>
@@ -2065,8 +2067,8 @@ export function HudOverlay({
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3">
-                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Signal Stack</div>
+                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3">
+                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Signal Stack</div>
                       <div className="space-y-2">
                         <SliderControl
                           label="Master Blend"
@@ -2077,7 +2079,7 @@ export function HudOverlay({
                         {modeSliders.length > 0 ? (
                           modeSliders.map((slider) => <SliderControl key={`mobile-${slider.label}`} {...slider} />)
                         ) : (
-                          <div className="rounded-xl border border-[#17374c] bg-[#071020] px-2 py-2 font-mono text-[9px] uppercase tracking-[0.16em] text-[#66889b]">
+                          <div className="rounded-xl border border-[#665c54] bg-[#1d2021] px-2 py-2 font-mono text-[9px] uppercase tracking-[0.16em] text-[#928374]">
                             Normal mode has no active shader params.
                           </div>
                         )}
@@ -2088,8 +2090,8 @@ export function HudOverlay({
 
                 {mobileTab === "status" && (
                   <div className="space-y-3">
-                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3 font-mono text-[10px] text-[#7fb4c5]">
-                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Feed Health</div>
+                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3 font-mono text-[10px] text-[#a89984]">
+                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Feed Health</div>
                       <div>OpenSky: {feedHealth.opensky.status} @ {fmtDate(feedHealth.opensky.lastSuccessAt)}</div>
                       <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
                       <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
@@ -2101,15 +2103,15 @@ export function HudOverlay({
                       <div>AISStream: {feedHealth.ais.status} @ {fmtDate(feedHealth.ais.lastSuccessAt)}</div>
                     </div>
 
-                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3 font-mono text-[10px] text-[#7fb4c5]">
-                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Camera</div>
+                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3 font-mono text-[10px] text-[#a89984]">
+                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Camera</div>
                       <div>REC 2026-02-12 {fmtDate(recTimestamp || null)}</div>
                       <div>ALT {camera.altMeters.toFixed(0)}m</div>
                       <div>{camera.lat.toFixed(4)}N {camera.lon.toFixed(4)}E</div>
                     </div>
 
-                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3 font-mono text-[10px] text-[#7fb4c5]">
-                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Counts</div>
+                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3 font-mono text-[10px] text-[#a89984]">
+                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Counts</div>
                       <div>Flights: {counts.flights} · Military: {counts.military}</div>
                       <div>Satellites: {counts.satellites} · Links: {counts.satelliteLinks}</div>
                       <div>Quakes: {counts.seismic} · Cameras: {counts.cctv}</div>
@@ -2129,7 +2131,7 @@ export function HudOverlay({
               paddingRight: "calc(0.5rem + env(safe-area-inset-right))",
             }}
           >
-            <div className="rounded-[30px] border border-[#113446] bg-[#050b17f0] px-1.5 py-1.5 shadow-[0_0_34px_rgba(10,145,223,0.18)] backdrop-blur-xl">
+            <div className="rounded-[30px] border border-[#3c3836] bg-[#1d2021f0] px-1.5 py-1.5 shadow-[0_0_34px_rgba(10,145,223,0.18)] backdrop-blur-xl">
               <div className="grid grid-cols-5 gap-1">
                 {mobileDockDefs.map((tab) => (
                   <button
@@ -2145,8 +2147,8 @@ export function HudOverlay({
                     }}
                     className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-[22px] px-2 py-2 font-mono text-[9px] uppercase tracking-[0.14em] transition ${
                       mobileTab === tab.id
-                        ? "border border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
-                        : "border border-transparent text-[#4e6a7a] hover:border-[#284f63] hover:bg-[#081322]"
+                        ? "border border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
+                        : "border border-transparent text-[#7c6f64] hover:border-[#665c54] hover:bg-[#1d2021]"
                     }`}
                   >
                     <span className="text-[15px]">{tab.icon}</span>
@@ -2194,14 +2196,14 @@ export function HudOverlay({
           </button>
 
           <span className="min-w-[70px] text-center tabular-nums">
-            {new Date(playbackCurrentTime).toLocaleTimeString()}
+            {playbackTime ? playbackTime.toLocaleTimeString() : "--:--:--"}
           </span>
 
           <input
             type="range"
             min={playbackTimeRange.start}
             max={playbackTimeRange.end}
-            value={playbackCurrentTime}
+            value={currentPlaybackTimeMs}
             onChange={(e) => onSeek?.(Number(e.target.value))}
             className={`h-1 cursor-pointer accent-cyan-500 ${isMobile ? "w-full max-w-[220px]" : "w-48"}`}
           />

@@ -16,7 +16,7 @@ import {
 import { buildSatelliteLinkTargets } from "@/data/satelliteLinkTargets";
 import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
 import { computeOrbitTrack, computeSatellitePositions } from "@/lib/ingest/tle";
-import type { SatelliteRecord } from "@/types/intel";
+import type { PlaybackSatelliteSnapshot, SatelliteRecord } from "@/types/intel";
 
 export class SatelliteLayer {
   private viewer: Viewer;
@@ -31,6 +31,7 @@ export class SatelliteLayer {
   private selectedSatId: string | null = null;
   private linksVisible = true;
   private linkCount = 0;
+  private visible = true;
   private readonly marker = createTacticalMarkerSvg({
     fill: "#99ffca",
     glow: "#ceffe4",
@@ -145,6 +146,64 @@ export class SatelliteLayer {
       this.refreshOrbit(at, orbitSamples, orbitStepMinutes);
     }
 
+    return this.entities.size;
+  }
+
+  upsertPlaybackSatellites(satellites: PlaybackSatelliteSnapshot[]): number {
+    const seen = new Set<string>();
+
+    for (const sat of satellites) {
+      seen.add(sat.id);
+
+      const position = Cartesian3.fromDegrees(sat.longitude, sat.latitude, sat.altitudeKm * 1000);
+      const existing = this.entities.get(sat.id);
+      if (existing) {
+        const positionProperty = existing.position as ConstantPositionProperty | undefined;
+        if (positionProperty?.setValue) {
+          positionProperty.setValue(position);
+        } else {
+          existing.position = new ConstantPositionProperty(position);
+        }
+        existing.show = this.visible;
+        continue;
+      }
+
+      const entity = this.viewer.entities.add({
+        id: `sat-${sat.id}`,
+        position,
+        show: this.visible,
+        billboard: {
+          image: new ConstantProperty(this.marker),
+          scale: 0.72,
+          verticalOrigin: VerticalOrigin.CENTER,
+          scaleByDistance: new NearFarScalar(2_000_000, 1.5, 25_000_000, 0.45),
+        },
+        label: {
+          text: sat.name,
+          font: "10px monospace",
+          style: LabelStyle.FILL,
+          fillColor: Color.LIME,
+          showBackground: true,
+          backgroundColor: Color.BLACK.withAlpha(0.65),
+          scaleByDistance: new NearFarScalar(3_000_000, 0.9, 10_000_000, 0),
+        },
+        properties: {
+          kind: "satellite",
+          name: sat.name,
+        },
+      });
+
+      this.entities.set(sat.id, entity);
+    }
+
+    for (const [id, entity] of this.entities.entries()) {
+      if (seen.has(id)) continue;
+      this.viewer.entities.remove(entity);
+      this.entities.delete(id);
+    }
+
+    this.showOrbit(null, 0, 0);
+    this.setLinkVisible(false);
     return this.entities.size;
   }
 
@@ -286,6 +345,7 @@ export class SatelliteLayer {
   }
 
   setVisible(visible: boolean): void {
+    this.visible = visible;
     for (const entity of this.entities.values()) {
       entity.show = visible;
     }
