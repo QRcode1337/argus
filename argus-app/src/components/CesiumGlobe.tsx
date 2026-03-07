@@ -25,7 +25,6 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ARGUS_CONFIG, CAMERA_PRESETS } from "@/lib/config";
-import { CctvLayer } from "@/lib/cesium/layers/cctvLayer";
 import { FlightLayer } from "@/lib/cesium/layers/flightLayer";
 import { MilitaryLayer } from "@/lib/cesium/layers/militaryLayer";
 import { RasterLayer } from "@/lib/cesium/layers/rasterLayer";
@@ -34,9 +33,9 @@ import { OutageLayer } from "@/lib/cesium/layers/outageLayer";
 import { ThreatLayer } from "@/lib/cesium/layers/threatLayer";
 import { SatelliteLayer } from "@/lib/cesium/layers/satelliteLayer";
 import { SeismicLayer } from "@/lib/cesium/layers/seismicLayer";
+import { GdeltLayer } from "@/lib/cesium/layers/gdeltLayer";
 import { VisualModeController } from "@/lib/cesium/shaders/visualModes";
 import { fetchMilitaryFlights } from "@/lib/ingest/adsb";
-import { fetchCctvCameras } from "@/lib/ingest/cctv";
 import { fetchOpenSkyFlights } from "@/lib/ingest/opensky";
 import { fetchAircraftPhoto } from "@/lib/ingest/planespotters";
 import { PollingManager } from "@/lib/ingest/pollingManager";
@@ -46,6 +45,7 @@ import { fetchThreatPulses } from "@/lib/ingest/otx";
 import { fetchFredObservations } from "@/lib/ingest/fred";
 import { fetchAisSnapshotCount } from "@/lib/ingest/aisstream";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
+import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import { recordFlights, recordMilitary, recordSatellites, recordQuakes, recordOutages, recordThreats } from "@/lib/ingest/recorder";
 import {
   analyzeFlights,
@@ -132,7 +132,7 @@ const inferKindFromId = (id: string): string => {
   if (id.startsWith("mil-")) return "military";
   if (id.startsWith("sat-")) return "satellite";
   if (id.startsWith("quake-")) return "earthquake";
-  if (id.startsWith("cctv-")) return "cctv";
+
   if (id.startsWith("base-")) return "base";
   if (id.startsWith("outage-")) return "outage";
   if (id.startsWith("threat-")) return "threat";
@@ -146,6 +146,7 @@ const PRIORITY_THRESHOLDS = {
 
 const classifyImportance = (kind: string, props: Record<string, unknown>): IntelImportance => {
   if (kind === "military" || kind === "threat") return "important";
+  if (kind === "gdelt" && toNumber(props.goldsteinScale) !== null && (toNumber(props.goldsteinScale)! <= -7)) return "important";
 
   const magnitude = toNumber(props.magnitude);
   if (
@@ -230,11 +231,6 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("Apogee (km)", props.apogeeKm);
       pushQuick("Perigee (km)", props.perigeeKm);
       break;
-    case "cctv":
-      pushQuick("Camera", props.name);
-      pushQuick("Category", props.category);
-      pushQuick("Provider", props.provider);
-      break;
     case "threat":
       pushQuick("Adversary", props.adversary);
       pushQuick("Malware", props.malware);
@@ -243,6 +239,16 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("IOCs", props.indicators);
       pushQuick("TLP", props.tlp);
       pushQuick("Tags", props.tags);
+      break;
+    case "gdelt":
+      pushQuick("Actor 1", `${props.actor1Name ?? ""} (${props.actor1Country ?? ""})`);
+      pushQuick("Actor 2", `${props.actor2Name ?? ""} (${props.actor2Country ?? ""})`);
+      pushQuick("Event Code", props.eventCode);
+      pushQuick("Goldstein", props.goldsteinScale);
+      pushQuick("Mentions", props.numMentions);
+      pushQuick("Tone", props.avgTone);
+      pushQuick("Location", props.actionGeoName);
+      pushQuick("Source", props.sourceUrl);
       break;
     default:
       break;
@@ -302,10 +308,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const militaryLayerRef = useRef<MilitaryLayer | null>(null);
   const satLayerRef = useRef<SatelliteLayer | null>(null);
   const seismicLayerRef = useRef<SeismicLayer | null>(null);
-  const cctvLayerRef = useRef<CctvLayer | null>(null);
   const basesLayerRef = useRef<BasesLayer | null>(null);
   const outageLayerRef = useRef<OutageLayer | null>(null);
   const threatLayerRef = useRef<ThreatLayer | null>(null);
+  const gdeltLayerRef = useRef<GdeltLayer | null>(null);
   const rasterLayerRef = useRef<RasterLayer | null>(null);
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
@@ -346,12 +352,12 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const setIntelBriefing = useArgusStore((s) => s.setIntelBriefing);
   const trackedEntityId = useArgusStore((s) => s.trackedEntityId);
   const setTrackedEntityId = useArgusStore((s) => s.setTrackedEntityId);
-  const setCameras = useArgusStore((s) => s.setCameras);
   const searchQuery = useArgusStore((s) => s.searchQuery);
   const sceneMode = useArgusStore((s) => s.sceneMode);
   const dayNight = useArgusStore((s) => s.dayNight);
   const setSearchResults = useArgusStore((s) => s.setSearchResults);
   const setPlaybackTimeRange = useArgusStore((s) => s.setPlaybackTimeRange);
+  const setPlaybackCurrentTime = useArgusStore((s) => s.setPlaybackCurrentTime);
   const setPlaybackTime = useArgusStore((s) => s.setPlaybackTime);
   const setIsPlaying = useArgusStore((s) => s.setIsPlaying);
 
@@ -561,10 +567,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const militaryLayer = new MilitaryLayer(viewer);
     const satLayer = new SatelliteLayer(viewer);
     const seismicLayer = new SeismicLayer(viewer);
-    const cctvLayer = new CctvLayer(viewer);
     const basesLayer = new BasesLayer(viewer);
     const outageLayer = new OutageLayer(viewer);
     const threatLayer = new ThreatLayer(viewer);
+    const gdeltLayer = new GdeltLayer(viewer);
     const rasterLayer = new RasterLayer(viewer);
     const visualController = new VisualModeController(viewer);
     const picker = new ScreenSpaceEventHandler(viewer.scene.canvas);
@@ -573,10 +579,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     militaryLayerRef.current = militaryLayer;
     satLayerRef.current = satLayer;
     seismicLayerRef.current = seismicLayer;
-    cctvLayerRef.current = cctvLayer;
     basesLayerRef.current = basesLayer;
     outageLayerRef.current = outageLayer;
     threatLayerRef.current = threatLayer;
+    gdeltLayerRef.current = gdeltLayer;
     rasterLayerRef.current = rasterLayer;
 
     // Load static bases layer immediately
@@ -796,27 +802,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     });
 
     poller.add({
-      id: "cctv",
-      intervalMs: ARGUS_CONFIG.pollMs.cctv,
-      run: async () => {
-        if (platformModeRef.current !== "live") return;
-        try {
-          const cameras = await fetchCctvCameras(ARGUS_CONFIG.endpoints.webcams);
-          setCameras(cameras);
-          const categoryFilter = useArgusStore.getState().cctvCategoryFilter;
-          const filtered = categoryFilter === "All"
-            ? cameras
-            : cameras.filter((c) => c.category === categoryFilter);
-          const count = cctvLayer.upsertCameras(filtered.slice(0, ARGUS_CONFIG.limits.maxCctv));
-          setCount("cctv", count);
-          setFeedHealthy("cctv");
-        } catch (error) {
-          setFeedError("cctv", error instanceof Error ? error.message : "Failed to fetch CCTV");
-        }
-      },
-    });
-
-    poller.add({
       id: "cloudflare-radar",
       intervalMs: ARGUS_CONFIG.pollMs.cloudflareRadar,
       run: async () => {
@@ -878,6 +863,22 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
+    poller.add({
+      id: "gdelt",
+      intervalMs: ARGUS_CONFIG.pollMs.gdelt,
+      run: async () => {
+        if (platformModeRef.current !== "live") return;
+        try {
+          const events = await fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt);
+          const count = gdeltLayer.update(events);
+          setCount("gdelt", count);
+          setFeedHealthy("gdelt");
+        } catch (error) {
+          setFeedError("gdelt", error instanceof Error ? error.message : "Failed to fetch GDELT");
+        }
+      },
+    });
+
     return () => {
       poller.stopAll();
       rasterLayer.unload();
@@ -900,15 +901,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       militaryLayerRef.current = null;
       satLayerRef.current = null;
       seismicLayerRef.current = null;
-      cctvLayerRef.current = null;
       basesLayerRef.current = null;
       outageLayerRef.current = null;
       threatLayerRef.current = null;
+      gdeltLayerRef.current = null;
       rasterLayerRef.current = null;
       visualModeRef.current = null;
       pickerRef.current = null;
     };
-  }, [setCamera, setCameras, setCount, setFeedError, setFeedHealthy]);
+  }, [setCamera, setCount, setFeedError, setFeedHealthy]);
 
   // DVR playback data loop
   const playbackModeState = useArgusStore((s) => s.platformMode);
@@ -933,6 +934,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         );
         useArgusStore.setState({
           playbackTime: new Date(nextTimeMs),
+          playbackCurrentTime: nextTimeMs,
           isPlaying: nextTimeMs < maxTime ? state.isPlaying : false,
         });
       }
@@ -1165,10 +1167,11 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       satLayerRef.current?.setVisible(false);
       satLayerRef.current?.setLinkVisible(false);
       seismicLayerRef.current?.setVisible(false);
-      cctvLayerRef.current?.setVisible(false);
+
       basesLayerRef.current?.setVisible(false);
       outageLayerRef.current?.setVisible(false);
       threatLayerRef.current?.setVisible(false);
+      gdeltLayerRef.current?.setVisible(false);
     } else if (platformMode === "playback") {
       const { layers } = useArgusStore.getState();
 
@@ -1177,10 +1180,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       satLayerRef.current?.setVisible(layers.satellites);
       satLayerRef.current?.setLinkVisible(false);
       seismicLayerRef.current?.setVisible(layers.seismic);
-      cctvLayerRef.current?.setVisible(false);
       basesLayerRef.current?.setVisible(layers.bases);
       outageLayerRef.current?.setVisible(layers.outages);
       threatLayerRef.current?.setVisible(layers.threats);
+      gdeltLayerRef.current?.setVisible(false);
       setIsPlaying(false);
 
       void fetch("/api/playback/range", { cache: "no-store" })
@@ -1193,6 +1196,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         .then((range) => {
           if (!range.earliest || !range.latest) {
             setPlaybackTimeRange(null);
+            setPlaybackCurrentTime(0);
             setPlaybackTime(null);
             return;
           }
@@ -1200,15 +1204,18 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           const start = new Date(range.earliest).getTime();
           const end = new Date(range.latest).getTime();
           setPlaybackTimeRange({ start, end });
+          setPlaybackCurrentTime(end);
           setPlaybackTime(new Date(end));
         })
         .catch(() => {
           setPlaybackTimeRange(null);
+          setPlaybackCurrentTime(0);
           setPlaybackTime(null);
         });
     } else {
       // "live" — clean up playback, restore live layers
       setPlaybackTimeRange(null);
+      setPlaybackCurrentTime(0);
       setPlaybackTime(null);
       setIsPlaying(false);
 
@@ -1218,12 +1225,13 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       satLayerRef.current?.setVisible(layers.satellites);
       satLayerRef.current?.setLinkVisible(layers.satellites && layers.satelliteLinks);
       seismicLayerRef.current?.setVisible(layers.seismic);
-      cctvLayerRef.current?.setVisible(layers.cctv);
+
       basesLayerRef.current?.setVisible(layers.bases);
       outageLayerRef.current?.setVisible(layers.outages);
       threatLayerRef.current?.setVisible(layers.threats);
+      gdeltLayerRef.current?.setVisible(layers.gdelt);
     }
-  }, [platformMode, setIsPlaying, setPlaybackTime, setPlaybackTimeRange]);
+  }, [platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
 
   useEffect(() => {
     if (platformMode !== "analytics") {
@@ -1280,14 +1288,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     satLayerRef.current?.setVisible(layers.satellites);
     satLayerRef.current?.setLinkVisible(layers.satellites && layers.satelliteLinks);
     seismicLayerRef.current?.setVisible(layers.seismic);
-    cctvLayerRef.current?.setVisible(layers.cctv);
+
     basesLayerRef.current?.setVisible(layers.bases);
     outageLayerRef.current?.setVisible(layers.outages);
     threatLayerRef.current?.setVisible(layers.threats);
+    gdeltLayerRef.current?.setVisible(layers.gdelt);
   }, [
     layers.bases,
-    layers.cctv,
     layers.flights,
+    layers.gdelt,
     layers.military,
     layers.outages,
     layers.satelliteLinks,
@@ -1332,15 +1341,17 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
     if (!state.playbackTime) {
       const latest = new Date(state.playbackTimeRange.end);
+      setPlaybackCurrentTime(latest.getTime());
       setPlaybackTime(latest);
     }
 
     setIsPlaying(!state.isPlaying);
-  }, [setIsPlaying, setPlaybackTime]);
+  }, [setIsPlaying, setPlaybackCurrentTime, setPlaybackTime]);
 
   const handleSeek = useCallback((timestampMs: number) => {
+    setPlaybackCurrentTime(timestampMs);
     setPlaybackTime(new Date(timestampMs));
-  }, [setPlaybackTime]);
+  }, [setPlaybackCurrentTime, setPlaybackTime]);
 
   return (
     <div className={`relative h-screen w-screen overflow-hidden ${className ?? ""}`}>
@@ -1350,7 +1361,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       <div className="absolute inset-0 z-10 flex items-center justify-center">
         <div className={`argus-viewport ${sceneMode === "map" ? "argus-map-viewport" : ""}`}>
           <div ref={mountRef} className={sceneMode === "map" ? "hidden" : "h-full w-full"} />
-          {sceneMode === "map" ? <FlatMapView /> : null}
+          {sceneMode === "map" ? <FlatMapView onSelectIntel={setSelectedIntel} /> : null}
           {sceneMode !== "map" && visualMode === "crt" ? (
             <div className="argus-scanlines pointer-events-none absolute inset-0" />
           ) : null}

@@ -34,25 +34,25 @@ export function VideoOverlay({ src, title, onClose }: VideoOverlayProps) {
       {/* Video container */}
       <div className="relative z-10 w-[90vw] max-w-[960px]">
         {/* Header bar */}
-        <div className="flex items-center justify-between rounded-t-xl border border-b-0 border-[#113446] bg-[#050b17] px-4 py-2">
+        <div className="flex items-center justify-between rounded-t-xl border border-b-0 border-[#3c3836] bg-[#1d2021] px-4 py-2">
           <div className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#e3ad50]">
+            <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#fabd2f]">
               Live Feed
             </span>
           </div>
-          <span className="font-mono text-[12px] text-[#d5f7ff]">{title}</span>
+          <span className="font-mono text-[12px] text-[#ebdbb2]">{title}</span>
           <button
             type="button"
             onClick={onClose}
-            className="rounded border border-[#284f63] bg-[#081322] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#7298a8] transition hover:border-[#2ad4ff] hover:text-[#9ceaff]"
+            className="rounded border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#a89984] transition hover:border-[#83a598] hover:text-[#d5c4a1]"
           >
             ESC
           </button>
         </div>
 
         {/* Video iframe */}
-        <div className="relative aspect-video w-full overflow-hidden rounded-b-xl border border-[#113446]">
+        <div className="relative aspect-video w-full overflow-hidden rounded-b-xl border border-[#3c3836]">
           <iframe
             src={src}
             title={title}
@@ -65,10 +65,10 @@ export function VideoOverlay({ src, title, onClose }: VideoOverlayProps) {
 
         {/* Footer info */}
         <div className="mt-1 flex items-center justify-between px-1">
-          <span className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#4e6a7a]">
+          <span className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#928374]">
             Stream source — external provider
           </span>
-          <span className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#4e6a7a]">
+          <span className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#928374]">
             Press ESC to close
           </span>
         </div>

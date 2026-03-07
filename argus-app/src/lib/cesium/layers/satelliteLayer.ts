@@ -103,7 +103,7 @@ export class SatelliteLayer {
           scaleByDistance: new NearFarScalar(2_000_000, 1.5, 25_000_000, 0.45),
         },
         label: {
-          text: sat.name,
+          text: sat.name.length > 9 ? `${sat.name.slice(0, 9)}…` : sat.name,
           font: "10px monospace",
           style: LabelStyle.FILL,
           fillColor: Color.LIME,

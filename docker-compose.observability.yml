@@ -1,0 +1,99 @@
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: argus_uptime_kuma
+    volumes:
+      - uptime_kuma_data:/app/data
+    ports:
+      - "127.0.0.1:3002:3001"
+    networks:
+      - argus_network
+    restart: unless-stopped
+
+  apprise-api:
+    image: caronc/apprise:latest
+    container_name: argus_apprise_api
+    ports:
+      - "127.0.0.1:8008:8000"
+    environment:
+      - APPRISE_STATEFUL_MODE=simple
+      - APPRISE_WORKER_COUNT=2
+    volumes:
+      - apprise_data:/config
+    networks:
+      - argus_network
+    restart: unless-stopped
+
+  # Lightweight self-hosted error tracking (Sentry alternative)
+  glitchtip:
+    image: glitchtip/glitchtip:latest
+    container_name: argus_glitchtip
+    depends_on:
+      glitchtip-postgres:
+        condition: service_started
+      glitchtip-redis:
+        condition: service_started
+    environment:
+      - SECRET_KEY=${GLITCHTIP_SECRET_KEY:-change-me}
+      - DATABASE_URL=postgres://glitchtip:${GLITCHTIP_DB_PASSWORD:-glitchtip}@glitchtip-postgres:5432/glitchtip
+      - REDIS_URL=redis://glitchtip-redis:6379/0
+      - EMAIL_URL=${GLITCHTIP_EMAIL_URL:-smtp://localhost:25}
+      - GLITCHTIP_DOMAIN=${GLITCHTIP_DOMAIN:-http://localhost:8090}
+      - DEFAULT_FROM_EMAIL=${GLITCHTIP_FROM_EMAIL:-argus@localhost}
+      - ENABLE_USER_REGISTRATION=${GLITCHTIP_ENABLE_SIGNUP:-false}
+      - ENABLE_ORGANIZATION_CREATION=${GLITCHTIP_ENABLE_ORG_CREATION:-true}
+    ports:
+      - "127.0.0.1:8090:8000"
+    networks:
+      - argus_network
+    restart: unless-stopped
+
+  glitchtip-postgres:
+    image: postgres:16-alpine
+    container_name: argus_glitchtip_postgres
+    environment:
+      - POSTGRES_DB=glitchtip
+      - POSTGRES_USER=glitchtip
+      - POSTGRES_PASSWORD=${GLITCHTIP_DB_PASSWORD:-glitchtip}
+    volumes:
+      - glitchtip_postgres_data:/var/lib/postgresql/data
+    networks:
+      - argus_network
+    restart: unless-stopped
+
+  glitchtip-redis:
+    image: redis:7-alpine
+    container_name: argus_glitchtip_redis
+    networks:
+      - argus_network
+    restart: unless-stopped
+
+  # Placeholder for entity extraction + dedupe worker
+  # Enable after adding ./workers/enricher Dockerfile
+  enricher-worker:
+    build:
+      context: ./workers/enricher
+      dockerfile: Dockerfile
+    container_name: argus_enricher_worker
+    environment:
+      - DATABASE_URL=postgresql://argus:argus_dev@postgis:5432/argus
+      - REDIS_URL=redis://redis:6379
+      - NLP_MODEL=${NLP_MODEL:-en_core_web_sm}
+      - LOG_LEVEL=info
+    depends_on:
+      postgis:
+        condition: service_healthy
+    networks:
+      - argus_network
+    restart: unless-stopped
+    profiles: ["workers"]
+
+volumes:
+  uptime_kuma_data:
+  apprise_data:
+  glitchtip_postgres_data:
+
+networks:
+  argus_network:
+    external: true
+    name: argus_argus_network

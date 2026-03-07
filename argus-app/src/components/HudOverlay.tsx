@@ -49,9 +49,9 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "seismic", label: "Earthquakes (24h)", feed: "USGS" },
   { key: "satellites", label: "Satellites", feed: "CelesTrak" },
   { key: "satelliteLinks", label: "Sat Link Lines", feed: "Derived" },
-  { key: "cctv", label: "CCTV Mesh", feed: "TFL + Windy" },
   { key: "outages", label: "Internet Outages", feed: "CF Radar" },
   { key: "threats", label: "Cyber Threats", feed: "OTX" },
+  { key: "gdelt", label: "GDELT Events", feed: "GDELT" },
 ];
 
 const modeDefs: { key: VisualMode; label: string }[] = [
@@ -66,8 +66,6 @@ const fmtDate = (ts: number | null): string => {
   return new Date(ts).toLocaleTimeString();
 };
 
-const formatUtcTimestamp = (date: Date): string => date.toUTCString().replace("GMT", "UTC");
-
 const compact = (value: number): string => {
   if (value >= 1000) {
     return `${(value / 1000).toFixed(1)}K`;
@@ -77,15 +75,15 @@ const compact = (value: number): string => {
 };
 
 const threatLevelColors: Record<ThreatLevel, { text: string; border: string; bg: string }> = {
-  GREEN: { text: "text-[#b8bb26]", border: "border-[#3b9b6b]", bg: "bg-[#001a0f]" },
-  AMBER: { text: "text-[#fabd2f]", border: "border-[#fabd2f]", bg: "bg-[#1a0f00]" },
-  RED: { text: "text-[#ff4444]", border: "border-[#ff4444]", bg: "bg-[#1a0000]" },
+  GREEN: { text: "text-[#b8bb26]", border: "border-[#98971a]", bg: "bg-[#1a2e1a]" },
+  AMBER: { text: "text-[#fabd2f]", border: "border-[#fabd2f]", bg: "bg-[#2e2a1a]" },
+  RED: { text: "text-[#fb4934]", border: "border-[#fb4934]", bg: "bg-[#2e1a1a]" },
 };
 
 const severityColors: Record<AlertSeverity, string> = {
-  CRITICAL: "text-[#ff4444]",
+  CRITICAL: "text-[#fb4934]",
   WARNING: "text-[#fabd2f]",
-  INFO: "text-[#d79921]",
+  INFO: "text-[#83a598]",
 };
 
 const severityIcons: Record<AlertSeverity, string> = {
@@ -102,16 +100,7 @@ const workspaceDefs = [
   { id: "status", label: "Status" },
 ] as const;
 
-const mobileDockDefs = [
-  { id: "intel", label: "Intel", icon: "◆" },
-  { id: "news", label: "News", icon: "▣" },
-  { id: "feeds", label: "Feeds", icon: "◎" },
-  { id: "ops", label: "Ops", icon: "⚙" },
-  { id: "status", label: "Status", icon: "█" },
-] as const;
-
 type WorkspaceId = (typeof workspaceDefs)[number]["id"];
-type MobilePanelId = (typeof mobileDockDefs)[number]["id"];
 type TimeRange = "1h" | "6h" | "24h" | "48h" | "7d" | "ALL";
 
 const timeRangeHours: Record<Exclude<TimeRange, "ALL">, number> = {
@@ -125,18 +114,18 @@ const timeRangeHours: Record<Exclude<TimeRange, "ALL">, number> = {
 function TacticalGlyph({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" className={className ?? "h-2.5 w-2.5"} aria-hidden>
-      <circle cx="10" cy="10" r="8" fill="#1d2021" stroke="#d79921" strokeWidth="1.2" />
-      <path d="M10 3L11.7 8.3L17 10L11.7 11.7L10 17L8.3 11.7L3 10L8.3 8.3Z" fill="#ebdbb2" />
+      <circle cx="10" cy="10" r="8" fill="#282828" stroke="#83a598" strokeWidth="1.2" />
+      <path d="M10 3L11.7 8.3L17 10L11.7 11.7L10 17L8.3 11.7L3 10L8.3 8.3Z" fill="#bdae93" />
     </svg>
   );
 }
 
 function SliderControl({ label, value, onChange }: SliderDef) {
   return (
-    <div className="rounded-lg border border-[#665c54] bg-[#1d2021] px-2 py-1.5">
-      <div className="mb-1 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.24em] text-[#928374]">
+    <div className="rounded-lg border border-[#3c3836] bg-[#282828] px-2 py-1.5">
+      <div className="mb-1 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.24em] text-[#a89984]">
         <span>{label}</span>
-        <span className="text-[#ebdbb2]">{Math.round(value * 100)}%</span>
+        <span className="text-[#d5c4a1]">{Math.round(value * 100)}%</span>
       </div>
       <input
         type="range"
@@ -145,7 +134,7 @@ function SliderControl({ label, value, onChange }: SliderDef) {
         step={0.01}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full accent-[#d79921]"
+        className="w-full accent-[#83a598]"
       />
     </div>
   );
@@ -169,10 +158,10 @@ function CollapsibleSection({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between px-3 py-2.5 transition hover:bg-[#282828]"
+        className="flex w-full items-center justify-between px-3 py-2.5 transition hover:bg-[#3c3836]"
       >
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-[#7c6f64]">
+          <span className="font-mono text-[10px] text-[#928374]">
             {isOpen ? "\u25BE" : "\u25B8"}
           </span>
           <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#fabd2f]">
@@ -180,7 +169,7 @@ function CollapsibleSection({
           </span>
         </div>
         {badge ? (
-          <span className="rounded-md border border-[#665c54] bg-[#1d2021] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#928374]">
+          <span className="rounded-md border border-[#504945] bg-[#282828] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">
             {badge}
           </span>
         ) : null}
@@ -191,13 +180,13 @@ function CollapsibleSection({
 }
 
 const controlInputClass =
-  "w-full rounded-lg border border-[#665c54] bg-[#1d2021] px-3 py-2 font-mono text-[12px] text-[#ebdbb2] focus:border-[#d79921] focus:outline-none";
+  "w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-2 font-mono text-[12px] text-[#ebdbb2] focus:border-[#83a598] focus:outline-none";
 
 const actionButtonClass =
-  "rounded-lg border border-[#665c54] bg-[#1d2021] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[#ebdbb2] transition hover:border-[#d79921]";
+  "rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[#d5c4a1] transition hover:border-[#83a598]";
 
 const camBtnClass =
-  "flex h-8 w-8 items-center justify-center rounded-lg border border-[#665c54] bg-[#1d2021d9] font-mono text-[14px] text-[#ebdbb2] shadow-[0_0_12px_rgba(10,145,223,0.15)] backdrop-blur-md transition hover:border-[#d79921] hover:text-white active:bg-[#3c3836]";
+  "flex h-8 w-8 items-center justify-center rounded-lg border border-[#504945] bg-[#1d2021d9] font-mono text-[14px] text-[#d5c4a1] shadow-[0_0_12px_rgba(131,165,152,0.12)] backdrop-blur-md transition hover:border-[#83a598] hover:text-white active:bg-[#504945]";
 
 export function HudOverlay({
   onFlyToPoi,
@@ -244,31 +233,29 @@ export function HudOverlay({
     setPlatformMode,
     analyticsLayers,
     toggleAnalyticsLayer,
-    cctvCategoryFilter,
-    setCctvCategoryFilter,
     sceneMode,
     setSceneMode,
     dayNight,
     toggleDayNight,
   } = useArgusStore();
 
-  const cameras = useArgusStore((s) => s.cameras);
   const searchQuery = useArgusStore((s) => s.searchQuery);
   const setSearchQuery = useArgusStore((s) => s.setSearchQuery);
   const searchResults = useArgusStore((s) => s.searchResults);
   const isPlaying = useArgusStore((s) => s.isPlaying);
   const playbackSpeed = useArgusStore((s) => s.playbackSpeed);
   const setPlaybackSpeed = useArgusStore((s) => s.setPlaybackSpeed);
-  const playbackTime = useArgusStore((s) => s.playbackTime);
   const playbackTimeRange = useArgusStore((s) => s.playbackTimeRange);
+  const playbackCurrentTime = useArgusStore((s) => s.playbackCurrentTime);
 
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [workspace, setWorkspace] = useState<WorkspaceId>("news");
   const [alertFilter, setAlertFilter] = useState<AlertSeverity | null>(null);
   const [enlargedStream, setEnlargedStream] = useState<{ src: string; title: string } | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const [utcTimestamp, setUtcTimestamp] = useState("");
-  const [mobileTab, setMobileTab] = useState<MobilePanelId | null>(null);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
+  );
+  const [mobileTab, setMobileTab] = useState<"intel" | "feeds" | "controls" | "status" | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [newsSearch, setNewsSearch] = useState("");
   const [newsSortMode, setNewsSortMode] = useState<"score" | "newest">("score");
@@ -280,27 +267,11 @@ export function HudOverlay({
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsError, setNewsError] = useState<string | null>(null);
 
-  const currentPlaybackTimeMs = playbackTime?.getTime() ?? playbackTimeRange?.end ?? 0;
-
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
-    setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, []);
-
-  useEffect(() => {
-    if (!isMobile) {
-      setMobileTab(null);
-    }
-  }, [isMobile]);
-
-  useEffect(() => {
-    const updateUtcTimestamp = () => setUtcTimestamp(formatUtcTimestamp(new Date()));
-    updateUtcTimestamp();
-    const timer = window.setInterval(updateUtcTimestamp, 1000);
-    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -393,7 +364,7 @@ export function HudOverlay({
     feedHealth.adsb.lastSuccessAt ?? 0,
     feedHealth.celestrak.lastSuccessAt ?? 0,
     feedHealth.usgs.lastSuccessAt ?? 0,
-    feedHealth.cctv.lastSuccessAt ?? 0,
+
     feedHealth.cfradar.lastSuccessAt ?? 0,
     feedHealth.otx.lastSuccessAt ?? 0,
     feedHealth.fred.lastSuccessAt ?? 0,
@@ -473,10 +444,10 @@ export function HudOverlay({
     counts.seismic +
     counts.satellites +
     counts.satelliteLinks +
-    counts.cctv +
     counts.bases +
     counts.outages +
-    counts.threats;
+    counts.threats +
+    counts.gdelt;
 
   const activeFeedCount = Object.values(feedHealth).filter(
     (fh) => fh.status === "ok",
@@ -487,19 +458,19 @@ export function HudOverlay({
       {/* Top info strip */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] hidden h-8 items-center justify-between border-b border-[#3c3836] bg-[#1d2021e6] px-4 font-mono uppercase tracking-[0.22em] text-[#928374] md:flex">
         <span>Global Situation</span>
-        <span>{utcTimestamp}</span>
+        <span>{new Date().toUTCString().replace("GMT", "UTC")}</span>
       </div>
 
       {/* Bottom info strip */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[25] hidden h-7 items-center justify-between border-t border-[#3c3836] bg-[#1d2021e6] px-4 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374] md:flex">
-        <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: {activeFeedCount}/9</span>
+        <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: {activeFeedCount}/8</span>
         <span>
           Region {newsRegionFilter} · {activeRegionDigest?.posture ?? "STABLE"}
         </span>
       </div>
 
       {/* Time range strip */}
-      <div className="pointer-events-auto absolute left-4 top-10 hidden rounded-md border border-[#504945] bg-[#1d2021e0] p-1 md:flex">
+      <div className="pointer-events-auto absolute left-4 top-10 hidden rounded-md border border-[#3c3836] bg-[#1d2021e0] p-1 md:flex">
         {(["1h", "6h", "24h", "48h", "7d", "ALL"] as TimeRange[]).map((range) => (
           <button
             key={range}
@@ -508,7 +479,7 @@ export function HudOverlay({
             className={`rounded-sm px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
               timeRange === range
                 ? "bg-[#b8bb26] text-[#1d2021]"
-                : "text-[#928374] hover:bg-[#282828] hover:text-[#ebdbb2]"
+                : "text-[#928374] hover:bg-[#3c3836] hover:text-[#d5c4a1]"
             }`}
           >
             {range}
@@ -517,41 +488,41 @@ export function HudOverlay({
       </div>
 
       {/* ARGUS header */}
-      <header className="absolute left-3 top-2 hidden font-mono md:left-6 md:top-10 md:block">
-        <h1 className="text-[20px] font-semibold leading-none tracking-[0.34em] text-[#fbf1c7] md:text-[42px]">
-          ARG<span className="text-[#d79921]">US</span>
+      <header className="absolute left-3 top-2 font-mono md:left-6 md:top-[5.5rem]">
+        <h1 className="text-[20px] font-semibold leading-none tracking-[0.34em] text-[#ebdbb2] md:text-[42px]">
+          ARG<span className="text-[#83a598]">US</span>
         </h1>
-        <p className="mt-1 hidden text-[10px] uppercase tracking-[0.45em] text-[#7c6f64] md:block">Epsilon LLC</p>
+        <p className="mt-1 hidden text-[10px] uppercase tracking-[0.45em] text-[#928374] md:block">Epsilon LLC</p>
       </header>
 
       {/* Active style display (top-right) — desktop only */}
-      <div className="absolute right-8 top-10 hidden text-right font-mono uppercase tracking-[0.28em] text-[#7c6f64] md:block">
+      <div className="absolute right-8 top-10 hidden text-right font-mono uppercase tracking-[0.28em] text-[#928374] md:block">
         <div className="text-[10px] text-[#928374]">Active Style</div>
-        <div className="text-[26px] text-[#d79921]">{modeLabel}</div>
+        <div className="text-[26px] text-[#83a598]">{modeLabel}</div>
       </div>
 
       {/* Selected intel panel (right side) — desktop only */}
       {selectedIntel && !isMobile ? (
-        <section className="pointer-events-auto absolute right-8 top-[5.5rem] w-[348px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] p-4 shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
+        <section className="pointer-events-auto absolute right-8 top-[5.5rem] w-[348px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] p-4 shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md">
           <div className="flex items-center justify-between">
             <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#fabd2f]">Target Intel</div>
             <button
               type="button"
               onClick={onCloseIntel}
-              className="rounded-md border border-[#665c54] bg-[#1d2021] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#d79921]"
+              className="rounded-md border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#83a598]"
             >
               Clear
             </button>
           </div>
 
-          <div className="mt-2 rounded-xl border border-[#504945] bg-[#1d2021] p-3 font-mono">
+          <div className="mt-2 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono">
             <div className="text-[15px] text-[#ebdbb2]">{selectedIntel.name}</div>
-            <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[#928374]">
+            <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[#a89984]">
               {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority Target" : "Standard Target"}
             </div>
           </div>
 
-          <div className="mt-2 rounded-xl border border-[#504945] bg-[#1d2021] p-3 font-mono text-[11px] text-[#a89984]">
+          <div className="mt-2 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
             {selectedIntel.quickFacts.map((fact) => (
               <div key={`quick-${fact.label}`}>
                 {fact.label}: {fact.value}
@@ -560,7 +531,7 @@ export function HudOverlay({
           </div>
 
           {selectedIntel.importance === "important" || showFullIntel ? (
-            <div className="mt-2 max-h-[180px] overflow-auto rounded-xl border border-[#504945] bg-[#1d2021] p-3 font-mono text-[11px] text-[#a89984]">
+            <div className="mt-2 max-h-[180px] overflow-auto rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
               {selectedIntel.fullFacts.map((fact) => (
                 <div key={`full-${fact.label}`}>
                   {fact.label}: {fact.value}
@@ -574,7 +545,7 @@ export function HudOverlay({
               <iframe
                 src={selectedIntel.streamUrl}
                 title={selectedIntel.name}
-                className="h-44 w-full rounded border border-[#665c54]"
+                className="h-44 w-full rounded border border-[#504945]"
                 allow="autoplay; encrypted-media"
                 allowFullScreen
                 sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
@@ -587,7 +558,7 @@ export function HudOverlay({
                     title: selectedIntel.name,
                   })
                 }
-                className="absolute right-1.5 top-1.5 rounded border border-[#665c54] bg-[#1d2021]/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#d79921] transition hover:border-[#d79921] hover:bg-[#1d2021]"
+                className="absolute right-1.5 top-1.5 rounded border border-[#504945] bg-[#282828]/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#83a598] transition hover:border-[#83a598] hover:bg-[#282828]"
               >
                 Enlarge
               </button>
@@ -602,15 +573,9 @@ export function HudOverlay({
               <img
                 src={selectedIntel.imageUrl}
                 alt={selectedIntel.name}
-                className="mt-2 h-32 w-full rounded border border-[#665c54] object-cover"
+                className="mt-2 h-32 w-full rounded border border-[#504945] object-cover"
               />
             </>
-          ) : selectedIntel.kind === "cctv" ? (
-            <div className="mt-2 flex h-32 w-full items-center justify-center rounded border border-[#504945] bg-[#1d2021]">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-[#7c6f64]">
-                No live feed
-              </span>
-            </div>
           ) : null}
 
           <div className="mt-2 flex gap-2">
@@ -631,8 +596,8 @@ export function HudOverlay({
                 }
                 className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition ${
                   trackedEntityId === selectedIntel.id
-                    ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
-                    : "border-[#665c54] bg-[#1d2021] text-[#ebdbb2] hover:border-[#d79921]"
+                    ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                    : "border-[#504945] bg-[#282828] text-[#d5c4a1] hover:border-[#83a598]"
                 }`}
               >
                 {trackedEntityId === selectedIntel.id ? "Stop Tracking" : "Track"}
@@ -641,7 +606,7 @@ export function HudOverlay({
           </div>
 
           {trackedEntityId === selectedIntel.id && (
-            <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#d79921]">
+            <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#83a598]">
               Tracking Active
             </div>
           )}
@@ -650,31 +615,48 @@ export function HudOverlay({
             <button
               type="button"
               onClick={onToggleFullIntel}
-              className="mt-2 w-full rounded-lg border border-[#665c54] bg-[#1d2021] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#d79921]"
+              className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#83a598]"
             >
               {showFullIntel ? "Hide Full Intel" : "Load Full Intel"}
             </button>
           ) : null}
+
+          <button
+            type="button"
+            onClick={() => {
+              const summary = [
+                `AI Analysis — ${selectedIntel.name}`,
+                `Type: ${selectedIntel.kind} | ${selectedIntel.importance === "important" ? "Priority" : "Standard"} Target`,
+                "",
+                ...selectedIntel.quickFacts.map((f) => `${f.label}: ${f.value}`),
+                ...(selectedIntel.fullFacts.length ? ["", ...selectedIntel.fullFacts.map((f) => `${f.label}: ${f.value}`)] : []),
+              ].join("\n");
+              alert(summary);
+            }}
+            className="mt-2 w-full rounded-lg border border-[#fabd2f]/40 bg-[#fabd2f]/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#fabd2f] transition hover:border-[#fabd2f] hover:bg-[#fabd2f]/20"
+          >
+            AI Analysis / Summary
+          </button>
         </section>
       ) : null}
 
       {/* Decorative side text — desktop only */}
-      <div className="absolute right-3 top-1/2 hidden -translate-y-1/2 rotate-90 font-mono text-[10px] uppercase tracking-[0.45em] text-[#665c54] md:block">
+      <div className="absolute right-3 top-1/2 hidden -translate-y-1/2 rotate-90 font-mono text-[10px] uppercase tracking-[0.45em] text-[#2f5467] md:block">
         BAND-PAN BITS: 11 LVL: 1A
       </div>
 
       {/* LEFT SIDEBAR - Collapsible Accordion Panels — desktop only */}
       {sidebarVisible && !isMobile ? (
-        <nav className="pointer-events-auto absolute left-4 top-24 w-[260px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md">
+        <nav className="pointer-events-auto absolute left-4 top-[8.5rem] w-[260px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md">
           {/* Sidebar header with hide button */}
           <div className="flex items-center justify-between border-b border-[#3c3836] px-3 py-2">
-            <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#928374]">
+            <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#a89984]">
               {platformMode === "analytics" ? "Analytics" : platformMode === "playback" ? "Playback" : "Live"} Panels
             </span>
             <button
               type="button"
               onClick={() => setSidebarVisible(false)}
-              className="rounded border border-[#665c54] bg-[#1d2021] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984] transition hover:border-[#d79921] hover:text-[#ebdbb2]"
+              className="rounded border border-[#504945] bg-[#282828] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#7298a8] transition hover:border-[#83a598] hover:text-[#d5c4a1]"
             >
               Hide
             </button>
@@ -688,8 +670,8 @@ export function HudOverlay({
                 onClick={() => setWorkspace(tab.id)}
                 className={`rounded px-1 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
                   workspace === tab.id
-                    ? "border border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
-                    : "border border-transparent text-[#928374] hover:border-[#665c54] hover:bg-[#1d2021]"
+                    ? "border border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                    : "border border-transparent text-[#a89984] hover:border-[#504945] hover:bg-[#282828]"
                 }`}
               >
                 {tab.label}
@@ -701,7 +683,7 @@ export function HudOverlay({
             <section className="space-y-2 border-b border-[#3c3836] px-3 py-2.5">
               <div className="flex items-center justify-between">
                 <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#fabd2f]">Live News</div>
-                <div className="font-mono text-[8px] text-[#928374]">
+                <div className="font-mono text-[8px] text-[#a89984]">
                   {newsMeta ? `${newsMeta.dedupedCount} items` : "--"}
                 </div>
               </div>
@@ -714,8 +696,8 @@ export function HudOverlay({
                     onClick={() => setNewsRegionFilter(region)}
                     className={`rounded-md border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] ${
                       newsRegionFilter === region
-                        ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
-                        : "border-[#665c54] bg-[#1d2021] text-[#a89984]"
+                        ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                        : "border-[#504945] bg-[#282828] text-[#7298a8]"
                     }`}
                   >
                     {region}
@@ -723,12 +705,12 @@ export function HudOverlay({
                 ))}
               </div>
 
-              <div className="rounded-md border border-[#504945] bg-[#1d2021] px-2 py-1.5">
+              <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#928374]">AI Summary</span>
-                  <span className="font-mono text-[8px] text-[#d79921]">{activeRegionDigest?.posture ?? "STABLE"}</span>
+                  <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#a89984]">AI Summary</span>
+                  <span className="font-mono text-[8px] text-[#83a598]">{activeRegionDigest?.posture ?? "STABLE"}</span>
                 </div>
-                <p className="mt-1 font-mono text-[9px] leading-relaxed text-[#d5c4a1]">
+                <p className="mt-1 font-mono text-[9px] leading-relaxed text-[#8bb8c9]">
                   {activeRegionDigest?.summary ?? "Collecting source headlines for regional summary..."}
                 </p>
               </div>
@@ -738,14 +720,14 @@ export function HudOverlay({
                 placeholder="Search headlines..."
                 value={newsSearch}
                 onChange={(e) => setNewsSearch(e.target.value)}
-                className="w-full rounded-md border border-[#665c54] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#ebdbb2] placeholder-[#7c6f64] focus:border-[#d79921] focus:outline-none"
+                className="w-full rounded-md border border-[#504945] bg-[#282828] px-2 py-1.5 font-mono text-[10px] text-[#ebdbb2] placeholder-[#4e6a7a] focus:border-[#83a598] focus:outline-none"
               />
 
               <div className="flex gap-1">
                 <select
                   value={newsSourceFilter}
                   onChange={(e) => setNewsSourceFilter(e.target.value)}
-                  className="flex-1 rounded-md border border-[#665c54] bg-[#1d2021] px-2 py-1 font-mono text-[9px] text-[#ebdbb2] focus:border-[#d79921] focus:outline-none"
+                  className="flex-1 rounded-md border border-[#504945] bg-[#282828] px-2 py-1 font-mono text-[9px] text-[#ebdbb2] focus:border-[#83a598] focus:outline-none"
                 >
                   {newsSources.map((source) => (
                     <option key={source} value={source}>{source}</option>
@@ -754,7 +736,7 @@ export function HudOverlay({
                 <button
                   type="button"
                   onClick={() => setNewsSortMode((prev) => (prev === "score" ? "newest" : "score"))}
-                  className="rounded-md border border-[#665c54] bg-[#1d2021] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em] text-[#ebdbb2]"
+                  className="rounded-md border border-[#504945] bg-[#282828] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em] text-[#d5c4a1]"
                 >
                   {newsSortMode === "score" ? "Intel" : "Newest"}
                 </button>
@@ -767,7 +749,7 @@ export function HudOverlay({
               ) : null}
 
               {newsLoading && filteredNewsItems.length === 0 ? (
-                <div className="rounded-md border border-[#504945] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#a89984]">
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#7faec0]">
                   Pulling feeds...
                 </div>
               ) : null}
@@ -776,13 +758,13 @@ export function HudOverlay({
                 {filteredNewsItems.slice(0, 60).map((item) => (
                   <article
                     key={item.id}
-                    className="rounded-md border border-[#504945] bg-[#1d2021] px-2 py-1.5"
+                    className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-mono text-[8px] uppercase tracking-[0.1em] text-[#928374]">
+                      <span className="truncate font-mono text-[8px] uppercase tracking-[0.1em] text-[#a89984]">
                         {item.source}
                       </span>
-                      <span className="font-mono text-[8px] text-[#7c6f64]">
+                      <span className="font-mono text-[8px] text-[#4e6a7a]">
                         {new Date(item.publishedAt).toLocaleTimeString()}
                       </span>
                     </div>
@@ -790,15 +772,15 @@ export function HudOverlay({
                       href={item.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-1 block font-mono text-[10px] leading-snug text-[#ebdbb2] hover:text-[#ebdbb2]"
+                      className="mt-1 block font-mono text-[10px] leading-snug text-[#ebdbb2] hover:text-[#d5c4a1]"
                     >
                       {item.title}
                     </a>
                     <div className="mt-1 flex items-center justify-between gap-2">
-                      <span className="truncate font-mono text-[8px] text-[#928374]">
+                      <span className="truncate font-mono text-[8px] text-[#a89984]">
                         {item.tags.join(" · ")}
                       </span>
-                      <span className="font-mono text-[8px] text-[#d79921]">{item.score.toFixed(1)}</span>
+                      <span className="font-mono text-[8px] text-[#83a598]">{item.score.toFixed(1)}</span>
                     </div>
                   </article>
                 ))}
@@ -824,7 +806,7 @@ export function HudOverlay({
                     className={`rounded-lg border px-2.5 py-2 font-mono ${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg}`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[9px] uppercase tracking-[0.28em] text-[#928374]">
+                      <span className="text-[9px] uppercase tracking-[0.28em] text-[#a89984]">
                         Threat Level
                       </span>
                       <span
@@ -833,7 +815,7 @@ export function HudOverlay({
                         {intelBriefing.threatLevel}
                       </span>
                     </div>
-                    <div className="mt-1.5 text-[10px] text-[#a89984]">
+                    <div className="mt-1.5 text-[10px] text-[#7fb4c5]">
                       {intelBriefing.summary}
                     </div>
                   </div>
@@ -841,9 +823,9 @@ export function HudOverlay({
                   {/* Alert count breakdown — clickable to filter */}
                   <div className="flex gap-1.5">
                     {([
-                      { sev: "CRITICAL" as const, label: "Crit", count: intelBriefing.criticalCount, color: "#ff4444" },
+                      { sev: "CRITICAL" as const, label: "Crit", count: intelBriefing.criticalCount, color: "#fb4934" },
                       { sev: "WARNING" as const, label: "Warn", count: intelBriefing.warningCount, color: "#fabd2f" },
-                      { sev: "INFO" as const, label: "Info", count: intelBriefing.infoCount, color: "#d79921" },
+                      { sev: "INFO" as const, label: "Info", count: intelBriefing.infoCount, color: "#83a598" },
                     ] as const).map(({ sev, label, count, color }) => (
                       <button
                         key={sev}
@@ -881,12 +863,12 @@ export function HudOverlay({
                           <button
                             type="button"
                             onClick={() => setAlertFilter(null)}
-                            className="mb-1 rounded border border-[#665c54] bg-[#1d2021] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.14em] text-[#a89984] transition hover:border-[#d79921]"
+                            className="mb-1 rounded border border-[#504945] bg-[#282828] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.14em] text-[#7298a8] transition hover:border-[#83a598]"
                           >
                             Clear Filter ({filtered.length})
                           </button>
                         )}
-                        <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#665c54]">
+                        <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#504945]">
                           {filtered.map((alert: IntelAlert) => (
                             <button
                               key={alert.id}
@@ -898,9 +880,9 @@ export function HudOverlay({
                                   onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
                                 }
                               }}
-                              className={`w-full rounded-lg border border-[#504945] bg-[#1d2021] px-2 py-1.5 text-left transition ${
+                              className={`w-full rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition ${
                                 alert.coordinates || alert.entityId
-                                  ? "cursor-pointer hover:border-[#d79921] hover:bg-[#282828]"
+                                  ? "cursor-pointer hover:border-[#83a598] hover:bg-[#3c3836]"
                                   : "cursor-default"
                               }`}
                             >
@@ -916,11 +898,11 @@ export function HudOverlay({
                                   >
                                     {alert.title}
                                   </div>
-                                  <div className="mt-0.5 font-mono text-[9px] leading-relaxed text-[#928374]">
+                                  <div className="mt-0.5 font-mono text-[9px] leading-relaxed text-[#a89984]">
                                     {alert.detail}
                                   </div>
                                   {alert.coordinates && (
-                                    <div className="mt-0.5 font-mono text-[8px] text-[#d79921]/60">
+                                    <div className="mt-0.5 font-mono text-[8px] text-[#83a598]/60">
                                       {alert.coordinates.lat.toFixed(2)}N {alert.coordinates.lon.toFixed(2)}E
                                     </div>
                                   )}
@@ -934,7 +916,7 @@ export function HudOverlay({
                   })()}
                 </div>
               ) : (
-                <div className="rounded-lg border border-[#504945] bg-[#1d2021] px-2.5 py-2 font-mono text-[10px] text-[#7c6f64]">
+                <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-2 font-mono text-[10px] text-[#928374]">
                   Awaiting first intelligence cycle...
                 </div>
               )}
@@ -950,17 +932,16 @@ export function HudOverlay({
                   placeholder="Search entities..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-[#665c54] bg-[#1d2021] px-2.5 py-1.5 font-mono text-[11px] text-[#ebdbb2] placeholder-[#7c6f64] focus:border-[#d79921] focus:outline-none"
+                  className="w-full rounded-lg border border-[#504945] bg-[#282828] px-2.5 py-1.5 font-mono text-[11px] text-[#ebdbb2] placeholder-[#4e6a7a] focus:border-[#83a598] focus:outline-none"
                 />
                 {searchResults.length > 0 && (
                   <div className="max-h-[180px] space-y-1 overflow-y-auto">
                     {searchResults.map((result) => {
                       const kindColors: Record<string, string> = {
-                        flight: "text-[#ebdbb2]",
+                        flight: "text-[#d5c4a1]",
                         military: "text-[#fabd2f]",
                         satellite: "text-[#b8bb26]",
                         earthquake: "text-[#ff6b6b]",
-                        cctv: "text-[#c4b5fd]",
                       };
                       return (
                         <button
@@ -970,17 +951,17 @@ export function HudOverlay({
                             onFlyToEntityById(result.id);
                             setSearchQuery("");
                           }}
-                          className="w-full rounded-lg border border-[#504945] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#d79921] hover:bg-[#282828]"
+                          className="w-full rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
                         >
                           <div className="truncate font-mono text-[10px] text-[#ebdbb2]">
                             {result.name}
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <span className={`font-mono text-[8px] uppercase tracking-[0.14em] ${kindColors[result.kind] ?? "text-[#928374]"}`}>
+                            <span className={`font-mono text-[8px] uppercase tracking-[0.14em] ${kindColors[result.kind] ?? "text-[#a89984]"}`}>
                               {result.kind}
                             </span>
                             {result.lat !== null && result.lon !== null && (
-                              <span className="font-mono text-[8px] text-[#7c6f64]">
+                              <span className="font-mono text-[8px] text-[#4e6a7a]">
                                 {result.lat.toFixed(1)}N {result.lon.toFixed(1)}E
                               </span>
                             )}
@@ -991,7 +972,7 @@ export function HudOverlay({
                   </div>
                 )}
                 {searchQuery.trim() && searchResults.length === 0 && (
-                  <div className="rounded-lg border border-[#504945] bg-[#1d2021] px-2.5 py-2 font-mono text-[10px] text-[#7c6f64]">
+                  <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-2 font-mono text-[10px] text-[#928374]">
                     No entities found
                   </div>
                 )}
@@ -999,89 +980,6 @@ export function HudOverlay({
             </CollapsibleSection>
           )}
 
-          {/* FEATURED FEEDS — curated live streams with thumbnails */}
-          {workspace === "feeds" && platformMode === "live" && cameras.length > 0 && (() => {
-            const filtered = cameras.filter((cam) => cctvCategoryFilter === "All" || cam.category === cctvCategoryFilter);
-            const featured = filtered.filter((cam) => cam.streamUrl);
-            const cctv = filtered.filter((cam) => !cam.streamUrl);
-            return (
-              <>
-                {featured.length > 0 && (
-                  <CollapsibleSection title="Featured Feeds" badge={`${featured.length} live`}>
-                    <div className="max-h-[400px] space-y-1.5 overflow-y-auto">
-                      {featured.map((cam) => (
-                        <button
-                          key={cam.id}
-                          type="button"
-                          onClick={() => {
-                            if (!layers.cctv) setLayer("cctv", true);
-                            onFlyToEntityById(`cctv-${cam.id}`);
-                            setEnlargedStream({ src: cam.streamUrl!, title: cam.name });
-                          }}
-                          className="flex w-full items-center gap-2 rounded-lg border border-[#504945] bg-[#1d2021] p-1.5 text-left transition hover:border-[#d79921] hover:bg-[#282828]"
-                        >
-                          <div className="h-10 w-14 shrink-0 overflow-hidden rounded border border-[#504945]">
-                            {cam.imageUrl && cam.imageUrl !== "/camera-placeholder.svg" ? (
-                              /* eslint-disable-next-line @next/next/no-img-element */
-                              <img
-                                src={cam.imageUrl}
-                                alt={cam.name}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-[#1d2021] font-mono text-[9px] text-[#7c6f64]">
-                                LIVE
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate font-mono text-[9px] text-[#ebdbb2]">
-                              {cam.name}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono text-[7px] uppercase tracking-[0.1em] text-[#7c6f64]">
-                                {cam.category}
-                              </span>
-                              <span className="inline-block h-1 w-1 rounded-full bg-red-500 animate-pulse" />
-                              <span className="font-mono text-[7px] text-red-400">LIVE</span>
-                            </div>
-                          </div>
-                          <TacticalGlyph className="h-3 w-3 shrink-0" />
-                        </button>
-                      ))}
-                    </div>
-                  </CollapsibleSection>
-                )}
-
-                {/* CCTV MESH — compact list of all TFL/bulk cameras */}
-                {cctv.length > 0 && (
-                  <CollapsibleSection title="CCTV Mesh" badge={`${cctv.length}`}>
-                    <div className="max-h-[300px] overflow-y-auto">
-                      {cctv.map((cam) => (
-                        <button
-                          key={cam.id}
-                          type="button"
-                          onClick={() => {
-                            if (!layers.cctv) setLayer("cctv", true);
-                            onFlyToEntityById(`cctv-${cam.id}`);
-                          }}
-                          className="flex w-full items-center gap-1.5 border-b border-[#3c3836] px-1 py-[3px] text-left transition hover:bg-[#282828]"
-                        >
-                          <TacticalGlyph className="h-2.5 w-2.5 shrink-0" />
-                          <span className="min-w-0 flex-1 truncate font-mono text-[8px] text-[#d5c4a1]">
-                            {cam.name}
-                          </span>
-                          <span className="shrink-0 font-mono text-[7px] text-[#665c54]">
-                            {cam.category}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </CollapsibleSection>
-                )}
-              </>
-            );
-          })()}
 
           {/* INTEL FEEDS section */}
           {workspace === "feeds" && (
@@ -1100,23 +998,23 @@ export function HudOverlay({
                       !layer.available
                         ? "cursor-not-allowed border-[#3c3836] bg-[#1d2021] opacity-40"
                         : analyticsLayers[layer.key]
-                          ? "border-[#fabd2f] bg-[#1a0f00]"
-                          : "border-[#504945] bg-[#1d2021] hover:border-[#d79921]"
+                          ? "border-[#fabd2f] bg-[#2e2a1a]"
+                          : "border-[#3c3836] bg-[#1d2021] hover:border-[#2eb8d4]"
                     }`}
                   >
                     <div className="min-w-0">
                       <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
-                      <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#928374]">
+                      <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">
                         {layer.source}{!layer.available ? " \u00B7 Phase 4" : ""}
                       </div>
                     </div>
                     <span
                       className={`ml-2 shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
                         !layer.available
-                          ? "border-[#665c54] bg-[#1d2021] text-[#928374]"
+                          ? "border-[#504945] bg-[#282828] text-[#a89984]"
                           : analyticsLayers[layer.key]
-                            ? "border-[#fabd2f] bg-[#1a0f00] text-[#fabd2f]"
-                            : "border-[#665c54] bg-[#1d2021] text-[#928374]"
+                            ? "border-[#fabd2f] bg-[#2e2a1a] text-[#fabd2f]"
+                            : "border-[#504945] bg-[#282828] text-[#a89984]"
                       }`}
                     >
                       {!layer.available ? "Soon" : analyticsLayers[layer.key] ? "On" : "Off"}
@@ -1125,7 +1023,7 @@ export function HudOverlay({
                 ))}
 
                 {analyticsStatus ? (
-                  <div className="rounded-lg border border-[#504945] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#a89984]">
+                  <div className="rounded-lg border border-[#1f3f52] bg-[#282828] px-2 py-1.5 font-mono text-[9px] text-[#7fb4c5]">
                     {analyticsStatus}
                   </div>
                 ) : null}
@@ -1139,10 +1037,10 @@ export function HudOverlay({
                     satellites: counts.satellites,
                     satelliteLinks: counts.satelliteLinks,
                     seismic: counts.seismic,
-                    cctv: counts.cctv,
                     bases: counts.bases,
                     outages: counts.outages,
                     threats: counts.threats,
+                    gdelt: counts.gdelt,
                   };
                   const value = valueMap[layer.key];
 
@@ -1151,19 +1049,19 @@ export function HudOverlay({
                       key={layer.key}
                       type="button"
                       onClick={() => toggleLayer(layer.key)}
-                      className="flex w-full items-center justify-between rounded-lg border border-[#504945] bg-[#1d2021] px-2.5 py-1.5 text-left transition hover:border-[#d79921]"
+                      className="flex w-full items-center justify-between rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-1.5 text-left transition hover:border-[#2eb8d4]"
                     >
                       <div className="min-w-0">
                         <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
-                        <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#928374]">{layer.feed}</div>
+                        <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">{layer.feed}</div>
                       </div>
                       <div className="ml-2 flex shrink-0 items-center gap-2 text-right font-mono">
-                        <span className="text-[11px] text-[#ebdbb2]">{compact(value)}</span>
+                        <span className="text-[11px] text-[#a5f0ff]">{compact(value)}</span>
                         <span
                           className={`rounded-md border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] ${
                             layers[layer.key]
-                              ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
-                              : "border-[#665c54] bg-[#1d2021] text-[#928374]"
+                              ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                              : "border-[#504945] bg-[#282828] text-[#a89984]"
                           }`}
                         >
                           {layers[layer.key] ? "On" : "Off"}
@@ -1173,24 +1071,6 @@ export function HudOverlay({
                   );
                 })}
 
-                {layers.cctv && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {(["All", "Traffic", "Nature", "Landmark", "Wildlife", "Scenic", "Infrastructure"] as const).map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setCctvCategoryFilter(cat)}
-                        className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] transition ${
-                          cctvCategoryFilter === cat
-                            ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
-                            : "border-[#665c54] bg-[#1d2021] text-[#a89984] hover:border-[#d79921]"
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </CollapsibleSection>
@@ -1209,7 +1089,7 @@ export function HudOverlay({
               {modeSliders.length > 0 ? (
                 modeSliders.map((slider) => <SliderControl key={slider.label} {...slider} />)
               ) : (
-                <div className="rounded-lg border border-[#665c54] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">
+                <div className="rounded-lg border border-[#3c3836] bg-[#282828] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-[#66889b]">
                   Normal mode has no active shader params.
                 </div>
               )}
@@ -1221,21 +1101,21 @@ export function HudOverlay({
           {workspace === "status" && (
           <CollapsibleSection title="Status" badge={`${activeFeedCount}/9`}>
             <div className="space-y-1.5">
-              <div className="rounded-lg border border-[#504945] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#a89984]">
-                <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Feed Health</div>
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
+                <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Feed Health</div>
                 <div>OpenSky: {feedHealth.opensky.status} @ {fmtDate(feedHealth.opensky.lastSuccessAt)}</div>
                 <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
                 <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
                 <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
-                <div>CCTV: {feedHealth.cctv.status} @ {fmtDate(feedHealth.cctv.lastSuccessAt)}</div>
+
                 <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
                 <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
                 <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
                 <div>AISStream: {feedHealth.ais.status} @ {fmtDate(feedHealth.ais.lastSuccessAt)}</div>
               </div>
 
-              <div className="rounded-lg border border-[#504945] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#a89984]">
-                <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Camera</div>
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
+                <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Camera</div>
                 <div>REC 2026-02-12 {fmtDate(recTimestamp || null)}</div>
                 <div>ALT {camera.altMeters.toFixed(0)}m</div>
                 <div>{camera.lat.toFixed(4)}N {camera.lon.toFixed(4)}E</div>
@@ -1248,7 +1128,7 @@ export function HudOverlay({
         <button
           type="button"
           onClick={() => setSidebarVisible(true)}
-          className="pointer-events-auto absolute left-4 top-24 hidden rounded-lg border border-[#3c3836] bg-[#1d2021d9] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#928374] shadow-[0_0_40px_rgba(10,145,223,0.24)] backdrop-blur-md transition hover:border-[#d79921] hover:text-[#ebdbb2] md:block"
+          className="pointer-events-auto absolute left-4 top-24 hidden rounded-lg border border-[#3c3836] bg-[#1d2021d9] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#a89984] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md transition hover:border-[#83a598] hover:text-[#d5c4a1] md:block"
         >
           Panels
         </button>
@@ -1363,7 +1243,7 @@ export function HudOverlay({
       <div className="pointer-events-auto absolute right-4 top-1/2 hidden -translate-y-1/2 flex-col items-center gap-1 md:flex">
         <button type="button" onClick={onZoomIn} className={camBtnClass} title="Zoom In">+</button>
         <button type="button" onClick={onZoomOut} className={camBtnClass} title="Zoom Out">&minus;</button>
-        <div className="my-1 h-px w-6 bg-[#665c54]" />
+        <div className="my-1 h-px w-6 bg-[#504945]" />
         <button type="button" onClick={onTiltUp} className={camBtnClass} title="Tilt Up">&uarr;</button>
         <div className="flex gap-1">
           <button type="button" onClick={onRotateLeft} className={camBtnClass} title="Rotate Left">&larr;</button>
@@ -1372,613 +1252,96 @@ export function HudOverlay({
         <button type="button" onClick={onTiltDown} className={camBtnClass} title="Tilt Down">&darr;</button>
       </div>
 
-      {/* ═══ MOBILE FIELD HUD ═══ */}
+      {/* ═══ MOBILE TAB BAR + SHEETS ═══ */}
       {isMobile && (
         <>
-          <div
-            className="pointer-events-auto absolute inset-x-0 top-0 z-40 px-3 pt-2"
-            style={{
-              paddingTop: "calc(0.5rem + env(safe-area-inset-top))",
-              paddingLeft: "calc(0.75rem + env(safe-area-inset-left))",
-              paddingRight: "calc(0.75rem + env(safe-area-inset-right))",
-            }}
-          >
-            <div className="rounded-[26px] border border-[#3c3836] bg-[#1d2021dd] p-3 shadow-[0_0_34px_rgba(10,145,223,0.18)] backdrop-blur-xl">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-mono text-[9px] uppercase tracking-[0.34em] text-[#7c6f64]">Argus // Field Handset</div>
-                  <div className="mt-1 font-mono text-[24px] font-semibold leading-none tracking-[0.28em] text-[#fbf1c7]">
-                    ARG<span className="text-[#d79921]">US</span>
-                  </div>
-                  <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-[#928374]">
-                    {platformMode} · {sceneMode === "globe" ? "3D Globe" : "Map"} · {modeLabel}
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <div
-                    className={`inline-flex rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.2em] ${
-                      intelBriefing
-                        ? `${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg} ${threatLevelColors[intelBriefing.threatLevel].text}`
-                        : "border-[#665c54] bg-[#1d2021] text-[#ebdbb2]"
-                    }`}
-                  >
-                    {intelBriefing?.threatLevel ?? activeRegionDigest?.posture ?? "Stable"}
-                  </div>
-                  <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">
-                    {utcTimestamp || "Syncing UTC"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                {[
-                  { label: "Live", value: compact(totalLiveCount) },
-                  { label: "Feeds", value: `${activeFeedCount}/9` },
-                  { label: "Region", value: newsRegionFilter },
-                  { label: "View", value: sceneMode === "globe" ? "3D" : "MAP" },
-                ].map((stat) => (
-                  <div key={stat.label} className="rounded-2xl border border-[#504945] bg-[#1d2021] px-2 py-2">
-                    <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#7c6f64]">{stat.label}</div>
-                    <div className="mt-1 truncate font-mono text-[11px] text-[#ebdbb2]">{stat.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-3 space-y-2">
-                <label className="block font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">
-                  Command Search
-                  <div className="mt-1 flex items-center gap-2 rounded-2xl border border-[#665c54] bg-[#1d2021] px-3 py-2.5">
-                    <span className="font-mono text-[12px] text-[#d79921]">⌕</span>
-                    <input
-                      type="text"
-                      placeholder="Entity, callsign, camera..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full border-0 bg-transparent font-mono text-[13px] text-[#ebdbb2] placeholder-[#7c6f64] outline-none"
-                    />
-                  </div>
-                </label>
-
-                {searchQuery.trim() ? (
-                  <div className="max-h-32 overflow-y-auto rounded-2xl border border-[#504945] bg-[#1d2021] p-2">
-                    {searchResults.length > 0 ? (
-                      <div className="space-y-1">
-                        {searchResults.slice(0, 5).map((result) => {
-                          const kindColors: Record<string, string> = {
-                            flight: "text-[#ebdbb2]",
-                            military: "text-[#fabd2f]",
-                            satellite: "text-[#b8bb26]",
-                            earthquake: "text-[#ff6b6b]",
-                            cctv: "text-[#c4b5fd]",
-                          };
-
-                          return (
-                            <button
-                              key={result.id}
-                              type="button"
-                              onClick={() => {
-                                onFlyToEntityById(result.id);
-                                setSearchQuery("");
-                                setMobileTab(null);
-                              }}
-                              className="w-full rounded-xl border border-[#504945] bg-[#1d2021] px-2.5 py-2 text-left transition hover:border-[#d79921] hover:bg-[#282828]"
-                            >
-                              <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{result.name}</div>
-                              <div className="mt-1 flex items-center gap-2">
-                                <span className={`font-mono text-[8px] uppercase tracking-[0.16em] ${kindColors[result.kind] ?? "text-[#928374]"}`}>
-                                  {result.kind}
-                                </span>
-                                {result.lat !== null && result.lon !== null ? (
-                                  <span className="font-mono text-[8px] text-[#7c6f64]">
-                                    {result.lat.toFixed(1)}N {result.lon.toFixed(1)}E
-                                  </span>
-                                ) : null}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-[#504945] bg-[#1d2021] px-2.5 py-2 font-mono text-[10px] text-[#928374]">
-                        No entities found.
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
+          {/* Slide-up sheet */}
           {mobileTab && (
-            <div
-              className="pointer-events-auto fixed inset-x-0 z-50 mx-2 overflow-hidden rounded-[28px] border border-[#3c3836] bg-[#1d2021f2] shadow-[0_12px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
-              style={{
-                top: "calc(13rem + env(safe-area-inset-top))",
-                bottom: "calc(6.15rem + env(safe-area-inset-bottom))",
-              }}
-            >
-              <div className="sticky top-0 z-10 border-b border-[#3c3836] bg-[#1d2021f2] px-4 py-3 backdrop-blur-2xl">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="font-mono text-[10px] uppercase tracking-[0.32em] text-[#fabd2f]">
-                      {mobileTab === "intel"
-                        ? "Intel Deck"
-                        : mobileTab === "news"
-                          ? "Newsstream"
-                          : mobileTab === "feeds"
-                            ? "Sensors & Feeds"
-                            : mobileTab === "ops"
-                              ? "Ops Console"
-                              : "System Status"}
-                    </div>
-                    <div className="mt-1 font-mono text-[10px] text-[#928374]">
-                      {mobileTab === "intel"
-                        ? "Threat posture, alerts, and active target actions."
-                        : mobileTab === "news"
-                          ? "Regional summaries and live headlines."
-                          : mobileTab === "feeds"
-                            ? "Live sensors, layer toggles, and CCTV routing."
-                            : mobileTab === "ops"
-                              ? "Camera, platform, and signal controls."
-                              : "Health, counts, and camera telemetry."}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setMobileTab(null)}
-                    className="rounded-full border border-[#665c54] bg-[#1d2021] px-3 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#ebdbb2]"
-                  >
-                    Close
-                  </button>
-                </div>
+            <div className="pointer-events-auto fixed inset-x-0 bottom-[52px] z-50 max-h-[60vh] overflow-y-auto rounded-t-2xl border-t border-[#3c3836] bg-[#1d2021f0] backdrop-blur-xl">
+              {/* Drag handle */}
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#3c3836] bg-[#1d2021f0] px-4 py-2 backdrop-blur-xl">
+                <span className="font-mono text-[10px] uppercase tracking-[0.33em] text-[#fabd2f]">
+                  {mobileTab === "intel" ? "Intel Brief" : mobileTab === "feeds" ? "Live Feeds" : mobileTab === "controls" ? "Controls" : "Status"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMobileTab(null)}
+                  className="rounded border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[9px] text-[#7298a8]"
+                >
+                  Close
+                </button>
               </div>
 
-              <div className="h-full overflow-y-auto px-3 pb-4 pt-3">
+              <div className="p-3">
+                {/* INTEL TAB */}
                 {mobileTab === "intel" && (
-                  <div className="space-y-3">
-                    {selectedIntel ? (
-                      <div className="rounded-2xl border border-[#504945] bg-[#1d2021] p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#928374]">Active Target</div>
-                            <div className="mt-1 font-mono text-[15px] text-[#ebdbb2]">{selectedIntel.name}</div>
-                            <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#7c6f64]">
-                              {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority" : "Standard"}
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={onCloseIntel}
-                            className="rounded border border-[#665c54] bg-[#1d2021] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-[#ebdbb2]"
-                          >
-                            Clear
-                          </button>
-                        </div>
-
-                        <div className="mt-3 space-y-1 rounded-xl border border-[#504945] bg-[#1d2021] p-2.5 font-mono text-[10px] text-[#a89984]">
-                          {selectedIntel.quickFacts.slice(0, 4).map((fact) => (
-                            <div key={`mobile-quick-${fact.label}`}>
-                              {fact.label}: {fact.value}
-                            </div>
-                          ))}
-                        </div>
-
-                        {selectedIntel.importance === "important" || showFullIntel ? (
-                          <div className="mt-2 space-y-1 rounded-xl border border-[#504945] bg-[#1d2021] p-2.5 font-mono text-[10px] text-[#a89984]">
-                            {selectedIntel.fullFacts.slice(0, 8).map((fact) => (
-                              <div key={`mobile-full-${fact.label}`}>
-                                {fact.label}: {fact.value}
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onFlyToEntity();
-                              setMobileTab(null);
-                            }}
-                            className={`${actionButtonClass} flex-1 justify-center py-2 text-[10px]`}
-                          >
-                            Fly To
-                          </button>
-
-                          {(selectedIntel.kind === "flight" || selectedIntel.kind === "military" || selectedIntel.kind === "satellite") ? (
-                            <button
-                              type="button"
-                              onClick={() => onTrackEntity(trackedEntityId === selectedIntel.id ? null : selectedIntel.id)}
-                              className={`flex-1 rounded-lg border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
-                                trackedEntityId === selectedIntel.id
-                                  ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
-                                  : "border-[#665c54] bg-[#1d2021] text-[#ebdbb2] hover:border-[#d79921]"
-                              }`}
-                            >
-                              {trackedEntityId === selectedIntel.id ? "Stop Track" : "Track"}
-                            </button>
-                          ) : null}
-
-                          {selectedIntel.streamUrl ? (
-                            <button
-                              type="button"
-                              onClick={() => setEnlargedStream({ src: selectedIntel.streamUrl!, title: selectedIntel.name })}
-                              className={`${actionButtonClass} flex-1 justify-center py-2 text-[10px]`}
-                            >
-                              Open Feed
-                            </button>
-                          ) : null}
-                        </div>
-
-                        {selectedIntel.importance !== "important" ? (
-                          <button
-                            type="button"
-                            onClick={onToggleFullIntel}
-                            className="mt-2 w-full rounded-lg border border-[#665c54] bg-[#1d2021] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#a89984]"
-                          >
-                            {showFullIntel ? "Hide Full Intel" : "Load Full Intel"}
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
-
+                  <div className="space-y-2">
                     {intelBriefing ? (
                       <>
-                        <div className={`rounded-2xl border px-3 py-3 font-mono ${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg}`}>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[9px] uppercase tracking-[0.24em] text-[#928374]">Threat Level</span>
-                            <span className={`text-[15px] font-bold tracking-[0.18em] ${threatLevelColors[intelBriefing.threatLevel].text}`}>
-                              {intelBriefing.threatLevel}
-                            </span>
+                        <div className={`rounded-lg border px-2.5 py-2 font-mono ${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] uppercase tracking-[0.28em] text-[#a89984]">Threat Level</span>
+                            <span className={`text-[14px] font-bold ${threatLevelColors[intelBriefing.threatLevel].text}`}>{intelBriefing.threatLevel}</span>
                           </div>
-                          <div className="mt-2 text-[10px] leading-relaxed text-[#a89984]">{intelBriefing.summary}</div>
+                          <div className="mt-1 text-[9px] text-[#7fb4c5]">{intelBriefing.summary}</div>
                         </div>
-
-                        <div className="grid grid-cols-3 gap-2">
-                          {([
-                            { sev: "CRITICAL" as const, label: "Critical", count: intelBriefing.criticalCount, color: "#ff4444" },
-                            { sev: "WARNING" as const, label: "Warning", count: intelBriefing.warningCount, color: "#fabd2f" },
-                            { sev: "INFO" as const, label: "Info", count: intelBriefing.infoCount, color: "#d79921" },
-                          ] as const).map(({ sev, label, count, color }) => (
-                            <button
-                              key={sev}
-                              type="button"
-                              onClick={() => setAlertFilter((prev) => (prev === sev ? null : sev))}
-                              className="rounded-2xl border px-2 py-2 text-center"
-                              style={{
-                                borderColor: alertFilter === sev ? color : `${color}55`,
-                                backgroundColor: alertFilter === sev ? `${color}22` : `${color}0d`,
-                              }}
-                            >
-                              <div className="font-mono text-[14px] font-bold" style={{ color }}>
-                                {count}
-                              </div>
-                              <div className="font-mono text-[8px] uppercase tracking-[0.14em]" style={{ color: `${color}cc` }}>
-                                {label}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="space-y-2">
-                          {(alertFilter ? intelBriefing.alerts.filter((a: IntelAlert) => a.severity === alertFilter) : intelBriefing.alerts).map((alert: IntelAlert) => (
-                            <button
-                              key={alert.id}
-                              type="button"
-                              onClick={() => {
-                                if (alert.entityId) {
-                                  onFlyToEntityById(alert.entityId);
-                                } else if (alert.coordinates) {
-                                  onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
-                                }
-                                setMobileTab(null);
-                              }}
-                              className={`w-full rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2 text-left transition ${
-                                alert.coordinates || alert.entityId
-                                  ? "cursor-pointer hover:border-[#d79921] hover:bg-[#282828]"
-                                  : "cursor-default"
-                              }`}
-                            >
-                              <div className="flex items-start gap-2">
-                                <span className={`mt-px text-[11px] ${severityColors[alert.severity]}`}>{severityIcons[alert.severity]}</span>
-                                <div className="min-w-0 flex-1">
-                                  <div className={`font-mono text-[10px] font-bold uppercase tracking-[0.14em] ${severityColors[alert.severity]}`}>
-                                    {alert.title}
+                        <div className="space-y-1">
+                          {(() => {
+                            const alerts = intelBriefing.alerts;
+                            const filtered = alertFilter ? alerts.filter((a) => a.severity === alertFilter) : alerts;
+                            return filtered.map((alert: IntelAlert) => (
+                              <button
+                                key={alert.id}
+                                type="button"
+                                onClick={() => {
+                                  if (alert.entityId) onFlyToEntityById(alert.entityId);
+                                  else if (alert.coordinates) onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
+                                  setMobileTab(null);
+                                }}
+                                className="w-full rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left"
+                              >
+                                <div className="flex items-start gap-1.5">
+                                  <span className={`mt-px text-[10px] ${severityColors[alert.severity]}`}>{severityIcons[alert.severity]}</span>
+                                  <div className="min-w-0 flex-1">
+                                    <div className={`font-mono text-[10px] font-bold uppercase tracking-[0.1em] ${severityColors[alert.severity]}`}>{alert.title}</div>
+                                    <div className="mt-0.5 font-mono text-[9px] text-[#a89984]">{alert.detail}</div>
                                   </div>
-                                  <div className="mt-1 font-mono text-[10px] leading-relaxed text-[#928374]">{alert.detail}</div>
                                 </div>
-                              </div>
-                            </button>
-                          ))}
+                              </button>
+                            ));
+                          })()}
                         </div>
                       </>
                     ) : (
-                      <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3 font-mono text-[10px] text-[#7c6f64]">
+                      <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-2 font-mono text-[10px] text-[#928374]">
                         Awaiting first intelligence cycle...
                       </div>
                     )}
                   </div>
                 )}
 
-                {mobileTab === "news" && (
+                {/* FEEDS TAB */}
+                {mobileTab === "feeds" && (
                   <div className="space-y-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {COMMAND_REGIONS.map((region) => (
-                        <button
-                          key={region}
-                          type="button"
-                          onClick={() => setNewsRegionFilter(region)}
-                          className={`rounded-full border px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] ${
-                            newsRegionFilter === region
-                              ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
-                              : "border-[#665c54] bg-[#1d2021] text-[#a89984]"
-                          }`}
-                        >
-                          {region}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">AI Summary</span>
-                        <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#d79921]">{activeRegionDigest?.posture ?? "STABLE"}</span>
-                      </div>
-                      <p className="mt-2 font-mono text-[10px] leading-relaxed text-[#d5c4a1]">
-                        {activeRegionDigest?.summary ?? "Collecting source headlines for regional summary..."}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {(["1h", "6h", "24h", "48h", "7d", "ALL"] as TimeRange[]).map((range) => (
-                        <button
-                          key={range}
-                          type="button"
-                          onClick={() => setTimeRange(range)}
-                          className={`rounded-full px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.14em] ${
-                            timeRange === range
-                              ? "bg-[#b8bb26] text-[#1d2021]"
-                              : "border border-[#665c54] bg-[#1d2021] text-[#928374]"
-                          }`}
-                        >
-                          {range}
-                        </button>
-                      ))}
-                    </div>
-
-                    <input
-                      type="text"
-                      placeholder="Search headlines..."
-                      value={newsSearch}
-                      onChange={(e) => setNewsSearch(e.target.value)}
-                      className="w-full rounded-2xl border border-[#665c54] bg-[#1d2021] px-3 py-3 font-mono text-[13px] text-[#ebdbb2] placeholder-[#7c6f64] focus:border-[#d79921] focus:outline-none"
-                    />
-
-                    <div className="flex gap-2">
-                      <select
-                        value={newsSourceFilter}
-                        onChange={(e) => setNewsSourceFilter(e.target.value)}
-                        className={`${controlInputClass} flex-1 min-h-11 text-[13px]`}
-                      >
-                        {newsSources.map((source) => (
-                          <option key={source} value={source}>{source}</option>
-                        ))}
-                      </select>
-
-                      <button
-                        type="button"
-                        onClick={() => setNewsSortMode((prev) => (prev === "score" ? "newest" : "score"))}
-                        className="rounded-2xl border border-[#665c54] bg-[#1d2021] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#ebdbb2]"
-                      >
-                        {newsSortMode === "score" ? "Intel" : "Newest"}
-                      </button>
-                    </div>
-
-                    {newsError ? (
-                      <div className="rounded-2xl border border-[#712d2d] bg-[#2a1010] px-3 py-2 font-mono text-[10px] text-[#ff9191]">
-                        {newsError}
-                      </div>
-                    ) : null}
-
-                    {newsLoading && filteredNewsItems.length === 0 ? (
-                      <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2 font-mono text-[10px] text-[#a89984]">
-                        Pulling feeds...
-                      </div>
-                    ) : null}
-
-                    <div className="space-y-2">
-                      {filteredNewsItems.slice(0, 40).map((item) => (
-                        <article key={item.id} className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate font-mono text-[8px] uppercase tracking-[0.14em] text-[#928374]">{item.source}</span>
-                            <span className="font-mono text-[8px] text-[#7c6f64]">{new Date(item.publishedAt).toLocaleTimeString()}</span>
-                          </div>
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-1.5 block font-mono text-[11px] leading-snug text-[#ebdbb2] hover:text-[#ebdbb2]"
-                          >
-                            {item.title}
-                          </a>
-                          <div className="mt-1.5 flex items-center justify-between gap-2">
-                            <span className="truncate font-mono text-[8px] text-[#928374]">{item.tags.join(" · ")}</span>
-                            <span className="font-mono text-[8px] text-[#d79921]">{item.score.toFixed(1)}</span>
-                          </div>
-                        </article>
-                      ))}
+                    <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">
+                      No camera feeds active
                     </div>
                   </div>
                 )}
 
-                {mobileTab === "feeds" && (() => {
-                  const filtered = cameras.filter((cam) => cctvCategoryFilter === "All" || cam.category === cctvCategoryFilter);
-                  const featured = filtered.filter((cam) => cam.streamUrl);
-                  const cctvList = filtered.filter((cam) => !cam.streamUrl);
-
-                  return (
-                    <div className="space-y-3">
-                      {platformMode === "analytics" ? (
-                        <div className="space-y-2">
-                          {analyticsLayerDefs.map((layer) => (
-                            <button
-                              key={layer.key}
-                              type="button"
-                              onClick={() => layer.available && toggleAnalyticsLayer(layer.key)}
-                              className={`flex w-full items-center justify-between rounded-2xl border px-3 py-2.5 text-left transition ${
-                                !layer.available
-                                  ? "cursor-not-allowed border-[#3c3836] bg-[#1d2021] opacity-40"
-                                  : analyticsLayers[layer.key]
-                                    ? "border-[#fabd2f] bg-[#1a0f00]"
-                                    : "border-[#504945] bg-[#1d2021] hover:border-[#d79921]"
-                              }`}
-                            >
-                              <div>
-                                <div className="font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
-                                <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#928374]">{layer.source}</div>
-                              </div>
-                              <span className="rounded-full border border-[#665c54] bg-[#1d2021] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-[#928374]">
-                                {!layer.available ? "Soon" : analyticsLayers[layer.key] ? "On" : "Off"}
-                              </span>
-                            </button>
-                          ))}
-
-                          {analyticsStatus ? (
-                            <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2 font-mono text-[10px] text-[#a89984]">
-                              {analyticsStatus}
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {layerDefs.map((layer) => {
-                            const valueMap: Record<LayerKey, number> = {
-                              flights: counts.flights,
-                              military: counts.military,
-                              satellites: counts.satellites,
-                              satelliteLinks: counts.satelliteLinks,
-                              seismic: counts.seismic,
-                              cctv: counts.cctv,
-                              bases: counts.bases,
-                              outages: counts.outages,
-                              threats: counts.threats,
-                            };
-
-                            return (
-                              <button
-                                key={layer.key}
-                                type="button"
-                                onClick={() => toggleLayer(layer.key)}
-                                className="flex w-full items-center justify-between rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2.5 text-left transition hover:border-[#d79921]"
-                              >
-                                <div>
-                                  <div className="font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
-                                  <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#928374]">{layer.feed}</div>
-                                </div>
-                                <div className="ml-2 flex items-center gap-2 font-mono">
-                                  <span className="text-[11px] text-[#ebdbb2]">{compact(valueMap[layer.key])}</span>
-                                  <span className={`rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.12em] ${
-                                    layers[layer.key]
-                                      ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
-                                      : "border-[#665c54] bg-[#1d2021] text-[#928374]"
-                                  }`}>
-                                    {layers[layer.key] ? "On" : "Off"}
-                                  </span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {(["All", "Traffic", "Nature", "Landmark", "Wildlife", "Scenic", "Infrastructure"] as const).map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => setCctvCategoryFilter(cat)}
-                            className={`rounded-full border px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] ${
-                              cctvCategoryFilter === cat
-                                ? "border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
-                                : "border-[#665c54] bg-[#1d2021] text-[#a89984]"
-                            }`}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-
-                      {featured.length > 0 ? (
-                        <div className="space-y-2">
-                          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Featured Feeds ({featured.length})</div>
-                          {featured.map((cam) => (
-                            <button
-                              key={cam.id}
-                              type="button"
-                              onClick={() => {
-                                if (!layers.cctv) setLayer("cctv", true);
-                                onFlyToEntityById(`cctv-${cam.id}`);
-                                setEnlargedStream({ src: cam.streamUrl!, title: cam.name });
-                                setMobileTab(null);
-                              }}
-                              className="flex w-full items-center gap-3 rounded-2xl border border-[#504945] bg-[#1d2021] p-2.5 text-left"
-                            >
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{cam.name}</div>
-                                <div className="mt-1 flex items-center gap-2">
-                                  <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#7c6f64]">{cam.category}</span>
-                                  <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-                                  <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-red-400">Live</span>
-                                </div>
-                              </div>
-                              <TacticalGlyph className="h-4 w-4 shrink-0" />
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-
-                      {cctvList.length > 0 ? (
-                        <div className="space-y-1.5">
-                          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">CCTV Mesh ({cctvList.length})</div>
-                          {cctvList.map((cam) => (
-                            <button
-                              key={cam.id}
-                              type="button"
-                              onClick={() => {
-                                if (!layers.cctv) setLayer("cctv", true);
-                                onFlyToEntityById(`cctv-${cam.id}`);
-                                setMobileTab(null);
-                              }}
-                              className="flex w-full items-center gap-2 rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-2 text-left"
-                            >
-                              <TacticalGlyph className="h-3 w-3 shrink-0" />
-                              <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-[#d5c4a1]">{cam.name}</span>
-                              <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#665c54]">{cam.category}</span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })()}
-
-                {mobileTab === "ops" && (
+                {/* CONTROLS TAB */}
+                {mobileTab === "controls" && (
                   <div className="space-y-3">
+                    {/* Location select */}
                     <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
                       Location
                       <select
-                        className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
+                        className={`${controlInputClass} mt-1`}
                         value={activePoiId ?? ""}
                         onChange={(event) => {
                           const nextPoi = event.target.value || null;
                           setActivePoiId(nextPoi);
-                          if (nextPoi) {
-                            onFlyToPoi(nextPoi);
-                            setMobileTab(null);
-                          }
+                          if (nextPoi) { onFlyToPoi(nextPoi); setMobileTab(null); }
                         }}
                       >
                         <option value="">Select location</option>
@@ -1988,39 +1351,26 @@ export function HudOverlay({
                       </select>
                     </label>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
-                        Platform
-                        <select
-                          className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
-                          value={platformMode}
-                          onChange={(event) => setPlatformMode(event.target.value as PlatformMode)}
-                        >
-                          <option value="live">Live</option>
-                          <option value="playback">Playback</option>
-                          <option value="analytics">Analytics</option>
-                        </select>
-                      </label>
+                    {/* Camera mode */}
+                    <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
+                      Camera Mode
+                      <select
+                        className={`${controlInputClass} mt-1`}
+                        value={visualMode}
+                        onChange={(event) => setVisualMode(event.target.value as VisualMode)}
+                      >
+                        {modeDefs.map((mode) => (
+                          <option key={mode.key} value={mode.key}>{mode.label}</option>
+                        ))}
+                      </select>
+                    </label>
 
-                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
-                        Camera Mode
-                        <select
-                          className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
-                          value={visualMode}
-                          onChange={(event) => setVisualMode(event.target.value as VisualMode)}
-                        >
-                          {modeDefs.map((mode) => (
-                            <option key={mode.key} value={mode.key}>{mode.label}</option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
+                    {/* View / Lighting */}
                     <div className="grid grid-cols-2 gap-2">
                       <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
                         View
                         <select
-                          className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
+                          className={`${controlInputClass} mt-1`}
                           value={sceneMode}
                           onChange={(event) => setSceneMode(event.target.value as "globe" | "map")}
                         >
@@ -2028,11 +1378,10 @@ export function HudOverlay({
                           <option value="map">Map</option>
                         </select>
                       </label>
-
                       <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
                         Lighting
                         <select
-                          className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
+                          className={`${controlInputClass} mt-1`}
                           value={dayNight ? "on" : "off"}
                           onChange={() => toggleDayNight()}
                         >
@@ -2042,80 +1391,77 @@ export function HudOverlay({
                       </label>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <button type="button" onClick={onResetCamera} className={`${actionButtonClass} py-2 text-[10px]`}>
-                        Reset View
-                      </button>
-                      <button type="button" onClick={onToggleCollision} className={`${actionButtonClass} py-2 text-[10px]`}>
-                        Terrain {collisionEnabled ? "On" : "Off"}
+                    {/* Action buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => { onResetCamera(); setMobileTab(null); }} className={actionButtonClass}>Reset View</button>
+                      <button type="button" onClick={onToggleCollision} className={actionButtonClass}>
+                        Terrain: {collisionEnabled ? "On" : "Off"}
                       </button>
                     </div>
 
-                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3">
-                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Camera Controls</div>
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="flex items-center gap-2">
-                          <button type="button" onClick={onZoomIn} className={`${camBtnClass} h-10 w-10 text-[16px]`}>+</button>
-                          <button type="button" onClick={onZoomOut} className={`${camBtnClass} h-10 w-10 text-[16px]`}>&minus;</button>
-                        </div>
-                        <button type="button" onClick={onTiltUp} className={`${camBtnClass} h-10 w-10 text-[16px]`}>&uarr;</button>
-                        <div className="flex gap-2">
-                          <button type="button" onClick={onRotateLeft} className={`${camBtnClass} h-10 w-10 text-[16px]`}>&larr;</button>
-                          <button type="button" onClick={onRotateRight} className={`${camBtnClass} h-10 w-10 text-[16px]`}>&rarr;</button>
-                        </div>
-                        <button type="button" onClick={onTiltDown} className={`${camBtnClass} h-10 w-10 text-[16px]`}>&darr;</button>
+                    {/* D-pad controls */}
+                    <div className="flex flex-col items-center gap-1 pt-1">
+                      <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.28em] text-[#a89984]">Camera Controls</div>
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={onZoomIn} className={camBtnClass}>+</button>
+                        <button type="button" onClick={onZoomOut} className={camBtnClass}>&minus;</button>
                       </div>
+                      <button type="button" onClick={onTiltUp} className={camBtnClass}>&uarr;</button>
+                      <div className="flex gap-1">
+                        <button type="button" onClick={onRotateLeft} className={camBtnClass}>&larr;</button>
+                        <button type="button" onClick={onRotateRight} className={camBtnClass}>&rarr;</button>
+                      </div>
+                      <button type="button" onClick={onTiltDown} className={camBtnClass}>&darr;</button>
                     </div>
 
-                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3">
-                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Signal Stack</div>
-                      <div className="space-y-2">
-                        <SliderControl
-                          label="Master Blend"
-                          value={visualIntensity}
-                          onChange={(value) => setVisualIntensity(value)}
-                        />
-
-                        {modeSliders.length > 0 ? (
-                          modeSliders.map((slider) => <SliderControl key={`mobile-${slider.label}`} {...slider} />)
-                        ) : (
-                          <div className="rounded-xl border border-[#665c54] bg-[#1d2021] px-2 py-2 font-mono text-[9px] uppercase tracking-[0.16em] text-[#928374]">
-                            Normal mode has no active shader params.
-                          </div>
-                        )}
-                      </div>
+                    {/* Layer toggles */}
+                    <div className="space-y-1">
+                      <div className="font-mono text-[8px] uppercase tracking-[0.28em] text-[#a89984]">Layers</div>
+                      {layerDefs.map((layer) => (
+                        <button
+                          key={layer.key}
+                          type="button"
+                          onClick={() => toggleLayer(layer.key)}
+                          className="flex w-full items-center justify-between rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left"
+                        >
+                          <span className="font-mono text-[10px] text-[#ebdbb2]">{layer.label}</span>
+                          <span className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase ${
+                            layers[layer.key]
+                              ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                              : "border-[#504945] bg-[#282828] text-[#a89984]"
+                          }`}>
+                            {layers[layer.key] ? "On" : "Off"}
+                          </span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
 
+                {/* STATUS TAB */}
                 {mobileTab === "status" && (
-                  <div className="space-y-3">
-                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3 font-mono text-[10px] text-[#a89984]">
-                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Feed Health</div>
+                  <div className="space-y-2">
+                    <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
+                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Feed Health</div>
                       <div>OpenSky: {feedHealth.opensky.status} @ {fmtDate(feedHealth.opensky.lastSuccessAt)}</div>
                       <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
                       <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
                       <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
-                      <div>CCTV: {feedHealth.cctv.status} @ {fmtDate(feedHealth.cctv.lastSuccessAt)}</div>
+      
                       <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
                       <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
                       <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
                       <div>AISStream: {feedHealth.ais.status} @ {fmtDate(feedHealth.ais.lastSuccessAt)}</div>
                     </div>
-
-                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3 font-mono text-[10px] text-[#a89984]">
-                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Camera</div>
-                      <div>REC 2026-02-12 {fmtDate(recTimestamp || null)}</div>
+                    <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
+                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Camera</div>
                       <div>ALT {camera.altMeters.toFixed(0)}m</div>
                       <div>{camera.lat.toFixed(4)}N {camera.lon.toFixed(4)}E</div>
                     </div>
-
-                    <div className="rounded-2xl border border-[#504945] bg-[#1d2021] px-3 py-3 font-mono text-[10px] text-[#a89984]">
-                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">Counts</div>
+                    <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
+                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Counts</div>
                       <div>Flights: {counts.flights} · Military: {counts.military}</div>
-                      <div>Satellites: {counts.satellites} · Links: {counts.satelliteLinks}</div>
-                      <div>Quakes: {counts.seismic} · Cameras: {counts.cctv}</div>
-                      <div>Bases: {counts.bases} · Threats: {counts.threats}</div>
+                      <div>Satellites: {counts.satellites} · Quakes: {counts.seismic}</div>
                     </div>
                   </div>
                 )}
@@ -2123,40 +1469,28 @@ export function HudOverlay({
             </div>
           )}
 
-          <div
-            className="pointer-events-auto fixed inset-x-0 z-50 px-2"
-            style={{
-              bottom: "calc(0.5rem + env(safe-area-inset-bottom))",
-              paddingLeft: "calc(0.5rem + env(safe-area-inset-left))",
-              paddingRight: "calc(0.5rem + env(safe-area-inset-right))",
-            }}
-          >
-            <div className="rounded-[30px] border border-[#3c3836] bg-[#1d2021f0] px-1.5 py-1.5 shadow-[0_0_34px_rgba(10,145,223,0.18)] backdrop-blur-xl">
-              <div className="grid grid-cols-5 gap-1">
-                {mobileDockDefs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => {
-                      setMobileTab(mobileTab === tab.id ? null : tab.id);
-                      if (tab.id === "intel") setWorkspace("intel");
-                      else if (tab.id === "news") setWorkspace("news");
-                      else if (tab.id === "feeds") setWorkspace("feeds");
-                      else if (tab.id === "status") setWorkspace("status");
-                      else setWorkspace("signal");
-                    }}
-                    className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-[22px] px-2 py-2 font-mono text-[9px] uppercase tracking-[0.14em] transition ${
-                      mobileTab === tab.id
-                        ? "border border-[#d79921] bg-[#3c3836] text-[#ebdbb2]"
-                        : "border border-transparent text-[#7c6f64] hover:border-[#665c54] hover:bg-[#1d2021]"
-                    }`}
-                  >
-                    <span className="text-[15px]">{tab.icon}</span>
-                    <span>{tab.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+          {/* Tab bar */}
+          <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-50 flex border-t border-[#3c3836] bg-[#1d2021f0] backdrop-blur-xl">
+            {([
+              { id: "intel" as const, label: "Intel", icon: "\u25C6" },
+              { id: "feeds" as const, label: "Feeds", icon: "\u25CE" },
+              { id: "controls" as const, label: "Controls", icon: "\u2699" },
+              { id: "status" as const, label: "Status", icon: "\u2588" },
+            ]).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setMobileTab(mobileTab === tab.id ? null : tab.id)}
+                className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 font-mono text-[9px] uppercase tracking-[0.14em] transition ${
+                  mobileTab === tab.id
+                    ? "text-[#83a598]"
+                    : "text-[#4e6a7a]"
+                }`}
+              >
+                <span className="text-[14px]">{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
           </div>
         </>
       )}
@@ -2171,21 +1505,8 @@ export function HudOverlay({
       )}
 
       {/* Playback Timeline Bar */}
-      {platformMode === "playback" && playbackTimeRange && (!isMobile || !mobileTab) && (
-        <div
-          className={`pointer-events-auto left-1/2 flex -translate-x-1/2 items-center gap-3 rounded border border-cyan-800/50 bg-black/80 px-4 py-2 font-mono text-xs text-cyan-400 backdrop-blur-sm ${
-            isMobile
-              ? "fixed z-[55] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-wrap justify-center"
-              : "absolute bottom-20"
-          }`}
-          style={
-            isMobile
-              ? {
-                  bottom: "calc(5.75rem + env(safe-area-inset-bottom))",
-                }
-              : undefined
-          }
-        >
+      {platformMode === "playback" && playbackTimeRange && (
+        <div className="pointer-events-auto absolute bottom-20 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded border border-cyan-800/50 bg-black/80 px-4 py-2 font-mono text-xs text-cyan-400 backdrop-blur-sm">
           <button
             type="button"
             onClick={onPlayPause}
@@ -2196,16 +1517,16 @@ export function HudOverlay({
           </button>
 
           <span className="min-w-[70px] text-center tabular-nums">
-            {playbackTime ? playbackTime.toLocaleTimeString() : "--:--:--"}
+            {new Date(playbackCurrentTime).toLocaleTimeString()}
           </span>
 
           <input
             type="range"
             min={playbackTimeRange.start}
             max={playbackTimeRange.end}
-            value={currentPlaybackTimeMs}
+            value={playbackCurrentTime}
             onChange={(e) => onSeek?.(Number(e.target.value))}
-            className={`h-1 cursor-pointer accent-cyan-500 ${isMobile ? "w-full max-w-[220px]" : "w-48"}`}
+            className="h-1 w-48 cursor-pointer accent-cyan-500"
           />
 
           <select

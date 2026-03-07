@@ -8,6 +8,8 @@ __pycache__/
 .env.local
 .env*.local
 .env.plugins
+.env.plugin
+*.bak
 
 # Next.js
 argus-app/.next/

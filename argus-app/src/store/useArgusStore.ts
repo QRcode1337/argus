@@ -3,9 +3,7 @@ import { create } from "zustand";
 import type { IntelBriefing } from "@/lib/intel/analysisEngine";
 import type {
   AnalyticsLayerKey,
-  CameraCategory,
   CameraReadout,
-  CctvCamera,
   FeedHealth,
   FeedKey,
   LayerKey,
@@ -32,10 +30,10 @@ type ArgusStore = {
     satellites: number;
     satelliteLinks: number;
     seismic: number;
-    cctv: number;
     bases: number;
     outages: number;
     threats: number;
+    gdelt: number;
   };
   feedHealth: Record<FeedKey, FeedHealth>;
   activePoiId: string | null;
@@ -55,10 +53,10 @@ type ArgusStore = {
       | "satellites"
       | "satelliteLinks"
       | "seismic"
-      | "cctv"
       | "bases"
       | "outages"
-      | "threats",
+      | "threats"
+      | "gdelt",
     value: number,
   ) => void;
   setFeedHealthy: (key: FeedKey) => void;
@@ -76,16 +74,12 @@ type ArgusStore = {
     key: P,
     value: number,
   ) => void;
-  cctvCategoryFilter: CameraCategory | "All";
-  setCctvCategoryFilter: (filter: CameraCategory | "All") => void;
   toggleAnalyticsLayer: (key: AnalyticsLayerKey) => void;
   setActiveGfsCogPath: (path: string | null) => void;
   intelBriefing: IntelBriefing | null;
   setIntelBriefing: (briefing: IntelBriefing | null) => void;
   trackedEntityId: string | null;
   setTrackedEntityId: (id: string | null) => void;
-  cameras: CctvCamera[];
-  setCameras: (cameras: CctvCamera[]) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   searchResults: SearchResult[];
@@ -100,6 +94,8 @@ type ArgusStore = {
   setIsPlaying: (playing: boolean) => void;
   playbackTimeRange: { start: number; end: number } | null;
   setPlaybackTimeRange: (range: { start: number; end: number } | null) => void;
+  playbackCurrentTime: number;
+  setPlaybackCurrentTime: (time: number) => void;
   setSceneMode: (mode: SceneMode) => void;
   dayNight: boolean;
   toggleDayNight: () => void;
@@ -118,10 +114,10 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     satellites: false,
     satelliteLinks: true,
     seismic: false,
-    cctv: true,
     bases: true,
     outages: true,
     threats: true,
+    gdelt: true,
   },
   counts: {
     flights: 0,
@@ -129,21 +125,21 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     satellites: 0,
     satelliteLinks: 0,
     seismic: 0,
-    cctv: 0,
     bases: 0,
     outages: 0,
     threats: 0,
+    gdelt: 0,
   },
   feedHealth: {
     opensky: emptyFeed(),
     celestrak: emptyFeed(),
     usgs: emptyFeed(),
     adsb: emptyFeed(),
-    cctv: emptyFeed(),
     cfradar: emptyFeed(),
     otx: emptyFeed(),
     fred: emptyFeed(),
     ais: emptyFeed(),
+    gdelt: emptyFeed(),
   },
   activePoiId: null,
   camera: {
@@ -159,8 +155,6 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     sentinel_imagery: false,
   },
   activeGfsCogPath: null,
-  cctvCategoryFilter: "All",
-  setCctvCategoryFilter: (filter) => set({ cctvCategoryFilter: filter }),
   visualParams: {
     nvg: {
       gain: 0.75,
@@ -250,8 +244,6 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setIntelBriefing: (briefing) => set({ intelBriefing: briefing }),
   trackedEntityId: null,
   setTrackedEntityId: (id) => set({ trackedEntityId: id }),
-  cameras: [],
-  setCameras: (cameras) => set({ cameras }),
   searchQuery: "",
   setSearchQuery: (query) => set({ searchQuery: query }),
   searchResults: [],
@@ -267,6 +259,8 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   playbackTimeRange: null,
   setPlaybackTimeRange: (range) => set({ playbackTimeRange: range }),
+  playbackCurrentTime: 0,
+  setPlaybackCurrentTime: (time) => set({ playbackCurrentTime: time }),
   dayNight: false,
   toggleDayNight: () => set((state) => ({ dayNight: !state.dayNight })),
 }));
