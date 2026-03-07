@@ -102,7 +102,16 @@ const workspaceDefs = [
   { id: "status", label: "Status" },
 ] as const;
 
+const mobileDockDefs = [
+  { id: "intel", label: "Intel", icon: "◆" },
+  { id: "news", label: "News", icon: "▣" },
+  { id: "feeds", label: "Feeds", icon: "◎" },
+  { id: "ops", label: "Ops", icon: "⚙" },
+  { id: "status", label: "Status", icon: "█" },
+] as const;
+
 type WorkspaceId = (typeof workspaceDefs)[number]["id"];
+type MobilePanelId = (typeof mobileDockDefs)[number]["id"];
 type TimeRange = "1h" | "6h" | "24h" | "48h" | "7d" | "ALL";
 
 const timeRangeHours: Record<Exclude<TimeRange, "ALL">, number> = {
@@ -259,7 +268,7 @@ export function HudOverlay({
   const [enlargedStream, setEnlargedStream] = useState<{ src: string; title: string } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [utcTimestamp, setUtcTimestamp] = useState("");
-  const [mobileTab, setMobileTab] = useState<"intel" | "feeds" | "controls" | "status" | null>(null);
+  const [mobileTab, setMobileTab] = useState<MobilePanelId | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [newsSearch, setNewsSearch] = useState("");
   const [newsSortMode, setNewsSortMode] = useState<"score" | "newest">("score");
@@ -278,6 +287,12 @@ export function HudOverlay({
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileTab(null);
+    }
+  }, [isMobile]);
 
   useEffect(() => {
     const updateUtcTimestamp = () => setUtcTimestamp(formatUtcTimestamp(new Date()));
@@ -500,7 +515,7 @@ export function HudOverlay({
       </div>
 
       {/* ARGUS header */}
-      <header className="absolute left-3 top-2 font-mono md:left-6 md:top-10">
+      <header className="absolute left-3 top-2 hidden font-mono md:left-6 md:top-10 md:block">
         <h1 className="text-[20px] font-semibold leading-none tracking-[0.34em] text-[#e8fcff] md:text-[42px]">
           ARG<span className="text-[#2ad4ff]">US</span>
         </h1>
@@ -1355,89 +1370,535 @@ export function HudOverlay({
         <button type="button" onClick={onTiltDown} className={camBtnClass} title="Tilt Down">&darr;</button>
       </div>
 
-      {/* ═══ MOBILE TAB BAR + SHEETS ═══ */}
+      {/* ═══ MOBILE FIELD HUD ═══ */}
       {isMobile && (
         <>
-          {/* Slide-up sheet */}
-          {mobileTab && (
-            <div className="pointer-events-auto fixed inset-x-0 bottom-[52px] z-50 max-h-[60vh] overflow-y-auto rounded-t-2xl border-t border-[#113446] bg-[#050b17f0] backdrop-blur-xl">
-              {/* Drag handle */}
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#113446] bg-[#050b17f0] px-4 py-2 backdrop-blur-xl">
-                <span className="font-mono text-[10px] uppercase tracking-[0.33em] text-[#e3ad50]">
-                  {mobileTab === "intel" ? "Intel Brief" : mobileTab === "feeds" ? "Live Feeds" : mobileTab === "controls" ? "Controls" : "Status"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setMobileTab(null)}
-                  className="rounded border border-[#284f63] bg-[#081322] px-2 py-0.5 font-mono text-[9px] text-[#7298a8]"
-                >
-                  Close
-                </button>
+          <div
+            className="pointer-events-auto absolute inset-x-0 top-0 z-40 px-3 pt-2"
+            style={{
+              paddingTop: "calc(0.5rem + env(safe-area-inset-top))",
+              paddingLeft: "calc(0.75rem + env(safe-area-inset-left))",
+              paddingRight: "calc(0.75rem + env(safe-area-inset-right))",
+            }}
+          >
+            <div className="rounded-[26px] border border-[#113446] bg-[#040b17dd] p-3 shadow-[0_0_34px_rgba(10,145,223,0.18)] backdrop-blur-xl">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-mono text-[9px] uppercase tracking-[0.34em] text-[#4e9ca8]">Argus // Field Handset</div>
+                  <div className="mt-1 font-mono text-[24px] font-semibold leading-none tracking-[0.28em] text-[#e8fcff]">
+                    ARG<span className="text-[#2ad4ff]">US</span>
+                  </div>
+                  <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-[#6c8ea2]">
+                    {platformMode} · {sceneMode === "globe" ? "3D Globe" : "Map"} · {modeLabel}
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div
+                    className={`inline-flex rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.2em] ${
+                      intelBriefing
+                        ? `${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg} ${threatLevelColors[intelBriefing.threatLevel].text}`
+                        : "border-[#284f63] bg-[#081322] text-[#9ceaff]"
+                    }`}
+                  >
+                    {intelBriefing?.threatLevel ?? activeRegionDigest?.posture ?? "Stable"}
+                  </div>
+                  <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#7fb4c5]">
+                    {utcTimestamp || "Syncing UTC"}
+                  </div>
+                </div>
               </div>
 
-              <div className="p-3">
-                {/* INTEL TAB */}
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {[
+                  { label: "Live", value: compact(totalLiveCount) },
+                  { label: "Feeds", value: `${activeFeedCount}/9` },
+                  { label: "Region", value: newsRegionFilter },
+                  { label: "View", value: sceneMode === "globe" ? "3D" : "MAP" },
+                ].map((stat) => (
+                  <div key={stat.label} className="rounded-2xl border border-[#123244] bg-[#040b17] px-2 py-2">
+                    <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#4e6a7a]">{stat.label}</div>
+                    <div className="mt-1 truncate font-mono text-[11px] text-[#d5f7ff]">{stat.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <label className="block font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">
+                  Command Search
+                  <div className="mt-1 flex items-center gap-2 rounded-2xl border border-[#284f63] bg-[#081322] px-3 py-2.5">
+                    <span className="font-mono text-[12px] text-[#2ad4ff]">⌕</span>
+                    <input
+                      type="text"
+                      placeholder="Entity, callsign, camera..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full border-0 bg-transparent font-mono text-[13px] text-[#d5f7ff] placeholder-[#4e6a7a] outline-none"
+                    />
+                  </div>
+                </label>
+
+                {searchQuery.trim() ? (
+                  <div className="max-h-32 overflow-y-auto rounded-2xl border border-[#123244] bg-[#040b17] p-2">
+                    {searchResults.length > 0 ? (
+                      <div className="space-y-1">
+                        {searchResults.slice(0, 5).map((result) => {
+                          const kindColors: Record<string, string> = {
+                            flight: "text-[#9ceaff]",
+                            military: "text-[#e3ad50]",
+                            satellite: "text-[#99ffca]",
+                            earthquake: "text-[#ff6b6b]",
+                            cctv: "text-[#c4b5fd]",
+                          };
+
+                          return (
+                            <button
+                              key={result.id}
+                              type="button"
+                              onClick={() => {
+                                onFlyToEntityById(result.id);
+                                setSearchQuery("");
+                                setMobileTab(null);
+                              }}
+                              className="w-full rounded-xl border border-[#123244] bg-[#071020] px-2.5 py-2 text-left transition hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
+                            >
+                              <div className="truncate font-mono text-[11px] text-[#d5f7ff]">{result.name}</div>
+                              <div className="mt-1 flex items-center gap-2">
+                                <span className={`font-mono text-[8px] uppercase tracking-[0.16em] ${kindColors[result.kind] ?? "text-[#6c8ea2]"}`}>
+                                  {result.kind}
+                                </span>
+                                {result.lat !== null && result.lon !== null ? (
+                                  <span className="font-mono text-[8px] text-[#4e6a7a]">
+                                    {result.lat.toFixed(1)}N {result.lon.toFixed(1)}E
+                                  </span>
+                                ) : null}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-[#123244] bg-[#071020] px-2.5 py-2 font-mono text-[10px] text-[#6c8ea2]">
+                        No entities found.
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {mobileTab && (
+            <div
+              className="pointer-events-auto fixed inset-x-0 z-50 mx-2 overflow-hidden rounded-[28px] border border-[#113446] bg-[#050b17f2] shadow-[0_12px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
+              style={{
+                top: "calc(13rem + env(safe-area-inset-top))",
+                bottom: "calc(6.15rem + env(safe-area-inset-bottom))",
+              }}
+            >
+              <div className="sticky top-0 z-10 border-b border-[#113446] bg-[#050b17f2] px-4 py-3 backdrop-blur-2xl">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-mono text-[10px] uppercase tracking-[0.32em] text-[#e3ad50]">
+                      {mobileTab === "intel"
+                        ? "Intel Deck"
+                        : mobileTab === "news"
+                          ? "Newsstream"
+                          : mobileTab === "feeds"
+                            ? "Sensors & Feeds"
+                            : mobileTab === "ops"
+                              ? "Ops Console"
+                              : "System Status"}
+                    </div>
+                    <div className="mt-1 font-mono text-[10px] text-[#6c8ea2]">
+                      {mobileTab === "intel"
+                        ? "Threat posture, alerts, and active target actions."
+                        : mobileTab === "news"
+                          ? "Regional summaries and live headlines."
+                          : mobileTab === "feeds"
+                            ? "Live sensors, layer toggles, and CCTV routing."
+                            : mobileTab === "ops"
+                              ? "Camera, platform, and signal controls."
+                              : "Health, counts, and camera telemetry."}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setMobileTab(null)}
+                    className="rounded-full border border-[#284f63] bg-[#081322] px-3 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#9ceaff]"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+
+              <div className="h-full overflow-y-auto px-3 pb-4 pt-3">
                 {mobileTab === "intel" && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
+                    {selectedIntel ? (
+                      <div className="rounded-2xl border border-[#123244] bg-[#040b17] p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#6c8ea2]">Active Target</div>
+                            <div className="mt-1 font-mono text-[15px] text-[#d5f7ff]">{selectedIntel.name}</div>
+                            <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#4e9ca8]">
+                              {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority" : "Standard"}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={onCloseIntel}
+                            className="rounded border border-[#284f63] bg-[#081322] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-[#9ceaff]"
+                          >
+                            Clear
+                          </button>
+                        </div>
+
+                        <div className="mt-3 space-y-1 rounded-xl border border-[#123244] bg-[#071020] p-2.5 font-mono text-[10px] text-[#7fb4c5]">
+                          {selectedIntel.quickFacts.slice(0, 4).map((fact) => (
+                            <div key={`mobile-quick-${fact.label}`}>
+                              {fact.label}: {fact.value}
+                            </div>
+                          ))}
+                        </div>
+
+                        {selectedIntel.importance === "important" || showFullIntel ? (
+                          <div className="mt-2 space-y-1 rounded-xl border border-[#123244] bg-[#071020] p-2.5 font-mono text-[10px] text-[#7fb4c5]">
+                            {selectedIntel.fullFacts.slice(0, 8).map((fact) => (
+                              <div key={`mobile-full-${fact.label}`}>
+                                {fact.label}: {fact.value}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onFlyToEntity();
+                              setMobileTab(null);
+                            }}
+                            className={`${actionButtonClass} flex-1 justify-center py-2 text-[10px]`}
+                          >
+                            Fly To
+                          </button>
+
+                          {(selectedIntel.kind === "flight" || selectedIntel.kind === "military" || selectedIntel.kind === "satellite") ? (
+                            <button
+                              type="button"
+                              onClick={() => onTrackEntity(trackedEntityId === selectedIntel.id ? null : selectedIntel.id)}
+                              className={`flex-1 rounded-lg border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
+                                trackedEntityId === selectedIntel.id
+                                  ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
+                                  : "border-[#284f63] bg-[#081322] text-[#9ceaff] hover:border-[#2ad4ff]"
+                              }`}
+                            >
+                              {trackedEntityId === selectedIntel.id ? "Stop Track" : "Track"}
+                            </button>
+                          ) : null}
+
+                          {selectedIntel.streamUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => setEnlargedStream({ src: selectedIntel.streamUrl!, title: selectedIntel.name })}
+                              className={`${actionButtonClass} flex-1 justify-center py-2 text-[10px]`}
+                            >
+                              Open Feed
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {selectedIntel.importance !== "important" ? (
+                          <button
+                            type="button"
+                            onClick={onToggleFullIntel}
+                            className="mt-2 w-full rounded-lg border border-[#284f63] bg-[#081322] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7aa1b3]"
+                          >
+                            {showFullIntel ? "Hide Full Intel" : "Load Full Intel"}
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+
                     {intelBriefing ? (
                       <>
-                        <div className={`rounded-lg border px-2.5 py-2 font-mono ${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg}`}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] uppercase tracking-[0.28em] text-[#6c8ea2]">Threat Level</span>
-                            <span className={`text-[14px] font-bold ${threatLevelColors[intelBriefing.threatLevel].text}`}>{intelBriefing.threatLevel}</span>
+                        <div className={`rounded-2xl border px-3 py-3 font-mono ${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[9px] uppercase tracking-[0.24em] text-[#6c8ea2]">Threat Level</span>
+                            <span className={`text-[15px] font-bold tracking-[0.18em] ${threatLevelColors[intelBriefing.threatLevel].text}`}>
+                              {intelBriefing.threatLevel}
+                            </span>
                           </div>
-                          <div className="mt-1 text-[9px] text-[#7fb4c5]">{intelBriefing.summary}</div>
+                          <div className="mt-2 text-[10px] leading-relaxed text-[#7fb4c5]">{intelBriefing.summary}</div>
                         </div>
-                        <div className="space-y-1">
-                          {(() => {
-                            const alerts = intelBriefing.alerts;
-                            const filtered = alertFilter ? alerts.filter((a) => a.severity === alertFilter) : alerts;
-                            return filtered.map((alert: IntelAlert) => (
-                              <button
-                                key={alert.id}
-                                type="button"
-                                onClick={() => {
-                                  if (alert.entityId) onFlyToEntityById(alert.entityId);
-                                  else if (alert.coordinates) onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
-                                  setMobileTab(null);
-                                }}
-                                className="w-full rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 text-left"
-                              >
-                                <div className="flex items-start gap-1.5">
-                                  <span className={`mt-px text-[10px] ${severityColors[alert.severity]}`}>{severityIcons[alert.severity]}</span>
-                                  <div className="min-w-0 flex-1">
-                                    <div className={`font-mono text-[10px] font-bold uppercase tracking-[0.1em] ${severityColors[alert.severity]}`}>{alert.title}</div>
-                                    <div className="mt-0.5 font-mono text-[9px] text-[#6c8ea2]">{alert.detail}</div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          {([
+                            { sev: "CRITICAL" as const, label: "Critical", count: intelBriefing.criticalCount, color: "#ff4444" },
+                            { sev: "WARNING" as const, label: "Warning", count: intelBriefing.warningCount, color: "#e3ad50" },
+                            { sev: "INFO" as const, label: "Info", count: intelBriefing.infoCount, color: "#2ad4ff" },
+                          ] as const).map(({ sev, label, count, color }) => (
+                            <button
+                              key={sev}
+                              type="button"
+                              onClick={() => setAlertFilter((prev) => (prev === sev ? null : sev))}
+                              className="rounded-2xl border px-2 py-2 text-center"
+                              style={{
+                                borderColor: alertFilter === sev ? color : `${color}55`,
+                                backgroundColor: alertFilter === sev ? `${color}22` : `${color}0d`,
+                              }}
+                            >
+                              <div className="font-mono text-[14px] font-bold" style={{ color }}>
+                                {count}
+                              </div>
+                              <div className="font-mono text-[8px] uppercase tracking-[0.14em]" style={{ color: `${color}cc` }}>
+                                {label}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="space-y-2">
+                          {(alertFilter ? intelBriefing.alerts.filter((a: IntelAlert) => a.severity === alertFilter) : intelBriefing.alerts).map((alert: IntelAlert) => (
+                            <button
+                              key={alert.id}
+                              type="button"
+                              onClick={() => {
+                                if (alert.entityId) {
+                                  onFlyToEntityById(alert.entityId);
+                                } else if (alert.coordinates) {
+                                  onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
+                                }
+                                setMobileTab(null);
+                              }}
+                              className={`w-full rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-2 text-left transition ${
+                                alert.coordinates || alert.entityId
+                                  ? "cursor-pointer hover:border-[#2ad4ff] hover:bg-[#0a1a2e]"
+                                  : "cursor-default"
+                              }`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <span className={`mt-px text-[11px] ${severityColors[alert.severity]}`}>{severityIcons[alert.severity]}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className={`font-mono text-[10px] font-bold uppercase tracking-[0.14em] ${severityColors[alert.severity]}`}>
+                                    {alert.title}
                                   </div>
+                                  <div className="mt-1 font-mono text-[10px] leading-relaxed text-[#6c8ea2]">{alert.detail}</div>
                                 </div>
-                              </button>
-                            ));
-                          })()}
+                              </div>
+                            </button>
+                          ))}
                         </div>
                       </>
                     ) : (
-                      <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2.5 py-2 font-mono text-[10px] text-[#4e9ca8]">
+                      <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3 font-mono text-[10px] text-[#4e9ca8]">
                         Awaiting first intelligence cycle...
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* FEEDS TAB */}
+                {mobileTab === "news" && (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      {COMMAND_REGIONS.map((region) => (
+                        <button
+                          key={region}
+                          type="button"
+                          onClick={() => setNewsRegionFilter(region)}
+                          className={`rounded-full border px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] ${
+                            newsRegionFilter === region
+                              ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
+                              : "border-[#284f63] bg-[#081322] text-[#7298a8]"
+                          }`}
+                        >
+                          {region}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">AI Summary</span>
+                        <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#2ad4ff]">{activeRegionDigest?.posture ?? "STABLE"}</span>
+                      </div>
+                      <p className="mt-2 font-mono text-[10px] leading-relaxed text-[#8bb8c9]">
+                        {activeRegionDigest?.summary ?? "Collecting source headlines for regional summary..."}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {(["1h", "6h", "24h", "48h", "7d", "ALL"] as TimeRange[]).map((range) => (
+                        <button
+                          key={range}
+                          type="button"
+                          onClick={() => setTimeRange(range)}
+                          className={`rounded-full px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.14em] ${
+                            timeRange === range
+                              ? "bg-[#29efab] text-[#03120d]"
+                              : "border border-[#284f63] bg-[#081322] text-[#6f93a5]"
+                          }`}
+                        >
+                          {range}
+                        </button>
+                      ))}
+                    </div>
+
+                    <input
+                      type="text"
+                      placeholder="Search headlines..."
+                      value={newsSearch}
+                      onChange={(e) => setNewsSearch(e.target.value)}
+                      className="w-full rounded-2xl border border-[#284f63] bg-[#081322] px-3 py-3 font-mono text-[13px] text-[#d5f7ff] placeholder-[#4e6a7a] focus:border-[#2ad4ff] focus:outline-none"
+                    />
+
+                    <div className="flex gap-2">
+                      <select
+                        value={newsSourceFilter}
+                        onChange={(e) => setNewsSourceFilter(e.target.value)}
+                        className={`${controlInputClass} flex-1 min-h-11 text-[13px]`}
+                      >
+                        {newsSources.map((source) => (
+                          <option key={source} value={source}>{source}</option>
+                        ))}
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => setNewsSortMode((prev) => (prev === "score" ? "newest" : "score"))}
+                        className="rounded-2xl border border-[#284f63] bg-[#081322] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#9ceaff]"
+                      >
+                        {newsSortMode === "score" ? "Intel" : "Newest"}
+                      </button>
+                    </div>
+
+                    {newsError ? (
+                      <div className="rounded-2xl border border-[#712d2d] bg-[#2a1010] px-3 py-2 font-mono text-[10px] text-[#ff9191]">
+                        {newsError}
+                      </div>
+                    ) : null}
+
+                    {newsLoading && filteredNewsItems.length === 0 ? (
+                      <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-2 font-mono text-[10px] text-[#7faec0]">
+                        Pulling feeds...
+                      </div>
+                    ) : null}
+
+                    <div className="space-y-2">
+                      {filteredNewsItems.slice(0, 40).map((item) => (
+                        <article key={item.id} className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate font-mono text-[8px] uppercase tracking-[0.14em] text-[#6c8ea2]">{item.source}</span>
+                            <span className="font-mono text-[8px] text-[#4e6a7a]">{new Date(item.publishedAt).toLocaleTimeString()}</span>
+                          </div>
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1.5 block font-mono text-[11px] leading-snug text-[#d5f7ff] hover:text-[#9ceaff]"
+                          >
+                            {item.title}
+                          </a>
+                          <div className="mt-1.5 flex items-center justify-between gap-2">
+                            <span className="truncate font-mono text-[8px] text-[#6c8ea2]">{item.tags.join(" · ")}</span>
+                            <span className="font-mono text-[8px] text-[#2ad4ff]">{item.score.toFixed(1)}</span>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {mobileTab === "feeds" && (() => {
                   const filtered = cameras.filter((cam) => cctvCategoryFilter === "All" || cam.category === cctvCategoryFilter);
                   const featured = filtered.filter((cam) => cam.streamUrl);
                   const cctvList = filtered.filter((cam) => !cam.streamUrl);
+
                   return (
                     <div className="space-y-3">
-                      {/* Category filter chips */}
-                      <div className="flex flex-wrap gap-1">
+                      {platformMode === "analytics" ? (
+                        <div className="space-y-2">
+                          {analyticsLayerDefs.map((layer) => (
+                            <button
+                              key={layer.key}
+                              type="button"
+                              onClick={() => layer.available && toggleAnalyticsLayer(layer.key)}
+                              className={`flex w-full items-center justify-between rounded-2xl border px-3 py-2.5 text-left transition ${
+                                !layer.available
+                                  ? "cursor-not-allowed border-[#1a2a35] bg-[#030a10] opacity-40"
+                                  : analyticsLayers[layer.key]
+                                    ? "border-[#e3ad50] bg-[#1a0f00]"
+                                    : "border-[#123244] bg-[#040b17] hover:border-[#2eb8d4]"
+                              }`}
+                            >
+                              <div>
+                                <div className="font-mono text-[11px] text-[#d5f7ff]">{layer.label}</div>
+                                <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#6c8ea2]">{layer.source}</div>
+                              </div>
+                              <span className="rounded-full border border-[#415f70] bg-[#071321] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-[#668092]">
+                                {!layer.available ? "Soon" : analyticsLayers[layer.key] ? "On" : "Off"}
+                              </span>
+                            </button>
+                          ))}
+
+                          {analyticsStatus ? (
+                            <div className="rounded-2xl border border-[#1f3f52] bg-[#071020] px-3 py-2 font-mono text-[10px] text-[#7fb4c5]">
+                              {analyticsStatus}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {layerDefs.map((layer) => {
+                            const valueMap: Record<LayerKey, number> = {
+                              flights: counts.flights,
+                              military: counts.military,
+                              satellites: counts.satellites,
+                              satelliteLinks: counts.satelliteLinks,
+                              seismic: counts.seismic,
+                              cctv: counts.cctv,
+                              bases: counts.bases,
+                              outages: counts.outages,
+                              threats: counts.threats,
+                            };
+
+                            return (
+                              <button
+                                key={layer.key}
+                                type="button"
+                                onClick={() => toggleLayer(layer.key)}
+                                className="flex w-full items-center justify-between rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-2.5 text-left transition hover:border-[#2eb8d4]"
+                              >
+                                <div>
+                                  <div className="font-mono text-[11px] text-[#d5f7ff]">{layer.label}</div>
+                                  <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-[#6c8ea2]">{layer.feed}</div>
+                                </div>
+                                <div className="ml-2 flex items-center gap-2 font-mono">
+                                  <span className="text-[11px] text-[#a5f0ff]">{compact(valueMap[layer.key])}</span>
+                                  <span className={`rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.12em] ${
+                                    layers[layer.key]
+                                      ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
+                                      : "border-[#415f70] bg-[#071321] text-[#668092]"
+                                  }`}>
+                                    {layers[layer.key] ? "On" : "Off"}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-1.5">
                         {(["All", "Traffic", "Nature", "Landmark", "Wildlife", "Scenic", "Infrastructure"] as const).map((cat) => (
                           <button
                             key={cat}
                             type="button"
                             onClick={() => setCctvCategoryFilter(cat)}
-                            className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] transition ${
+                            className={`rounded-full border px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] ${
                               cctvCategoryFilter === cat
                                 ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
                                 : "border-[#284f63] bg-[#081322] text-[#7298a8]"
@@ -1448,77 +1909,74 @@ export function HudOverlay({
                         ))}
                       </div>
 
-                      {/* Featured streams */}
-                      {featured.length > 0 && (
-                        <div>
-                          <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.28em] text-[#6c8ea2]">Featured Feeds ({featured.length})</div>
-                          <div className="space-y-1">
-                            {featured.map((cam) => (
-                              <button
-                                key={cam.id}
-                                type="button"
-                                onClick={() => {
-                                  if (!layers.cctv) setLayer("cctv", true);
-                                  onFlyToEntityById(`cctv-${cam.id}`);
-                                  setEnlargedStream({ src: cam.streamUrl!, title: cam.name });
-                                  setMobileTab(null);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg border border-[#123244] bg-[#040b17] p-1.5 text-left"
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <div className="truncate font-mono text-[9px] text-[#d5f7ff]">{cam.name}</div>
-                                  <div className="flex items-center gap-1">
-                                    <span className="font-mono text-[7px] text-[#4e9ca8]">{cam.category}</span>
-                                    <span className="inline-block h-1 w-1 animate-pulse rounded-full bg-red-500" />
-                                    <span className="font-mono text-[7px] text-red-400">LIVE</span>
-                                  </div>
+                      {featured.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Featured Feeds ({featured.length})</div>
+                          {featured.map((cam) => (
+                            <button
+                              key={cam.id}
+                              type="button"
+                              onClick={() => {
+                                if (!layers.cctv) setLayer("cctv", true);
+                                onFlyToEntityById(`cctv-${cam.id}`);
+                                setEnlargedStream({ src: cam.streamUrl!, title: cam.name });
+                                setMobileTab(null);
+                              }}
+                              className="flex w-full items-center gap-3 rounded-2xl border border-[#123244] bg-[#040b17] p-2.5 text-left"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate font-mono text-[11px] text-[#d5f7ff]">{cam.name}</div>
+                                <div className="mt-1 flex items-center gap-2">
+                                  <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#4e9ca8]">{cam.category}</span>
+                                  <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                                  <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-red-400">Live</span>
                                 </div>
-                              </button>
-                            ))}
-                          </div>
+                              </div>
+                              <TacticalGlyph className="h-4 w-4 shrink-0" />
+                            </button>
+                          ))}
                         </div>
-                      )}
+                      ) : null}
 
-                      {/* CCTV list */}
-                      {cctvList.length > 0 && (
-                        <div>
-                          <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.28em] text-[#6c8ea2]">CCTV Mesh ({cctvList.length})</div>
-                          <div className="max-h-[200px] overflow-y-auto">
-                            {cctvList.map((cam) => (
-                              <button
-                                key={cam.id}
-                                type="button"
-                                onClick={() => {
-                                  if (!layers.cctv) setLayer("cctv", true);
-                                  onFlyToEntityById(`cctv-${cam.id}`);
-                                  setMobileTab(null);
-                                }}
-                                className="flex w-full items-center gap-1.5 border-b border-[#0d1f2d] px-1 py-[3px] text-left"
-                              >
-                                <TacticalGlyph className="h-2.5 w-2.5 shrink-0" />
-                                <span className="min-w-0 flex-1 truncate font-mono text-[8px] text-[#8eb8c8]">{cam.name}</span>
-                              </button>
-                            ))}
-                          </div>
+                      {cctvList.length > 0 ? (
+                        <div className="space-y-1.5">
+                          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">CCTV Mesh ({cctvList.length})</div>
+                          {cctvList.map((cam) => (
+                            <button
+                              key={cam.id}
+                              type="button"
+                              onClick={() => {
+                                if (!layers.cctv) setLayer("cctv", true);
+                                onFlyToEntityById(`cctv-${cam.id}`);
+                                setMobileTab(null);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-2 text-left"
+                            >
+                              <TacticalGlyph className="h-3 w-3 shrink-0" />
+                              <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-[#8eb8c8]">{cam.name}</span>
+                              <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#3a5a6a]">{cam.category}</span>
+                            </button>
+                          ))}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   );
                 })()}
 
-                {/* CONTROLS TAB */}
-                {mobileTab === "controls" && (
+                {mobileTab === "ops" && (
                   <div className="space-y-3">
-                    {/* Location select */}
                     <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
                       Location
                       <select
-                        className={`${controlInputClass} mt-1`}
+                        className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
                         value={activePoiId ?? ""}
                         onChange={(event) => {
                           const nextPoi = event.target.value || null;
                           setActivePoiId(nextPoi);
-                          if (nextPoi) { onFlyToPoi(nextPoi); setMobileTab(null); }
+                          if (nextPoi) {
+                            onFlyToPoi(nextPoi);
+                            setMobileTab(null);
+                          }
                         }}
                       >
                         <option value="">Select location</option>
@@ -1528,26 +1986,39 @@ export function HudOverlay({
                       </select>
                     </label>
 
-                    {/* Camera mode */}
-                    <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
-                      Camera Mode
-                      <select
-                        className={`${controlInputClass} mt-1`}
-                        value={visualMode}
-                        onChange={(event) => setVisualMode(event.target.value as VisualMode)}
-                      >
-                        {modeDefs.map((mode) => (
-                          <option key={mode.key} value={mode.key}>{mode.label}</option>
-                        ))}
-                      </select>
-                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+                        Platform
+                        <select
+                          className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
+                          value={platformMode}
+                          onChange={(event) => setPlatformMode(event.target.value as PlatformMode)}
+                        >
+                          <option value="live">Live</option>
+                          <option value="playback">Playback</option>
+                          <option value="analytics">Analytics</option>
+                        </select>
+                      </label>
 
-                    {/* View / Lighting */}
+                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
+                        Camera Mode
+                        <select
+                          className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
+                          value={visualMode}
+                          onChange={(event) => setVisualMode(event.target.value as VisualMode)}
+                        >
+                          {modeDefs.map((mode) => (
+                            <option key={mode.key} value={mode.key}>{mode.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2">
                       <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
                         View
                         <select
-                          className={`${controlInputClass} mt-1`}
+                          className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
                           value={sceneMode}
                           onChange={(event) => setSceneMode(event.target.value as "globe" | "map")}
                         >
@@ -1555,10 +2026,11 @@ export function HudOverlay({
                           <option value="map">Map</option>
                         </select>
                       </label>
+
                       <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#6b8d97]">
                         Lighting
                         <select
-                          className={`${controlInputClass} mt-1`}
+                          className={`${controlInputClass} mt-1 min-h-11 text-[13px]`}
                           value={dayNight ? "on" : "off"}
                           onChange={() => toggleDayNight()}
                         >
@@ -1568,58 +2040,56 @@ export function HudOverlay({
                       </label>
                     </div>
 
-                    {/* Action buttons */}
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => { onResetCamera(); setMobileTab(null); }} className={actionButtonClass}>Reset View</button>
-                      <button type="button" onClick={onToggleCollision} className={actionButtonClass}>
-                        Terrain: {collisionEnabled ? "On" : "Off"}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={onResetCamera} className={`${actionButtonClass} py-2 text-[10px]`}>
+                        Reset View
+                      </button>
+                      <button type="button" onClick={onToggleCollision} className={`${actionButtonClass} py-2 text-[10px]`}>
+                        Terrain {collisionEnabled ? "On" : "Off"}
                       </button>
                     </div>
 
-                    {/* D-pad controls */}
-                    <div className="flex flex-col items-center gap-1 pt-1">
-                      <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.28em] text-[#6c8ea2]">Camera Controls</div>
-                      <div className="flex items-center gap-1">
-                        <button type="button" onClick={onZoomIn} className={camBtnClass}>+</button>
-                        <button type="button" onClick={onZoomOut} className={camBtnClass}>&minus;</button>
+                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3">
+                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Camera Controls</div>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={onZoomIn} className={`${camBtnClass} h-10 w-10 text-[16px]`}>+</button>
+                          <button type="button" onClick={onZoomOut} className={`${camBtnClass} h-10 w-10 text-[16px]`}>&minus;</button>
+                        </div>
+                        <button type="button" onClick={onTiltUp} className={`${camBtnClass} h-10 w-10 text-[16px]`}>&uarr;</button>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={onRotateLeft} className={`${camBtnClass} h-10 w-10 text-[16px]`}>&larr;</button>
+                          <button type="button" onClick={onRotateRight} className={`${camBtnClass} h-10 w-10 text-[16px]`}>&rarr;</button>
+                        </div>
+                        <button type="button" onClick={onTiltDown} className={`${camBtnClass} h-10 w-10 text-[16px]`}>&darr;</button>
                       </div>
-                      <button type="button" onClick={onTiltUp} className={camBtnClass}>&uarr;</button>
-                      <div className="flex gap-1">
-                        <button type="button" onClick={onRotateLeft} className={camBtnClass}>&larr;</button>
-                        <button type="button" onClick={onRotateRight} className={camBtnClass}>&rarr;</button>
-                      </div>
-                      <button type="button" onClick={onTiltDown} className={camBtnClass}>&darr;</button>
                     </div>
 
-                    {/* Layer toggles */}
-                    <div className="space-y-1">
-                      <div className="font-mono text-[8px] uppercase tracking-[0.28em] text-[#6c8ea2]">Layers</div>
-                      {layerDefs.map((layer) => (
-                        <button
-                          key={layer.key}
-                          type="button"
-                          onClick={() => toggleLayer(layer.key)}
-                          className="flex w-full items-center justify-between rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 text-left"
-                        >
-                          <span className="font-mono text-[10px] text-[#d5f7ff]">{layer.label}</span>
-                          <span className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase ${
-                            layers[layer.key]
-                              ? "border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
-                              : "border-[#415f70] bg-[#071321] text-[#668092]"
-                          }`}>
-                            {layers[layer.key] ? "On" : "Off"}
-                          </span>
-                        </button>
-                      ))}
+                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3">
+                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Signal Stack</div>
+                      <div className="space-y-2">
+                        <SliderControl
+                          label="Master Blend"
+                          value={visualIntensity}
+                          onChange={(value) => setVisualIntensity(value)}
+                        />
+
+                        {modeSliders.length > 0 ? (
+                          modeSliders.map((slider) => <SliderControl key={`mobile-${slider.label}`} {...slider} />)
+                        ) : (
+                          <div className="rounded-xl border border-[#17374c] bg-[#071020] px-2 py-2 font-mono text-[9px] uppercase tracking-[0.16em] text-[#66889b]">
+                            Normal mode has no active shader params.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* STATUS TAB */}
                 {mobileTab === "status" && (
-                  <div className="space-y-2">
-                    <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
-                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Feed Health</div>
+                  <div className="space-y-3">
+                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3 font-mono text-[10px] text-[#7fb4c5]">
+                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Feed Health</div>
                       <div>OpenSky: {feedHealth.opensky.status} @ {fmtDate(feedHealth.opensky.lastSuccessAt)}</div>
                       <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
                       <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
@@ -1630,16 +2100,20 @@ export function HudOverlay({
                       <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
                       <div>AISStream: {feedHealth.ais.status} @ {fmtDate(feedHealth.ais.lastSuccessAt)}</div>
                     </div>
-                    <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
-                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Camera</div>
+
+                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3 font-mono text-[10px] text-[#7fb4c5]">
+                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Camera</div>
+                      <div>REC 2026-02-12 {fmtDate(recTimestamp || null)}</div>
                       <div>ALT {camera.altMeters.toFixed(0)}m</div>
                       <div>{camera.lat.toFixed(4)}N {camera.lon.toFixed(4)}E</div>
                     </div>
-                    <div className="rounded-lg border border-[#123244] bg-[#040b17] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
-                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Counts</div>
+
+                    <div className="rounded-2xl border border-[#123244] bg-[#040b17] px-3 py-3 font-mono text-[10px] text-[#7fb4c5]">
+                      <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-[#6c8ea2]">Counts</div>
                       <div>Flights: {counts.flights} · Military: {counts.military}</div>
-                      <div>Satellites: {counts.satellites} · Quakes: {counts.seismic}</div>
-                      <div>Cameras: {counts.cctv}</div>
+                      <div>Satellites: {counts.satellites} · Links: {counts.satelliteLinks}</div>
+                      <div>Quakes: {counts.seismic} · Cameras: {counts.cctv}</div>
+                      <div>Bases: {counts.bases} · Threats: {counts.threats}</div>
                     </div>
                   </div>
                 )}
@@ -1647,28 +2121,40 @@ export function HudOverlay({
             </div>
           )}
 
-          {/* Tab bar */}
-          <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-50 flex border-t border-[#113446] bg-[#050b17f0] backdrop-blur-xl">
-            {([
-              { id: "intel" as const, label: "Intel", icon: "\u25C6" },
-              { id: "feeds" as const, label: "Feeds", icon: "\u25CE" },
-              { id: "controls" as const, label: "Controls", icon: "\u2699" },
-              { id: "status" as const, label: "Status", icon: "\u2588" },
-            ]).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setMobileTab(mobileTab === tab.id ? null : tab.id)}
-                className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 font-mono text-[9px] uppercase tracking-[0.14em] transition ${
-                  mobileTab === tab.id
-                    ? "text-[#2ad4ff]"
-                    : "text-[#4e6a7a]"
-                }`}
-              >
-                <span className="text-[14px]">{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            ))}
+          <div
+            className="pointer-events-auto fixed inset-x-0 z-50 px-2"
+            style={{
+              bottom: "calc(0.5rem + env(safe-area-inset-bottom))",
+              paddingLeft: "calc(0.5rem + env(safe-area-inset-left))",
+              paddingRight: "calc(0.5rem + env(safe-area-inset-right))",
+            }}
+          >
+            <div className="rounded-[30px] border border-[#113446] bg-[#050b17f0] px-1.5 py-1.5 shadow-[0_0_34px_rgba(10,145,223,0.18)] backdrop-blur-xl">
+              <div className="grid grid-cols-5 gap-1">
+                {mobileDockDefs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setMobileTab(mobileTab === tab.id ? null : tab.id);
+                      if (tab.id === "intel") setWorkspace("intel");
+                      else if (tab.id === "news") setWorkspace("news");
+                      else if (tab.id === "feeds") setWorkspace("feeds");
+                      else if (tab.id === "status") setWorkspace("status");
+                      else setWorkspace("signal");
+                    }}
+                    className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-[22px] px-2 py-2 font-mono text-[9px] uppercase tracking-[0.14em] transition ${
+                      mobileTab === tab.id
+                        ? "border border-[#2ad4ff] bg-[#0a2a44] text-[#9ceaff]"
+                        : "border border-transparent text-[#4e6a7a] hover:border-[#284f63] hover:bg-[#081322]"
+                    }`}
+                  >
+                    <span className="text-[15px]">{tab.icon}</span>
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </>
       )}
@@ -1683,8 +2169,21 @@ export function HudOverlay({
       )}
 
       {/* Playback Timeline Bar */}
-      {platformMode === "playback" && playbackTimeRange && (
-        <div className="pointer-events-auto absolute bottom-20 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded border border-cyan-800/50 bg-black/80 px-4 py-2 font-mono text-xs text-cyan-400 backdrop-blur-sm">
+      {platformMode === "playback" && playbackTimeRange && (!isMobile || !mobileTab) && (
+        <div
+          className={`pointer-events-auto left-1/2 flex -translate-x-1/2 items-center gap-3 rounded border border-cyan-800/50 bg-black/80 px-4 py-2 font-mono text-xs text-cyan-400 backdrop-blur-sm ${
+            isMobile
+              ? "fixed z-[55] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-wrap justify-center"
+              : "absolute bottom-20"
+          }`}
+          style={
+            isMobile
+              ? {
+                  bottom: "calc(5.75rem + env(safe-area-inset-bottom))",
+                }
+              : undefined
+          }
+        >
           <button
             type="button"
             onClick={onPlayPause}
@@ -1704,7 +2203,7 @@ export function HudOverlay({
             max={playbackTimeRange.end}
             value={playbackCurrentTime}
             onChange={(e) => onSeek?.(Number(e.target.value))}
-            className="h-1 w-48 cursor-pointer accent-cyan-500"
+            className={`h-1 cursor-pointer accent-cyan-500 ${isMobile ? "w-full max-w-[220px]" : "w-48"}`}
           />
 
           <select
