@@ -101,6 +101,7 @@ const workspaceDefs = [
 ] as const;
 
 type WorkspaceId = (typeof workspaceDefs)[number]["id"];
+type MobileTabId = "brief" | "news" | "ops";
 type TimeRange = "1h" | "6h" | "24h" | "48h" | "7d" | "ALL";
 
 const timeRangeHours: Record<Exclude<TimeRange, "ALL">, number> = {
@@ -111,14 +112,11 @@ const timeRangeHours: Record<Exclude<TimeRange, "ALL">, number> = {
   "7d": 168,
 };
 
-function TacticalGlyph({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" className={className ?? "h-2.5 w-2.5"} aria-hidden>
-      <circle cx="10" cy="10" r="8" fill="#282828" stroke="#83a598" strokeWidth="1.2" />
-      <path d="M10 3L11.7 8.3L17 10L11.7 11.7L10 17L8.3 11.7L3 10L8.3 8.3Z" fill="#bdae93" />
-    </svg>
-  );
-}
+const mobileTabDefs = [
+  { id: "brief" as const, label: "Brief", icon: "◆" },
+  { id: "news" as const, label: "News", icon: "◫" },
+  { id: "ops" as const, label: "Ops", icon: "⚙" },
+];
 
 function SliderControl({ label, value, onChange }: SliderDef) {
   return (
@@ -217,7 +215,6 @@ export function HudOverlay({
   const {
     layers,
     toggleLayer,
-    setLayer,
     counts,
     camera,
     feedHealth,
@@ -252,10 +249,8 @@ export function HudOverlay({
   const [workspace, setWorkspace] = useState<WorkspaceId>("news");
   const [alertFilter, setAlertFilter] = useState<AlertSeverity | null>(null);
   const [enlargedStream, setEnlargedStream] = useState<{ src: string; title: string } | null>(null);
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches,
-  );
-  const [mobileTab, setMobileTab] = useState<"intel" | "feeds" | "controls" | "status" | null>(null);
+  const [mobileTab, setMobileTab] = useState<MobileTabId | null>(null);
+  const [utcTimestamp, setUtcTimestamp] = useState("");
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [newsSearch, setNewsSearch] = useState("");
   const [newsSortMode, setNewsSortMode] = useState<"score" | "newest">("score");
@@ -268,10 +263,10 @@ export function HudOverlay({
   const [newsError, setNewsError] = useState<string | null>(null);
 
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
+    const syncClock = () => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC"));
+    syncClock();
+    const timer = window.setInterval(syncClock, 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -452,18 +447,29 @@ export function HudOverlay({
   const activeFeedCount = Object.values(feedHealth).filter(
     (fh) => fh.status === "ok",
   ).length;
+  const feedTotal = Object.keys(feedHealth).length;
+  const activeLayerCount = Object.values(layers).filter(Boolean).length;
+  const activePoiLabel = CAMERA_PRESETS.find((poi) => poi.id === activePoiId)?.label ?? null;
+  const mobileAlerts = useMemo(() => {
+    if (!intelBriefing) return [];
+    return alertFilter
+      ? intelBriefing.alerts.filter((alert) => alert.severity === alertFilter)
+      : intelBriefing.alerts;
+  }, [intelBriefing, alertFilter]);
+  const mobileAlertPreview = useMemo(() => mobileAlerts.slice(0, 5), [mobileAlerts]);
+  const mobileHeadlinePreview = useMemo(() => filteredNewsItems.slice(0, 8), [filteredNewsItems]);
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 text-[10px] text-[#b8bb26]">
       {/* Top info strip */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] hidden h-8 items-center justify-between border-b border-[#3c3836] bg-[#1d2021e6] px-4 font-mono uppercase tracking-[0.22em] text-[#928374] md:flex">
         <span>Global Situation</span>
-        <span>{new Date().toUTCString().replace("GMT", "UTC")}</span>
+        <span>{utcTimestamp || "SYNCING UTC"}</span>
       </div>
 
       {/* Bottom info strip */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[25] hidden h-7 items-center justify-between border-t border-[#3c3836] bg-[#1d2021e6] px-4 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374] md:flex">
-        <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: {activeFeedCount}/8</span>
+        <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: {activeFeedCount}/{feedTotal}</span>
         <span>
           Region {newsRegionFilter} · {activeRegionDigest?.posture ?? "STABLE"}
         </span>
@@ -488,7 +494,7 @@ export function HudOverlay({
       </div>
 
       {/* ARGUS header */}
-      <header className="absolute left-3 top-2 font-mono md:left-6 md:top-[5.5rem]">
+      <header className="absolute left-3 top-[calc(var(--safe-top)+0.35rem)] font-mono md:left-6 md:top-[5.5rem]">
         <h1 className="text-[20px] font-semibold leading-none tracking-[0.34em] text-[#ebdbb2] md:text-[42px]">
           ARG<span className="text-[#83a598]">US</span>
         </h1>
@@ -501,9 +507,73 @@ export function HudOverlay({
         <div className="text-[26px] text-[#83a598]">{modeLabel}</div>
       </div>
 
+      <section className="pointer-events-auto absolute left-1/2 top-[calc(var(--safe-top)+2.9rem)] z-[28] block w-[calc(100%-1rem)] max-w-sm -translate-x-1/2 rounded-[1.35rem] border border-[#3c3836] bg-[#1d2021eb] p-2.5 shadow-[0_0_24px_rgba(10,171,255,0.12)] backdrop-blur-xl md:hidden">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-mono text-[8px] uppercase tracking-[0.24em] text-[#fabd2f]">Field Summary</div>
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                <span className={`rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] ${
+                  intelBriefing
+                    ? `${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].text} ${threatLevelColors[intelBriefing.threatLevel].bg}`
+                    : "border-[#504945] bg-[#282828] text-[#a89984]"
+                }`}>
+                  {intelBriefing?.threatLevel ?? "STANDBY"}
+                </span>
+                <span className="rounded-full border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-[#83a598]">
+                  {newsRegionFilter}
+                </span>
+                <span className="rounded-full border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-[#7298a8]">
+                  {platformMode}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setMobileTab(mobileTab === "brief" ? null : "brief")}
+              className="rounded-lg border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[8px] uppercase tracking-[0.18em] text-[#d5c4a1] transition hover:border-[#83a598]"
+            >
+              {mobileTab === "brief" ? "Close" : "Brief"}
+            </button>
+          </div>
+
+          <p className="mt-2 line-clamp-2 font-mono text-[10px] leading-relaxed text-[#7fb4c5]">
+            {intelBriefing?.summary ?? "Collecting live feeds and generating the first mobile brief..."}
+          </p>
+
+          <div className="mt-2 flex flex-wrap gap-1">
+            {[
+              { label: "Live", value: compact(totalLiveCount), tone: "text-[#ebdbb2]" },
+              { label: "Feeds", value: `${activeFeedCount}/${feedTotal}`, tone: "text-[#83a598]" },
+              { label: "Layers", value: `${activeLayerCount}/${layerDefs.length}`, tone: "text-[#fabd2f]" },
+            ].map((item) => (
+              <div key={item.label} className="rounded-full border border-[#3c3836] bg-[#1d2021] px-2 py-1">
+                <span className="font-mono text-[8px] uppercase tracking-[0.16em] text-[#a89984]">{item.label}</span>
+                <span className={`ml-1 font-mono text-[9px] font-semibold ${item.tone}`}>{item.value}</span>
+              </div>
+            ))}
+            {(selectedIntel?.name ?? activePoiLabel) ? (
+              <div className="max-w-[12rem] truncate rounded-full border border-[#3c3836] bg-[#1d2021] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.16em] text-[#7298a8]">
+                Target <span className="text-[#d5c4a1] normal-case tracking-normal">{selectedIntel?.name ?? activePoiLabel}</span>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-2 flex items-center justify-between gap-2 font-mono text-[8px] uppercase tracking-[0.18em] text-[#728899]">
+            <span>{utcTimestamp || "Syncing UTC"}</span>
+            <button
+              type="button"
+              onClick={() => setMobileTab("ops")}
+              className="shrink-0 rounded-lg border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[8px] uppercase tracking-[0.18em] text-[#7298a8] transition hover:border-[#83a598] hover:text-[#d5c4a1]"
+            >
+              Ops
+            </button>
+          </div>
+      </section>
+
       {/* Selected intel panel (right side) — desktop only */}
-      {selectedIntel && !isMobile ? (
-        <section className="pointer-events-auto absolute right-8 top-[5.5rem] w-[348px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] p-4 shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md">
+      {selectedIntel ? (
+        <section className="pointer-events-auto absolute right-8 top-[5.5rem] hidden w-[348px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] p-4 shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md md:block">
           <div className="flex items-center justify-between">
             <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#fabd2f]">Target Intel</div>
             <button
@@ -646,8 +716,8 @@ export function HudOverlay({
       </div>
 
       {/* LEFT SIDEBAR - Collapsible Accordion Panels — desktop only */}
-      {sidebarVisible && !isMobile ? (
-        <nav className="pointer-events-auto absolute left-4 top-[8.5rem] w-[260px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md">
+      {sidebarVisible ? (
+        <nav className="pointer-events-auto absolute left-4 top-[8.5rem] hidden w-[260px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md md:block">
           {/* Sidebar header with hide button */}
           <div className="flex items-center justify-between border-b border-[#3c3836] px-3 py-2">
             <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#a89984]">
@@ -1099,7 +1169,7 @@ export function HudOverlay({
 
           {/* STATUS section */}
           {workspace === "status" && (
-          <CollapsibleSection title="Status" badge={`${activeFeedCount}/9`}>
+          <CollapsibleSection title="Status" badge={`${activeFeedCount}/${feedTotal}`}>
             <div className="space-y-1.5">
               <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
                 <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Feed Health</div>
@@ -1253,15 +1323,13 @@ export function HudOverlay({
       </div>
 
       {/* ═══ MOBILE TAB BAR + SHEETS ═══ */}
-      {isMobile && (
+      <div className="md:hidden">
         <>
-          {/* Slide-up sheet */}
           {mobileTab && (
-            <div className="pointer-events-auto fixed inset-x-0 bottom-[52px] z-50 max-h-[60vh] overflow-y-auto rounded-t-2xl border-t border-[#3c3836] bg-[#1d2021f0] backdrop-blur-xl">
-              {/* Drag handle */}
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#3c3836] bg-[#1d2021f0] px-4 py-2 backdrop-blur-xl">
+            <div className="pointer-events-auto fixed bottom-[calc(var(--safe-bottom)+4.15rem)] left-1/2 z-50 max-h-[56vh] w-[calc(100%-1rem)] max-w-md -translate-x-1/2 overflow-y-auto rounded-[1.35rem] border border-[#3c3836] bg-[#1d2021f2] shadow-[0_-18px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#3c3836] bg-[#1d2021f2] px-4 py-2.5 backdrop-blur-xl">
                 <span className="font-mono text-[10px] uppercase tracking-[0.33em] text-[#fabd2f]">
-                  {mobileTab === "intel" ? "Intel Brief" : mobileTab === "feeds" ? "Live Feeds" : mobileTab === "controls" ? "Controls" : "Status"}
+                  {mobileTab === "brief" ? "Mission Brief" : mobileTab === "news" ? "News Feed" : "Operations"}
                 </span>
                 <button
                   type="button"
@@ -1273,66 +1341,312 @@ export function HudOverlay({
               </div>
 
               <div className="p-3">
-                {/* INTEL TAB */}
-                {mobileTab === "intel" && (
-                  <div className="space-y-2">
+                {mobileTab === "brief" && (
+                  <div className="space-y-3">
                     {intelBriefing ? (
-                      <>
-                        <div className={`rounded-lg border px-2.5 py-2 font-mono ${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg}`}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] uppercase tracking-[0.28em] text-[#a89984]">Threat Level</span>
-                            <span className={`text-[14px] font-bold ${threatLevelColors[intelBriefing.threatLevel].text}`}>{intelBriefing.threatLevel}</span>
-                          </div>
-                          <div className="mt-1 text-[9px] text-[#7fb4c5]">{intelBriefing.summary}</div>
+                      <div className={`rounded-xl border px-3 py-2.5 font-mono ${threatLevelColors[intelBriefing.threatLevel].border} ${threatLevelColors[intelBriefing.threatLevel].bg}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[9px] uppercase tracking-[0.28em] text-[#a89984]">Threat Level</span>
+                          <span className={`text-[14px] font-bold tracking-[0.18em] ${threatLevelColors[intelBriefing.threatLevel].text}`}>{intelBriefing.threatLevel}</span>
                         </div>
-                        <div className="space-y-1">
-                          {(() => {
-                            const alerts = intelBriefing.alerts;
-                            const filtered = alertFilter ? alerts.filter((a) => a.severity === alertFilter) : alerts;
-                            return filtered.map((alert: IntelAlert) => (
-                              <button
-                                key={alert.id}
-                                type="button"
-                                onClick={() => {
-                                  if (alert.entityId) onFlyToEntityById(alert.entityId);
-                                  else if (alert.coordinates) onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
-                                  setMobileTab(null);
-                                }}
-                                className="w-full rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left"
-                              >
-                                <div className="flex items-start gap-1.5">
-                                  <span className={`mt-px text-[10px] ${severityColors[alert.severity]}`}>{severityIcons[alert.severity]}</span>
-                                  <div className="min-w-0 flex-1">
-                                    <div className={`font-mono text-[10px] font-bold uppercase tracking-[0.1em] ${severityColors[alert.severity]}`}>{alert.title}</div>
-                                    <div className="mt-0.5 font-mono text-[9px] text-[#a89984]">{alert.detail}</div>
-                                  </div>
-                                </div>
-                              </button>
-                            ));
-                          })()}
+                        <div className="mt-1.5 text-[10px] leading-relaxed text-[#7fb4c5]">{intelBriefing.summary}</div>
+                        <div className="mt-2 grid grid-cols-3 gap-2">
+                          {([
+                            { sev: "CRITICAL" as const, label: "Crit", count: intelBriefing.criticalCount, color: "#fb4934" },
+                            { sev: "WARNING" as const, label: "Warn", count: intelBriefing.warningCount, color: "#fabd2f" },
+                            { sev: "INFO" as const, label: "Info", count: intelBriefing.infoCount, color: "#83a598" },
+                          ] as const).map(({ sev, label, count, color }) => (
+                            <button
+                              key={sev}
+                              type="button"
+                              onClick={() => setAlertFilter((prev) => (prev === sev ? null : sev))}
+                              className="rounded-lg border px-2 py-1.5 text-center transition"
+                              style={{
+                                borderColor: alertFilter === sev ? color : `${color}4d`,
+                                backgroundColor: alertFilter === sev ? `${color}33` : `${color}12`,
+                              }}
+                            >
+                              <div className="font-mono text-[12px] font-bold" style={{ color }}>{count}</div>
+                              <div className="font-mono text-[8px] uppercase tracking-[0.16em]" style={{ color: `${color}b3` }}>{label}</div>
+                            </button>
+                          ))}
                         </div>
-                      </>
+                      </div>
                     ) : (
-                      <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-2 font-mono text-[10px] text-[#928374]">
+                      <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-3 py-2.5 font-mono text-[10px] text-[#928374]">
                         Awaiting first intelligence cycle...
                       </div>
                     )}
-                  </div>
-                )}
 
-                {/* FEEDS TAB */}
-                {mobileTab === "feeds" && (
-                  <div className="space-y-3">
-                    <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374]">
-                      No camera feeds active
+                    {selectedIntel ? (
+                      <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-3 py-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Selected Target</div>
+                            <div className="truncate font-mono text-[12px] text-[#ebdbb2]">{selectedIntel.name}</div>
+                            <div className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.16em] text-[#83a598]">
+                              {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority" : "Standard"}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={onCloseIntel}
+                            className="shrink-0 rounded border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[8px] uppercase tracking-[0.16em] text-[#7298a8]"
+                          >
+                            Clear
+                          </button>
+                        </div>
+
+                        <div className="mt-2 space-y-0.5 font-mono text-[9px] text-[#7fb4c5]">
+                          {selectedIntel.quickFacts.slice(0, 3).map((fact) => (
+                            <div key={`mobile-${fact.label}`}>{fact.label}: {fact.value}</div>
+                          ))}
+                        </div>
+
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onFlyToEntity();
+                              setMobileTab(null);
+                            }}
+                            className={actionButtonClass}
+                          >
+                            Fly To
+                          </button>
+                          {(selectedIntel.kind === "flight" || selectedIntel.kind === "military" || selectedIntel.kind === "satellite") ? (
+                            <button
+                              type="button"
+                              onClick={() => onTrackEntity(trackedEntityId === selectedIntel.id ? null : selectedIntel.id)}
+                              className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition ${
+                                trackedEntityId === selectedIntel.id
+                                  ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                                  : "border-[#504945] bg-[#282828] text-[#d5c4a1] hover:border-[#83a598]"
+                              }`}
+                            >
+                              {trackedEntityId === selectedIntel.id ? "Tracking" : "Track"}
+                            </button>
+                          ) : (
+                            <button type="button" onClick={() => setMobileTab("ops")} className={actionButtonClass}>Quick Ops</button>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-3 py-2.5">
+                      <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Quick Search</div>
+                      <input
+                        type="text"
+                        placeholder="Find entity or callsign..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-2.5 py-2 font-mono text-[11px] text-[#ebdbb2] placeholder-[#4e6a7a] focus:border-[#83a598] focus:outline-none"
+                      />
+                      {searchResults.length > 0 && (
+                        <div className="mt-2 max-h-[180px] space-y-1 overflow-y-auto">
+                          {searchResults.map((result) => {
+                            const kindColors: Record<string, string> = {
+                              flight: "text-[#d5c4a1]",
+                              military: "text-[#fabd2f]",
+                              satellite: "text-[#b8bb26]",
+                              earthquake: "text-[#ff6b6b]",
+                            };
+
+                            return (
+                              <button
+                                key={result.id}
+                                type="button"
+                                onClick={() => {
+                                  onFlyToEntityById(result.id);
+                                  setSearchQuery("");
+                                  setMobileTab(null);
+                                }}
+                                className="w-full rounded-lg border border-[#3c3836] bg-[#282828] px-2.5 py-2 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
+                              >
+                                <div className="truncate font-mono text-[10px] text-[#ebdbb2]">{result.name}</div>
+                                <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.14em]">
+                                  <span className={kindColors[result.kind] ?? "text-[#a89984]"}>{result.kind}</span>
+                                  {result.lat !== null && result.lon !== null ? (
+                                    <span className="text-[#4e6a7a]">{result.lat.toFixed(1)}N {result.lon.toFixed(1)}E</span>
+                                  ) : null}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {searchQuery.trim() && searchResults.length === 0 ? (
+                        <div className="mt-2 rounded-lg border border-[#3c3836] bg-[#282828] px-2.5 py-2 font-mono text-[10px] text-[#928374]">
+                          No entities found.
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-3 py-2.5">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Priority Alerts</div>
+                        {alertFilter ? (
+                          <button
+                            type="button"
+                            onClick={() => setAlertFilter(null)}
+                            className="rounded border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[8px] uppercase tracking-[0.16em] text-[#7298a8]"
+                          >
+                            Clear Filter
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {mobileAlertPreview.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {mobileAlertPreview.map((alert: IntelAlert) => (
+                            <button
+                              key={alert.id}
+                              type="button"
+                              onClick={() => {
+                                if (alert.entityId) {
+                                  onFlyToEntityById(alert.entityId);
+                                } else if (alert.coordinates) {
+                                  onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
+                                }
+                                setMobileTab(null);
+                              }}
+                              className="w-full rounded-lg border border-[#3c3836] bg-[#282828] px-2.5 py-2 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
+                            >
+                              <div className="flex items-start gap-2">
+                                <span className={`mt-px text-[10px] ${severityColors[alert.severity]}`}>{severityIcons[alert.severity]}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className={`font-mono text-[10px] font-bold uppercase tracking-[0.1em] ${severityColors[alert.severity]}`}>{alert.title}</div>
+                                  <div className="mt-0.5 font-mono text-[9px] leading-relaxed text-[#a89984]">{alert.detail}</div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                          {mobileAlerts.length > mobileAlertPreview.length ? (
+                            <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#7298a8]">
+                              +{mobileAlerts.length - mobileAlertPreview.length} additional alerts queued
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-[#3c3836] bg-[#282828] px-2.5 py-2 font-mono text-[10px] text-[#928374]">
+                          No active alerts in the current filter.
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* CONTROLS TAB */}
-                {mobileTab === "controls" && (
+                {mobileTab === "news" && (
                   <div className="space-y-3">
-                    {/* Location select */}
+                    <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#fabd2f]">Regional Digest</div>
+                        <button
+                          type="button"
+                          onClick={() => setNewsSortMode((prev) => (prev === "score" ? "newest" : "score"))}
+                          className="rounded border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[8px] uppercase tracking-[0.16em] text-[#d5c4a1]"
+                        >
+                          {newsSortMode === "score" ? "Intel" : "Newest"}
+                        </button>
+                      </div>
+
+                      <div className="mt-2 flex gap-1 overflow-x-auto pb-1">
+                        {COMMAND_REGIONS.map((region) => (
+                          <button
+                            key={region}
+                            type="button"
+                            onClick={() => setNewsRegionFilter(region)}
+                            className={`shrink-0 rounded-full border px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] ${
+                              newsRegionFilter === region
+                                ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                                : "border-[#504945] bg-[#282828] text-[#7298a8]"
+                            }`}
+                          >
+                            {region}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="mt-2 rounded-lg border border-[#3c3836] bg-[#282828] px-2.5 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-[#a89984]">{activeRegionDigest?.posture ?? "STABLE"}</span>
+                          <span className="font-mono text-[8px] text-[#83a598]">{newsMeta ? `${newsMeta.dedupedCount} items` : "--"}</span>
+                        </div>
+                        <p className="mt-1 font-mono text-[10px] leading-relaxed text-[#7fb4c5]">
+                          {activeRegionDigest?.summary ?? "Collecting source headlines for this region..."}
+                        </p>
+                      </div>
+
+                      <input
+                        type="text"
+                        placeholder="Search headlines..."
+                        value={newsSearch}
+                        onChange={(e) => setNewsSearch(e.target.value)}
+                        className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-2.5 py-2 font-mono text-[11px] text-[#ebdbb2] placeholder-[#4e6a7a] focus:border-[#83a598] focus:outline-none"
+                      />
+                    </div>
+
+                    {newsError ? (
+                      <div className="rounded-xl border border-[#712d2d] bg-[#2a1010] px-3 py-2.5 font-mono text-[10px] text-[#ff9191]">
+                        {newsError}
+                      </div>
+                    ) : null}
+
+                    {newsLoading && mobileHeadlinePreview.length === 0 ? (
+                      <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-3 py-2.5 font-mono text-[10px] text-[#7faec0]">
+                        Pulling feeds...
+                      </div>
+                    ) : null}
+
+                    <div className="space-y-1.5">
+                      {mobileHeadlinePreview.map((item) => (
+                        <article key={item.id} className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate font-mono text-[8px] uppercase tracking-[0.14em] text-[#a89984]">{item.source}</span>
+                            <span className="font-mono text-[8px] text-[#4e6a7a]">{new Date(item.publishedAt).toLocaleTimeString()}</span>
+                          </div>
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 block font-mono text-[11px] leading-snug text-[#ebdbb2] hover:text-[#d5c4a1]"
+                          >
+                            {item.title}
+                          </a>
+                          <p className="mt-1 line-clamp-2 font-mono text-[9px] leading-relaxed text-[#7fb4c5]">{item.summary}</p>
+                          <div className="mt-1 flex items-center justify-between gap-2">
+                            <span className="truncate font-mono text-[8px] text-[#a89984]">{item.tags.join(" · ")}</span>
+                            <span className="font-mono text-[8px] text-[#83a598]">{item.score.toFixed(1)}</span>
+                          </div>
+                        </article>
+                      ))}
+
+                      {!newsLoading && mobileHeadlinePreview.length === 0 ? (
+                        <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-3 py-2.5 font-mono text-[10px] text-[#928374]">
+                          No headlines matched the current filter.
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+
+                {mobileTab === "ops" && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-2 py-2 text-center">
+                        <div className="font-mono text-[8px] uppercase tracking-[0.16em] text-[#a89984]">Platform</div>
+                        <div className="mt-1 font-mono text-[11px] text-[#83a598]">{platformMode}</div>
+                      </div>
+                      <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-2 py-2 text-center">
+                        <div className="font-mono text-[8px] uppercase tracking-[0.16em] text-[#a89984]">View</div>
+                        <div className="mt-1 font-mono text-[11px] text-[#ebdbb2]">{sceneMode}</div>
+                      </div>
+                      <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-2 py-2 text-center">
+                        <div className="font-mono text-[8px] uppercase tracking-[0.16em] text-[#a89984]">Feeds</div>
+                        <div className="mt-1 font-mono text-[11px] text-[#fabd2f]">{activeFeedCount}/{feedTotal}</div>
+                      </div>
+                    </div>
+
                     <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
                       Location
                       <select
@@ -1341,7 +1655,10 @@ export function HudOverlay({
                         onChange={(event) => {
                           const nextPoi = event.target.value || null;
                           setActivePoiId(nextPoi);
-                          if (nextPoi) { onFlyToPoi(nextPoi); setMobileTab(null); }
+                          if (nextPoi) {
+                            onFlyToPoi(nextPoi);
+                            setMobileTab(null);
+                          }
                         }}
                       >
                         <option value="">Select location</option>
@@ -1351,22 +1668,33 @@ export function HudOverlay({
                       </select>
                     </label>
 
-                    {/* Camera mode */}
-                    <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
-                      Camera Mode
-                      <select
-                        className={`${controlInputClass} mt-1`}
-                        value={visualMode}
-                        onChange={(event) => setVisualMode(event.target.value as VisualMode)}
-                      >
-                        {modeDefs.map((mode) => (
-                          <option key={mode.key} value={mode.key}>{mode.label}</option>
-                        ))}
-                      </select>
-                    </label>
-
-                    {/* View / Lighting */}
                     <div className="grid grid-cols-2 gap-2">
+                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
+                        Platform
+                        <select
+                          className={`${controlInputClass} mt-1`}
+                          value={platformMode}
+                          onChange={(event) => setPlatformMode(event.target.value as PlatformMode)}
+                        >
+                          <option value="live">Live</option>
+                          <option value="playback">Playback</option>
+                          <option value="analytics">Analytics</option>
+                        </select>
+                      </label>
+
+                      <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
+                        Camera Mode
+                        <select
+                          className={`${controlInputClass} mt-1`}
+                          value={visualMode}
+                          onChange={(event) => setVisualMode(event.target.value as VisualMode)}
+                        >
+                          {modeDefs.map((mode) => (
+                            <option key={mode.key} value={mode.key}>{mode.label}</option>
+                          ))}
+                        </select>
+                      </label>
+
                       <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
                         View
                         <select
@@ -1378,6 +1706,7 @@ export function HudOverlay({
                           <option value="map">Map</option>
                         </select>
                       </label>
+
                       <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
                         Lighting
                         <select
@@ -1391,109 +1720,95 @@ export function HudOverlay({
                       </label>
                     </div>
 
-                    {/* Action buttons */}
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <button type="button" onClick={() => { onResetCamera(); setMobileTab(null); }} className={actionButtonClass}>Reset View</button>
-                      <button type="button" onClick={onToggleCollision} className={actionButtonClass}>
-                        Terrain: {collisionEnabled ? "On" : "Off"}
-                      </button>
+                      <button type="button" onClick={onToggleCollision} className={actionButtonClass}>Terrain {collisionEnabled ? "On" : "Off"}</button>
                     </div>
 
-                    {/* D-pad controls */}
-                    <div className="flex flex-col items-center gap-1 pt-1">
-                      <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.28em] text-[#a89984]">Camera Controls</div>
-                      <div className="flex items-center gap-1">
-                        <button type="button" onClick={onZoomIn} className={camBtnClass}>+</button>
-                        <button type="button" onClick={onZoomOut} className={camBtnClass}>&minus;</button>
+                    <CollapsibleSection title="Manual Camera" badge={sceneMode.toUpperCase()}>
+                      <div className="flex flex-col items-center gap-1 pt-1">
+                        <div className="flex items-center gap-1">
+                          <button type="button" onClick={onZoomIn} className={camBtnClass}>+</button>
+                          <button type="button" onClick={onZoomOut} className={camBtnClass}>&minus;</button>
+                        </div>
+                        <button type="button" onClick={onTiltUp} className={camBtnClass}>&uarr;</button>
+                        <div className="flex gap-1">
+                          <button type="button" onClick={onRotateLeft} className={camBtnClass}>&larr;</button>
+                          <button type="button" onClick={onRotateRight} className={camBtnClass}>&rarr;</button>
+                        </div>
+                        <button type="button" onClick={onTiltDown} className={camBtnClass}>&darr;</button>
                       </div>
-                      <button type="button" onClick={onTiltUp} className={camBtnClass}>&uarr;</button>
-                      <div className="flex gap-1">
-                        <button type="button" onClick={onRotateLeft} className={camBtnClass}>&larr;</button>
-                        <button type="button" onClick={onRotateRight} className={camBtnClass}>&rarr;</button>
+                    </CollapsibleSection>
+
+                    <CollapsibleSection title="Layers" badge={`${activeLayerCount}/${layerDefs.length}`}>
+                      <div className="space-y-1.5">
+                        {layerDefs.map((layer) => (
+                          <button
+                            key={layer.key}
+                            type="button"
+                            onClick={() => toggleLayer(layer.key)}
+                            className="flex w-full items-center justify-between rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left"
+                          >
+                            <span className="font-mono text-[10px] text-[#ebdbb2]">{layer.label}</span>
+                            <span className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase ${
+                              layers[layer.key]
+                                ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                                : "border-[#504945] bg-[#282828] text-[#a89984]"
+                            }`}>
+                              {layers[layer.key] ? "On" : "Off"}
+                            </span>
+                          </button>
+                        ))}
                       </div>
-                      <button type="button" onClick={onTiltDown} className={camBtnClass}>&darr;</button>
-                    </div>
+                    </CollapsibleSection>
 
-                    {/* Layer toggles */}
-                    <div className="space-y-1">
-                      <div className="font-mono text-[8px] uppercase tracking-[0.28em] text-[#a89984]">Layers</div>
-                      {layerDefs.map((layer) => (
-                        <button
-                          key={layer.key}
-                          type="button"
-                          onClick={() => toggleLayer(layer.key)}
-                          className="flex w-full items-center justify-between rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left"
-                        >
-                          <span className="font-mono text-[10px] text-[#ebdbb2]">{layer.label}</span>
-                          <span className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase ${
-                            layers[layer.key]
-                              ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
-                              : "border-[#504945] bg-[#282828] text-[#a89984]"
-                          }`}>
-                            {layers[layer.key] ? "On" : "Off"}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* STATUS TAB */}
-                {mobileTab === "status" && (
-                  <div className="space-y-2">
-                    <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
-                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Feed Health</div>
-                      <div>OpenSky: {feedHealth.opensky.status} @ {fmtDate(feedHealth.opensky.lastSuccessAt)}</div>
-                      <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
-                      <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
-                      <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
-      
-                      <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
-                      <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
-                      <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
-                      <div>AISStream: {feedHealth.ais.status} @ {fmtDate(feedHealth.ais.lastSuccessAt)}</div>
-                    </div>
-                    <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
-                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Camera</div>
-                      <div>ALT {camera.altMeters.toFixed(0)}m</div>
-                      <div>{camera.lat.toFixed(4)}N {camera.lon.toFixed(4)}E</div>
-                    </div>
-                    <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
-                      <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Counts</div>
-                      <div>Flights: {counts.flights} · Military: {counts.military}</div>
-                      <div>Satellites: {counts.satellites} · Quakes: {counts.seismic}</div>
-                    </div>
+                    <CollapsibleSection title="System" badge={`${activeFeedCount}/${feedTotal}`}>
+                      <div className="space-y-2 font-mono text-[10px] text-[#7fb4c5]">
+                        <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                          <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Camera</div>
+                          <div>ALT {camera.altMeters.toFixed(0)}m</div>
+                          <div>{camera.lat.toFixed(4)}N {camera.lon.toFixed(4)}E</div>
+                        </div>
+                        <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                          <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Feed Health</div>
+                          <div>OpenSky: {feedHealth.opensky.status} @ {fmtDate(feedHealth.opensky.lastSuccessAt)}</div>
+                          <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
+                          <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
+                          <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
+                          <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
+                          <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
+                          <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
+                          <div>AISStream: {feedHealth.ais.status} @ {fmtDate(feedHealth.ais.lastSuccessAt)}</div>
+                        </div>
+                      </div>
+                    </CollapsibleSection>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* Tab bar */}
-          <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-50 flex border-t border-[#3c3836] bg-[#1d2021f0] backdrop-blur-xl">
-            {([
-              { id: "intel" as const, label: "Intel", icon: "\u25C6" },
-              { id: "feeds" as const, label: "Feeds", icon: "\u25CE" },
-              { id: "controls" as const, label: "Controls", icon: "\u2699" },
-              { id: "status" as const, label: "Status", icon: "\u2588" },
-            ]).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setMobileTab(mobileTab === tab.id ? null : tab.id)}
-                className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 font-mono text-[9px] uppercase tracking-[0.14em] transition ${
-                  mobileTab === tab.id
-                    ? "text-[#83a598]"
-                    : "text-[#4e6a7a]"
-                }`}
-              >
-                <span className="text-[14px]">{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            ))}
+          <div className="pointer-events-auto fixed bottom-[calc(var(--safe-bottom)+0.5rem)] left-1/2 z-50 w-[calc(100%-1rem)] max-w-[19.5rem] -translate-x-1/2 rounded-[1.25rem] border border-[#3c3836] bg-[#1d2021f2] p-1.5 shadow-[0_14px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl">
+            <div className="flex items-center gap-1.5">
+              {mobileTabDefs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setMobileTab(mobileTab === tab.id ? null : tab.id)}
+                  className={`flex h-10 flex-1 items-center justify-center gap-1 rounded-xl border px-2 font-mono text-[8px] uppercase tracking-[0.14em] transition ${
+                    mobileTab === tab.id
+                      ? "border-[#83a598] bg-[#2d3432] text-[#d5c4a1]"
+                      : "border-[#3c3836] bg-[#1d2021] text-[#4e6a7a]"
+                  }`}
+                >
+                  <span className="text-[13px]">{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </>
-      )}
+      </div>
 
       {/* Enlarged video overlay */}
       {enlargedStream && (
@@ -1506,7 +1821,7 @@ export function HudOverlay({
 
       {/* Playback Timeline Bar */}
       {platformMode === "playback" && playbackTimeRange && (
-        <div className="pointer-events-auto absolute bottom-20 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded border border-cyan-800/50 bg-black/80 px-4 py-2 font-mono text-xs text-cyan-400 backdrop-blur-sm">
+        <div className="pointer-events-auto absolute bottom-[calc(var(--safe-bottom)+5rem)] left-1/2 flex w-[calc(100%-1rem)] max-w-sm -translate-x-1/2 items-center gap-2 rounded border border-cyan-800/50 bg-black/80 px-3 py-2 font-mono text-xs text-cyan-400 backdrop-blur-sm md:bottom-20 md:w-auto md:max-w-none md:gap-3 md:px-4">
           <button
             type="button"
             onClick={onPlayPause}

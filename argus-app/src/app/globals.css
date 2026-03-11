@@ -4,6 +4,8 @@
   --background: #1d2021;
   --foreground: #ebdbb2;
   --font-mono: var(--font-jetbrains-mono);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 html,
