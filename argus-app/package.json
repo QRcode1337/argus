@@ -19,6 +19,7 @@
     "react-dom": "19.2.3",
     "satellite.js": "^6.0.2",
     "topojson-client": "^3.1.0",
+    "ws": "^8.19.0",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
@@ -29,6 +30,7 @@
     "@types/react-dom": "^19",
     "@types/topojson-client": "^3.1.5",
     "@types/topojson-specification": "^1.0.5",
+    "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",

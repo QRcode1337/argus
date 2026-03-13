@@ -28,6 +28,8 @@ export interface IntelBriefing {
   infoCount: number;
   alerts: IntelAlert[];
   summary: string;
+  riskScore?: number;
+  dominantCategories?: AlertCategory[];
 }
 
 // ---------------------------------------------------------------------------
@@ -385,19 +387,47 @@ export function analyzeSeismic(count: number): IntelAlert[] {
 export function generateBriefing(alerts: IntelAlert[]): IntelBriefing {
   const now = Date.now();
 
-  const criticalCount = alerts.filter((a) => a.severity === "CRITICAL").length;
-  const warningCount = alerts.filter((a) => a.severity === "WARNING").length;
-  const infoCount = alerts.filter((a) => a.severity === "INFO").length;
+  // Deduplicate near-identical alerts in the same minute window.
+  const deduped = Array.from(
+    new Map(
+      alerts.map((a) => {
+        const minuteBucket = Math.floor(a.timestamp / 60000);
+        const key = `${a.severity}|${a.category}|${a.title}|${a.entityId ?? "none"}|${minuteBucket}`;
+        return [key, a] as const;
+      }),
+    ).values(),
+  );
+
+  const criticalCount = deduped.filter((a) => a.severity === "CRITICAL").length;
+  const warningCount = deduped.filter((a) => a.severity === "WARNING").length;
+  const infoCount = deduped.filter((a) => a.severity === "INFO").length;
+
+  const severityWeight: Record<AlertSeverity, number> = {
+    CRITICAL: 15,
+    WARNING: 6,
+    INFO: 1,
+  };
+  const categoryWeight: Record<AlertCategory, number> = {
+    FLIGHT: 1.0,
+    MILITARY: 1.2,
+    SATELLITE: 0.8,
+    SEISMIC: 1.1,
+    CAMERA: 0.7,
+  };
+
+  const riskScore = Math.round(
+    deduped.reduce((sum, a) => sum + severityWeight[a.severity] * categoryWeight[a.category], 0),
+  );
 
   let threatLevel: ThreatLevel = "GREEN";
-  if (criticalCount > 3) {
+  if (criticalCount >= 2 || riskScore >= 45) {
     threatLevel = "RED";
-  } else if (criticalCount > 0 || warningCount > 5) {
+  } else if (criticalCount > 0 || warningCount >= 4 || riskScore >= 18) {
     threatLevel = "AMBER";
   }
 
   // Sort: CRITICAL first, then WARNING, then INFO; newest first within each tier
-  const sorted = [...alerts].sort((a, b) => {
+  const sorted = [...deduped].sort((a, b) => {
     const severityOrder: Record<AlertSeverity, number> = {
       CRITICAL: 0,
       WARNING: 1,
@@ -408,16 +438,27 @@ export function generateBriefing(alerts: IntelAlert[]): IntelBriefing {
     return b.timestamp - a.timestamp;
   });
 
-  const summary = `${criticalCount} CRITICAL, ${warningCount} WARNING, ${infoCount} INFO \u2014 ${threatLevel} threat level`;
+  const categoryCounts = new Map<AlertCategory, number>();
+  for (const alert of deduped) {
+    categoryCounts.set(alert.category, (categoryCounts.get(alert.category) ?? 0) + 1);
+  }
+  const dominantCategories = [...categoryCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([category]) => category);
+
+  const summary = `${criticalCount} CRITICAL, ${warningCount} WARNING, ${infoCount} INFO \u2014 ${threatLevel} threat level (risk ${riskScore})`;
 
   return {
     timestamp: now,
     threatLevel,
-    totalAlerts: alerts.length,
+    totalAlerts: deduped.length,
     criticalCount,
     warningCount,
     infoCount,
     alerts: sorted,
     summary,
+    riskScore,
+    dominantCategories,
   };
 }
