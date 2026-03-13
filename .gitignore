@@ -24,3 +24,5 @@ certbot/duckdns.ini
 
 # macOS
 .DS_Store
+logs/
+.brv/
