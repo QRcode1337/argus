@@ -75,18 +75,34 @@ def grib2_to_cog(
 
     log.info(f"Opening GRIB2: {grib_path}")
     # cfgrib needs eccodes; open with squeeze=True to drop size-1 dims
-    ds = xr.open_dataset(
-        grib_path,
-        engine="cfgrib",
-        backend_kwargs={"indexing_kwargs": {}},
-        squeeze=True,
-    )
+    # cfgrib/xarray compatibility varies by version:
+    # some builds reject backend_kwargs.indexing_kwargs.
+    # Try modern/default open first, then fall back for older variants.
+    try:
+        ds = xr.open_dataset(
+            grib_path,
+            engine="cfgrib",
+            squeeze=True,
+        )
+    except TypeError:
+        ds = xr.open_dataset(
+            grib_path,
+            engine="cfgrib",
+            backend_kwargs={},
+            squeeze=True,
+        )
 
     valid_time = _parse_valid_time(ds)
 
     # Pick the first data variable (there should only be one per filtered file)
     data_var = list(ds.data_vars)[0]
-    data: np.ndarray = ds[data_var].values.astype(np.float32)
+    data: np.ndarray = np.asarray(ds[data_var].values, dtype=np.float32)
+    # Some cfgrib/xarray combinations keep singleton dims (time/step/surface).
+    # Normalize to a 2D lat/lon raster.
+    data = np.squeeze(data)
+    if data.ndim > 2:
+        # Keep the last 2 dims as spatial (lat, lon), drop leading singleton-ish axes.
+        data = data.reshape((-1, data.shape[-2], data.shape[-1]))[0]
 
     # GFS data comes on a 0–360 lon grid; normalise to -180–180 for EPSG:4326
     lons = ds.coords["longitude"].values
@@ -123,7 +139,7 @@ def grib2_to_cog(
 
     log.info(f"Writing temp GeoTIFF: {tmp_path}")
     with rasterio.open(tmp_path, "w", **profile) as dst:
-        dst.write(data[np.newaxis, :, :] if data.ndim == 2 else data, 1)
+        dst.write(data, 1)
 
     # Build overviews on the temp file
     log.info("Building overviews ...")

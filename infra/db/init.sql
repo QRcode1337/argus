@@ -26,6 +26,10 @@ CREATE INDEX IF NOT EXISTS idx_wl_valid_time  ON weather_layers (valid_time DESC
 CREATE INDEX IF NOT EXISTS idx_wl_variable    ON weather_layers (variable);
 CREATE INDEX IF NOT EXISTS idx_wl_run_time    ON weather_layers (run_time DESC);
 CREATE INDEX IF NOT EXISTS idx_wl_bbox        ON weather_layers USING GIST (bbox);
+-- Supports latest-per-variable queries (DISTINCT ON variable ORDER BY valid_time DESC)
+CREATE INDEX IF NOT EXISTS idx_wl_variable_valid_time_desc
+    ON weather_layers (variable, valid_time DESC)
+    INCLUDE (name, tile_url, file_size_mb);
 
 -- ----------------------------------------------------------------
 -- flight_routes (existing)

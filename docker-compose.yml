@@ -100,7 +100,8 @@ services:
     environment:
       - PORT=80
       - WORKERS_PER_CORE=1
-      - WEB_CONCURRENCY=1
+      - WEB_CONCURRENCY=2
+      - GDAL_CACHEMAX=128
     volumes:
       - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/tiles:/data/tiles:ro
     networks:
