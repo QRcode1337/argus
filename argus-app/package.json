@@ -14,7 +14,7 @@
     "@vercel/analytics": "^1.6.1",
     "cesium": "^1.138.0",
     "d3": "^7.9.0",
-    "next": "16.1.6",
+    "next": "16.1.7",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "satellite.js": "^6.0.2",
