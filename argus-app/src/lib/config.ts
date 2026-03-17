@@ -10,6 +10,13 @@ export const ARGUS_CONFIG = {
     aisstream: "/api/feeds/aisstream",
     news: "/api/feeds/news",
     gdelt: "/api/feeds/gdelt",
+    iss: "/api/feeds/iss",
+    threatRadar: "/api/feeds/threatradar",
+    threatRadarSearch: "/api/feeds/threatradar/search",
+    threatRadarIoc: "/api/feeds/threatradar/ioc",
+    aiSummarize: "/api/ai/summarize",
+    settings: "/api/settings",
+    analyticsLayers: "/api/analytics/layers",
   },
   pollMs: {
     openSky: 10_000,
@@ -22,6 +29,7 @@ export const ARGUS_CONFIG = {
     aisstream: 60_000,
     news: Number(process.env.NEXT_PUBLIC_NEWS_POLL_MS ?? process.env.NEWS_POLL_MS ?? 300_000),
     gdelt: 15 * 60_000,  // 15 minutes — matches GDELT update cadence
+    threatRadar: 300_000, // 5 minutes
   },
   limits: {
     maxFlights: 7000,

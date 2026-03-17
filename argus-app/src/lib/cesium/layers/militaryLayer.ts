@@ -1,11 +1,8 @@
 import {
-  Cartesian2,
   Cartesian3,
-  Color,
   ConstantProperty,
   ConstantPositionProperty,
   Entity,
-  LabelStyle,
   NearFarScalar,
   VerticalOrigin,
   type Viewer,
@@ -62,16 +59,6 @@ export class MilitaryLayer {
           scale: 0.72,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.4, 20_000_000, 0.4),
-        },
-        label: {
-          text: (() => { const t = `MIL ${flight.callsign}`; return t.length > 9 ? `${t.slice(0, 9)}…` : t; })(),
-          font: "10px monospace",
-          style: LabelStyle.FILL,
-          fillColor: Color.fromCssColorString("#fb4934"),
-          showBackground: true,
-          backgroundColor: Color.BLACK.withAlpha(0.65),
-          pixelOffset: new Cartesian2(0, -16),
-          scaleByDistance: new NearFarScalar(2_000_000, 1, 8_000_000, 0),
         },
         properties: {
           kind: "military",

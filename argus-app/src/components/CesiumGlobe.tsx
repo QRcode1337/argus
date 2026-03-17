@@ -19,6 +19,7 @@ import {
   SceneMode as CesiumSceneMode,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
+  UrlTemplateImageryProvider,
   Viewer,
   defined,
 } from "cesium";
@@ -46,6 +47,7 @@ import { fetchFredObservations } from "@/lib/ingest/fred";
 import { fetchAisSnapshotCount } from "@/lib/ingest/aisstream";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
 import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
+import { fetchIssIntel } from "@/lib/ingest/iss";
 import { recordFlights, recordMilitary, recordSatellites, recordQuakes, recordOutages, recordThreats } from "@/lib/ingest/recorder";
 import {
   analyzeFlights,
@@ -57,7 +59,14 @@ import {
 import type { IntelAlert } from "@/lib/intel/analysisEngine";
 import { useArgusStore } from "@/store/useArgusStore";
 import type { SearchResult } from "@/store/useArgusStore";
-import type { IntelDatum, IntelImportance, PlatformMode, SelectedIntel, SatelliteRecord } from "@/types/intel";
+import type {
+  IntelDatum,
+  IntelImportance,
+  PlatformMode,
+  SceneMode,
+  SelectedIntel,
+  SatelliteRecord,
+} from "@/types/intel";
 
 import { HudOverlay } from "./HudOverlay";
 import { FlatMapView } from "./FlatMapView";
@@ -139,6 +148,62 @@ const inferKindFromId = (id: string): string => {
   return "unknown";
 };
 
+const buildFlightAwareUrl = (callsign: unknown): string | undefined => {
+  if (typeof callsign !== "string") return undefined;
+  const normalized = callsign.replace(/\s+/g, "").toUpperCase();
+  if (!normalized) return undefined;
+  return `https://www.flightaware.com/live/flight/${encodeURIComponent(normalized)}`;
+};
+
+const buildAnalysisSummary = (kind: string, props: Record<string, unknown>, name: string): string => {
+  switch (kind) {
+    case "flight":
+      return [
+        `${name} is a ${String(props.flightCategory ?? "tracked")} civilian aircraft.`,
+        props.originCountry ? `Origin country: ${props.originCountry}.` : null,
+        typeof props.velocity === "number" ? `Current velocity is ${Math.round(props.velocity)} m/s.` : null,
+        typeof props.track === "number" ? `Track is ${Math.round(props.track)} degrees.` : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+    case "military":
+      return [
+        `${name} is a military aircraft track.`,
+        props.aircraftFullName ? `Platform: ${props.aircraftFullName}.` : null,
+        props.aircraftOrigin ? `Origin: ${props.aircraftOrigin}.` : null,
+        typeof props.velocity === "number" ? `Current velocity is ${Math.round(props.velocity)} m/s.` : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+    case "gdelt":
+      return [
+        `${name} is a GDELT event with ${props.numMentions ?? "unknown"} mentions across ${props.numSources ?? "unknown"} sources.`,
+        typeof props.goldsteinScale === "number"
+          ? `Goldstein score ${Number(props.goldsteinScale).toFixed(1)} indicates ${
+              Number(props.goldsteinScale) < 0 ? "conflict pressure" : "cooperative posture"
+            }.`
+          : null,
+        typeof props.avgTone === "number"
+          ? `Average tone is ${Number(props.avgTone).toFixed(2)}.`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+    case "satellite":
+      return [
+        `${name} is ${props.isIss ? "the International Space Station" : "a tracked orbital object"}.`,
+        props.orbitType ? `Orbit regime: ${props.orbitType}.` : null,
+        props.countryCode ? `Country code: ${props.countryCode}.` : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+    default:
+      return `${name} is the currently selected target. Review quick facts and full facts for supporting context.`;
+  }
+};
+
+const isFlatMapMode = (sceneMode: SceneMode): boolean => sceneMode === "flat_map";
+
 const PRIORITY_THRESHOLDS = {
   earthquakeMagnitude: 4.5,
   flightVelocityMps: 220,
@@ -199,6 +264,7 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
   switch (kind) {
     case "flight":
       pushQuick("Callsign", props.callsign);
+      pushQuick("Category", props.flightCategory);
       pushQuick("Origin", props.originCountry);
       pushQuick("Velocity (m/s)", props.velocity);
       pushQuick("Track (deg)", props.track);
@@ -220,6 +286,7 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("Depth (km)", props.depthKm);
       break;
     case "satellite":
+      pushQuick("Platform", props.isIss ? "ISS" : "Satellite");
       pushQuick("Name", props.name);
       pushQuick("Type", props.classification);
       pushQuick("Orbit", props.orbitType);
@@ -285,6 +352,26 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
         ? props.imageUrl
         : undefined,
     streamUrl: typeof props.streamUrl === "string" ? props.streamUrl : undefined,
+    externalUrl:
+      (kind === "flight" || kind === "military")
+        ? buildFlightAwareUrl(props.callsign)
+        : typeof props.sourceUrl === "string"
+          ? props.sourceUrl
+          : undefined,
+    externalLabel:
+      kind === "flight" || kind === "military"
+        ? "FlightAware"
+        : typeof props.sourceUrl === "string"
+          ? "Source Link"
+          : undefined,
+    analysisSummary: buildAnalysisSummary(kind, props, name),
+    coordinates: cartographic
+      ? {
+          lat: CesiumMath.toDegrees(cartographic.latitude),
+          lon: CesiumMath.toDegrees(cartographic.longitude),
+          altMeters: cartographic.height,
+        }
+      : undefined,
   };
 };
 
@@ -360,6 +447,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const setPlaybackCurrentTime = useArgusStore((s) => s.setPlaybackCurrentTime);
   const setPlaybackTime = useArgusStore((s) => s.setPlaybackTime);
   const setIsPlaying = useArgusStore((s) => s.setIsPlaying);
+  const clickedCoordinates = useArgusStore((s) => s.clickedCoordinates);
+  const setClickedCoordinates = useArgusStore((s) => s.setClickedCoordinates);
 
   const flyToPoi = useCallback((poiId: string) => {
     const viewer = viewerRef.current;
@@ -536,6 +625,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     cameraController.maximumZoomDistance = 60_000_000;
 
     viewer.scene.globe.enableLighting = true;
+    viewer.scene.globe.baseColor = Color.fromCssColorString("#0b1118");
     if (process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN) {
       void createWorldTerrainAsync({
         requestVertexNormals: true,
@@ -600,6 +690,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         !("id" in picked) ||
         !(picked.id instanceof Entity)
       ) {
+        const globePosition = viewer.camera.pickEllipsoid(event.position, viewer.scene.globe.ellipsoid);
+        if (globePosition) {
+          const cartographic = Cartographic.fromCartesian(globePosition);
+          setClickedCoordinates({
+            lat: CesiumMath.toDegrees(cartographic.latitude),
+            lon: CesiumMath.toDegrees(cartographic.longitude),
+            altMeters: cartographic.height,
+          });
+        }
         setSelectedIntel(null);
         setShowFullIntel(false);
         return;
@@ -614,6 +713,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
       setSelectedIntel(intel);
       setShowFullIntel(intel.importance === "important");
+      setClickedCoordinates(
+        intel.coordinates
+          ? {
+              lat: intel.coordinates.lat,
+              lon: intel.coordinates.lon,
+              altMeters: intel.coordinates.altMeters ?? null,
+            }
+          : null,
+      );
 
       if (intel.kind === "flight" || intel.kind === "military") {
         const rawId = intel.id.replace(/^(flight-|mil-)/, "");
@@ -624,6 +732,32 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
             );
           }
         });
+      }
+
+      if (intel.kind === "satellite" && /iss|zarya/i.test(intel.name)) {
+        void fetchIssIntel(ARGUS_CONFIG.endpoints.iss)
+          .then((iss) => {
+            const crewLine = iss.crew.length > 0 ? iss.crew.join(", ") : "Crew data unavailable";
+            setSelectedIntel((prev) => {
+              if (!prev || prev.id !== intel.id) return prev;
+              return {
+                ...prev,
+                quickFacts: [
+                  ...prev.quickFacts.filter((fact) => fact.label !== "Crew Aboard"),
+                  { label: "Crew Aboard", value: `${iss.crew.length}` },
+                ],
+                fullFacts: [
+                  ...prev.fullFacts.filter((fact) => fact.label !== "ISS Crew"),
+                  { label: "ISS Crew", value: crewLine },
+                ],
+                streamUrl: iss.videoUrl ?? prev.streamUrl,
+                externalUrl: iss.moreInfoUrl ?? prev.externalUrl,
+                externalLabel: "NASA ISS",
+                analysisSummary: `${prev.analysisSummary ?? "ISS track acquired."} Crew aboard: ${crewLine}.`,
+              };
+            });
+          })
+          .catch(() => undefined);
       }
     }, ScreenSpaceEventType.LEFT_CLICK);
 
@@ -805,7 +939,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "cloudflare-radar",
       intervalMs: ARGUS_CONFIG.pollMs.cloudflareRadar,
       run: async () => {
-        if (platformModeRef.current !== "live") return;
+        if (platformModeRef.current !== "analytics") return;
         try {
           const outages = await fetchInternetOutages(ARGUS_CONFIG.endpoints.cloudflareRadar);
           const count = outageLayer.update(outages);
@@ -822,7 +956,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "otx",
       intervalMs: ARGUS_CONFIG.pollMs.otx,
       run: async () => {
-        if (platformModeRef.current !== "live") return;
+        if (platformModeRef.current !== "analytics") return;
         try {
           const threats = await fetchThreatPulses(ARGUS_CONFIG.endpoints.otx);
           const count = threatLayer.update(threats);
@@ -867,7 +1001,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "gdelt",
       intervalMs: ARGUS_CONFIG.pollMs.gdelt,
       run: async () => {
-        if (platformModeRef.current !== "live") return;
+        if (platformModeRef.current !== "analytics") return;
         try {
           const events = await fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt);
           const count = gdeltLayer.update(events);
@@ -909,7 +1043,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       visualModeRef.current = null;
       pickerRef.current = null;
     };
-  }, [setCamera, setCount, setFeedError, setFeedHealthy]);
+  }, [setCamera, setClickedCoordinates, setCount, setFeedError, setFeedHealthy]);
 
   // DVR playback data loop
   const playbackModeState = useArgusStore((s) => s.platformMode);
@@ -1169,9 +1303,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       seismicLayerRef.current?.setVisible(false);
 
       basesLayerRef.current?.setVisible(false);
-      outageLayerRef.current?.setVisible(false);
-      threatLayerRef.current?.setVisible(false);
-      gdeltLayerRef.current?.setVisible(false);
+      outageLayerRef.current?.setVisible(layers.outages);
+      threatLayerRef.current?.setVisible(layers.threats);
+      gdeltLayerRef.current?.setVisible(layers.gdelt);
     } else if (platformMode === "playback") {
       const { layers } = useArgusStore.getState();
 
@@ -1181,8 +1315,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       satLayerRef.current?.setLinkVisible(false);
       seismicLayerRef.current?.setVisible(layers.seismic);
       basesLayerRef.current?.setVisible(layers.bases);
-      outageLayerRef.current?.setVisible(layers.outages);
-      threatLayerRef.current?.setVisible(layers.threats);
+      outageLayerRef.current?.setVisible(false);
+      threatLayerRef.current?.setVisible(false);
       gdeltLayerRef.current?.setVisible(false);
       setIsPlaying(false);
 
@@ -1227,11 +1361,11 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       seismicLayerRef.current?.setVisible(layers.seismic);
 
       basesLayerRef.current?.setVisible(layers.bases);
-      outageLayerRef.current?.setVisible(layers.outages);
-      threatLayerRef.current?.setVisible(layers.threats);
-      gdeltLayerRef.current?.setVisible(layers.gdelt);
+      outageLayerRef.current?.setVisible(false);
+      threatLayerRef.current?.setVisible(false);
+      gdeltLayerRef.current?.setVisible(false);
     }
-  }, [platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
+  }, [layers.gdelt, layers.outages, layers.threats, platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
 
   useEffect(() => {
     if (platformMode !== "analytics") {
@@ -1283,17 +1417,30 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   }, [platformMode, analyticsLayers.gfs_weather, activeGfsCogPath]);
 
   useEffect(() => {
+    if (platformMode === "analytics") {
+      flightLayerRef.current?.setVisible(false);
+      militaryLayerRef.current?.setVisible(false);
+      satLayerRef.current?.setVisible(false);
+      satLayerRef.current?.setLinkVisible(false);
+      seismicLayerRef.current?.setVisible(false);
+      basesLayerRef.current?.setVisible(false);
+      outageLayerRef.current?.setVisible(layers.outages);
+      threatLayerRef.current?.setVisible(layers.threats);
+      gdeltLayerRef.current?.setVisible(layers.gdelt);
+      return;
+    }
+
     flightLayerRef.current?.setVisible(layers.flights);
     militaryLayerRef.current?.setVisible(layers.military);
     satLayerRef.current?.setVisible(layers.satellites);
     satLayerRef.current?.setLinkVisible(layers.satellites && layers.satelliteLinks);
     seismicLayerRef.current?.setVisible(layers.seismic);
-
     basesLayerRef.current?.setVisible(layers.bases);
-    outageLayerRef.current?.setVisible(layers.outages);
-    threatLayerRef.current?.setVisible(layers.threats);
-    gdeltLayerRef.current?.setVisible(layers.gdelt);
+    outageLayerRef.current?.setVisible(false);
+    threatLayerRef.current?.setVisible(false);
+    gdeltLayerRef.current?.setVisible(false);
   }, [
+    platformMode,
     layers.bases,
     layers.flights,
     layers.gdelt,
@@ -1312,6 +1459,38 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     // Map mode uses a dedicated non-Cesium flat map panel.
     // Keep Cesium in 3D for live ingest + smooth return to globe mode.
     viewer.scene.mode = CesiumSceneMode.SCENE3D;
+    if (isFlatMapMode(sceneMode)) {
+      return;
+    }
+
+    const layers = viewer.imageryLayers;
+    const baseLayer = layers.length > 0 ? layers.get(0) : null;
+    if (baseLayer) {
+      layers.remove(baseLayer, true);
+    }
+
+    const satelliteProvider = new UrlTemplateImageryProvider({
+      url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    });
+    const streetProvider = new UrlTemplateImageryProvider({
+      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    });
+    const darkProvider = new UrlTemplateImageryProvider({
+      url: "https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+    });
+
+    const provider =
+      sceneMode === "globe_street"
+        ? streetProvider
+        : sceneMode === "globe_map"
+          ? darkProvider
+          : satelliteProvider;
+
+    layers.addImageryProvider(provider, 0);
+    viewer.scene.globe.baseColor =
+      sceneMode === "globe_map"
+        ? Color.fromCssColorString("#0b1118")
+        : Color.fromCssColorString("#13212b");
   }, [sceneMode]);
 
   // Day/Night terminator toggle
@@ -1359,10 +1538,46 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       <div className="argus-grid pointer-events-none absolute inset-0 z-0" />
 
       <div className="absolute inset-0 z-10 flex items-center justify-center">
-        <div className={`argus-viewport ${sceneMode === "map" ? "argus-map-viewport" : ""}`}>
-          <div ref={mountRef} className={sceneMode === "map" ? "hidden" : "h-full w-full"} />
-          {sceneMode === "map" ? <FlatMapView onSelectIntel={setSelectedIntel} /> : null}
-          {sceneMode !== "map" && visualMode === "crt" ? (
+        <div className={`argus-viewport ${isFlatMapMode(sceneMode) ? "argus-map-viewport" : ""}`}>
+          <div ref={mountRef} className={isFlatMapMode(sceneMode) ? "hidden" : "h-full w-full"} />
+          {isFlatMapMode(sceneMode) ? (
+            <FlatMapView
+              onSelectIntel={(intel) => {
+                setSelectedIntel(intel);
+                setShowFullIntel(Boolean(intel && intel.importance === "important"));
+                setClickedCoordinates(
+                  intel?.coordinates
+                    ? {
+                        lat: intel.coordinates.lat,
+                        lon: intel.coordinates.lon,
+                        altMeters: intel.coordinates.altMeters ?? null,
+                      }
+                    : null,
+                );
+              }}
+              onSelectCoordinates={(coords) => {
+                setClickedCoordinates(coords);
+                setSelectedIntel({
+                  id: `coords-${coords.lat.toFixed(4)}-${coords.lon.toFixed(4)}`,
+                  name: "Map Coordinates",
+                  kind: "coordinates",
+                  importance: "normal",
+                  quickFacts: [
+                    { label: "Latitude", value: coords.lat.toFixed(4) },
+                    { label: "Longitude", value: coords.lon.toFixed(4) },
+                  ],
+                  fullFacts: [
+                    { label: "Latitude", value: coords.lat.toFixed(6) },
+                    { label: "Longitude", value: coords.lon.toFixed(6) },
+                  ],
+                  coordinates: coords,
+                  analysisSummary: "Manual map selection. Use these coordinates to pivot into nearby entities, incidents, or follow-on analysis.",
+                });
+                setShowFullIntel(false);
+              }}
+            />
+          ) : null}
+          {!isFlatMapMode(sceneMode) && visualMode === "crt" ? (
             <div className="argus-scanlines pointer-events-none absolute inset-0" />
           ) : null}
         </div>
@@ -1398,6 +1613,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         onRotateRight={rotateRight}
         onPlayPause={handlePlayPause}
         onSeek={handleSeek}
+        clickedCoordinates={clickedCoordinates}
+        onSelectIntel={setSelectedIntel}
       />
     </div>
   );

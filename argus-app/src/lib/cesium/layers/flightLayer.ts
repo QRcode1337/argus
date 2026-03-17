@@ -1,24 +1,21 @@
 import {
   Cartesian3,
-  Cartesian2,
-  Color,
   ConstantProperty,
   ConstantPositionProperty,
   Entity,
-  LabelStyle,
   NearFarScalar,
   VerticalOrigin,
   type Viewer,
 } from "cesium";
 
-import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
+import { createAirplaneSvg } from "@/lib/cesium/tacticalMarker";
 import type { TrackedFlight } from "@/types/intel";
 
 export class FlightLayer {
   private viewer: Viewer;
 
   private entities = new Map<string, Entity>();
-  private readonly marker = createTacticalMarkerSvg({
+  private readonly marker = createAirplaneSvg({
     fill: "#fabd2f",
     glow: "#f9e2af",
     stroke: "#3c3836",
@@ -56,23 +53,14 @@ export class FlightLayer {
         position,
         billboard: {
           image: new ConstantProperty(this.marker),
-          scale: 0.66,
+          scale: 0.62,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.3, 20_000_000, 0.4),
-        },
-        label: {
-          text: flight.callsign.length > 9 ? `${flight.callsign.slice(0, 9)}…` : flight.callsign,
-          font: "10px monospace",
-          style: LabelStyle.FILL,
-          fillColor: Color.fromCssColorString("#fabd2f"),
-          showBackground: true,
-          backgroundColor: Color.BLACK.withAlpha(0.65),
-          pixelOffset: new Cartesian2(0, -16),
-          scaleByDistance: new NearFarScalar(2_000_000, 1, 8_000_000, 0),
         },
         properties: {
           kind: "flight",
           callsign: flight.callsign,
+          flightCategory: flight.category,
           velocity: flight.velocity,
           track: flight.trueTrack,
           originCountry: flight.originCountry,

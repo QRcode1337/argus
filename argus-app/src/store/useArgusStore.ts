@@ -4,6 +4,7 @@ import type { IntelBriefing } from "@/lib/intel/analysisEngine";
 import type {
   AnalyticsLayerKey,
   CameraReadout,
+  ClickedCoordinates,
   FeedHealth,
   FeedKey,
   LayerKey,
@@ -85,6 +86,7 @@ type ArgusStore = {
   searchResults: SearchResult[];
   setSearchResults: (results: SearchResult[]) => void;
   sceneMode: SceneMode;
+  clickedCoordinates: ClickedCoordinates | null;
   // DVR Playback
   playbackTime: Date | null;
   playbackSpeed: PlaybackSpeed;
@@ -97,6 +99,7 @@ type ArgusStore = {
   playbackCurrentTime: number;
   setPlaybackCurrentTime: (time: number) => void;
   setSceneMode: (mode: SceneMode) => void;
+  setClickedCoordinates: (coords: ClickedCoordinates | null) => void;
   dayNight: boolean;
   toggleDayNight: () => void;
 };
@@ -140,6 +143,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     fred: emptyFeed(),
     ais: emptyFeed(),
     gdelt: emptyFeed(),
+    threatradar: emptyFeed(),
   },
   activePoiId: null,
   camera: {
@@ -248,8 +252,10 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setSearchQuery: (query) => set({ searchQuery: query }),
   searchResults: [],
   setSearchResults: (results) => set({ searchResults: results }),
-  sceneMode: "globe",
+  sceneMode: "globe_sat",
+  clickedCoordinates: null,
   setSceneMode: (mode) => set({ sceneMode: mode }),
+  setClickedCoordinates: (coords) => set({ clickedCoordinates: coords }),
   // DVR Playback
   playbackTime: null,
   playbackSpeed: 1,

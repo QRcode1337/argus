@@ -8,13 +8,14 @@ export type LayerKey =
   | "outages"
   | "threats"
   | "gdelt";
-export type SceneMode = "globe" | "map";
-export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "cfradar" | "otx" | "fred" | "ais" | "gdelt";
+export type SceneMode = "globe_sat" | "globe_street" | "globe_map" | "flat_map";
+export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "cfradar" | "otx" | "fred" | "ais" | "gdelt" | "threatradar";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
 export type PlatformMode = "live" | "playback" | "analytics";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";
 export type CameraCategory = "Traffic" | "Nature" | "Landmark" | "Wildlife" | "Scenic" | "Infrastructure";
 export type CameraProvider = "TFL" | "Windy" | "Hardcoded";
+export type FlightCategory = "commercial" | "private" | "unknown";
 
 export type NvgVisualParams = {
   gain: number;
@@ -98,6 +99,7 @@ export interface TrackedFlight {
   verticalRate: number | null;
   onGround: boolean;
   squawk: string | null;
+  category: FlightCategory;
 }
 
 export interface PlaybackFlightSnapshot {
@@ -205,6 +207,20 @@ export interface SelectedIntel {
   fullFacts: IntelDatum[];
   imageUrl?: string;
   streamUrl?: string;
+  externalUrl?: string;
+  externalLabel?: string;
+  analysisSummary?: string;
+  coordinates?: {
+    lat: number;
+    lon: number;
+    altMeters?: number | null;
+  };
+}
+
+export interface ClickedCoordinates {
+  lat: number;
+  lon: number;
+  altMeters?: number | null;
 }
 
 export type PlaybackSpeed = 1 | 3 | 5 | 15 | 60;

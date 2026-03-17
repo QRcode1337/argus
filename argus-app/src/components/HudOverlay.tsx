@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { ARGUS_CONFIG, CAMERA_PRESETS } from "@/lib/config";
+import { LIVE_FEEDS } from "@/data/liveFeeds";
 import type { IntelBriefing, AlertSeverity, IntelAlert, ThreatLevel } from "@/lib/intel/analysisEngine";
 import { fetchNewsFeed, type NewsItem, type RegionDigest } from "@/lib/ingest/news";
 import { useArgusStore } from "@/store/useArgusStore";
-import type { LayerKey, PlatformMode, PlaybackSpeed, SelectedIntel, VisualMode } from "@/types/intel";
+import type { ClickedCoordinates, LayerKey, PlatformMode, PlaybackSpeed, SceneMode, SelectedIntel, VisualMode } from "@/types/intel";
 import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
 import { VideoOverlay } from "./VideoOverlay";
 
@@ -34,6 +35,8 @@ type HudOverlayProps = {
   onPlayPause?: () => void;
   onSeek?: (timestampMs: number) => void;
   onPlaybackSpeedChange?: (speed: number) => void;
+  clickedCoordinates: ClickedCoordinates | null;
+  onSelectIntel: (intel: SelectedIntel | null) => void;
 };
 
 type SliderDef = {
@@ -54,11 +57,24 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "gdelt", label: "GDELT Events", feed: "GDELT" },
 ];
 
+const analyticsIntelDefs: { key: LayerKey; label: string; feed: string }[] = [
+  { key: "outages", label: "Internet Outages", feed: "CF Radar" },
+  { key: "threats", label: "Cyber Threats", feed: "OTX" },
+  { key: "gdelt", label: "GDELT Events", feed: "GDELT" },
+];
+
 const modeDefs: { key: VisualMode; label: string }[] = [
   { key: "normal", label: "Normal" },
   { key: "crt", label: "CRT" },
   { key: "nvg", label: "NVG" },
   { key: "flir", label: "FLIR" },
+];
+
+const sceneModeDefs: { key: SceneMode; label: string }[] = [
+  { key: "globe_sat", label: "Globe Sat" },
+  { key: "globe_street", label: "Globe Street" },
+  { key: "flat_map", label: "Flat Map" },
+  { key: "globe_map", label: "Globe Map" },
 ];
 
 const fmtDate = (ts: number | null): string => {
@@ -98,6 +114,7 @@ const workspaceDefs = [
   { id: "feeds", label: "Feeds" },
   { id: "signal", label: "Signal" },
   { id: "status", label: "Status" },
+  { id: "settings", label: "Settings" },
 ] as const;
 
 type WorkspaceId = (typeof workspaceDefs)[number]["id"];
@@ -211,6 +228,8 @@ export function HudOverlay({
   onPlayPause,
   onSeek,
   onPlaybackSpeedChange,
+  clickedCoordinates,
+  onSelectIntel,
 }: HudOverlayProps) {
   const {
     layers,
@@ -261,6 +280,13 @@ export function HudOverlay({
   const [newsMeta, setNewsMeta] = useState<{ dedupedCount: number; fetchedAt: string } | null>(null);
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsError, setNewsError] = useState<string | null>(null);
+  const [llmProvider, setLlmProvider] = useState<"ollama" | "openai_compatible">("ollama");
+  const [llmEndpoint, setLlmEndpoint] = useState("http://localhost:11434");
+  const [llmModel, setLlmModel] = useState("llama3");
+  const [llmApiKey, setLlmApiKey] = useState("");
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
 
   useEffect(() => {
     const syncClock = () => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC"));
@@ -303,6 +329,22 @@ export function HudOverlay({
     };
   }, []);
 
+  useEffect(() => {
+    if (workspace !== "settings" || settingsLoaded) return;
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.llm) {
+          setLlmProvider(data.llm.provider ?? "ollama");
+          setLlmEndpoint(data.llm.endpoint ?? "http://localhost:11434");
+          setLlmModel(data.llm.model ?? "llama3");
+          setLlmApiKey(data.llm.apiKey ?? "");
+        }
+        setSettingsLoaded(true);
+      })
+      .catch(() => {});
+  }, [workspace, settingsLoaded]);
+
   const analyticsLayerDefs: {
     key: "gfs_weather" | "sentinel_imagery";
     label: string;
@@ -310,7 +352,7 @@ export function HudOverlay({
     available: boolean;
   }[] = [
     { key: "gfs_weather", label: "GFS Weather", source: "NOAA GFS", available: true },
-    { key: "sentinel_imagery", label: "Sentinel Imagery", source: "Copernicus", available: false },
+    { key: "sentinel_imagery", label: "Sentinel Imagery", source: "EOX Sentinel-2", available: true },
   ];
 
   const modeLabel = modeDefs.find((mode) => mode.key === visualMode)?.label ?? "Normal";
@@ -439,10 +481,7 @@ export function HudOverlay({
     counts.seismic +
     counts.satellites +
     counts.satelliteLinks +
-    counts.bases +
-    counts.outages +
-    counts.threats +
-    counts.gdelt;
+    counts.bases;
 
   const activeFeedCount = Object.values(feedHealth).filter(
     (fh) => fh.status === "ok",
@@ -458,6 +497,75 @@ export function HudOverlay({
   }, [intelBriefing, alertFilter]);
   const mobileAlertPreview = useMemo(() => mobileAlerts.slice(0, 5), [mobileAlerts]);
   const mobileHeadlinePreview = useMemo(() => filteredNewsItems.slice(0, 8), [filteredNewsItems]);
+  const activeViewLabel = sceneModeDefs.find((mode) => mode.key === sceneMode)?.label ?? sceneMode;
+
+  const selectNewsIntel = (item: NewsItem) => {
+    onSelectIntel({
+      id: `news-${item.id}`,
+      name: item.title,
+      kind: "news",
+      importance: item.score >= 80 ? "important" : "normal",
+      quickFacts: [
+        { label: "Source", value: item.source },
+        { label: "Region", value: item.region },
+        { label: "Published", value: new Date(item.publishedAt).toLocaleString() },
+        { label: "Score", value: item.score.toFixed(1) },
+      ],
+      fullFacts: [
+        { label: "Summary", value: item.summary },
+        { label: "Tags", value: item.tags.join(", ") || "GENERAL" },
+        { label: "URL", value: item.url },
+      ],
+      externalUrl: item.url,
+      externalLabel: "Open Source",
+      analysisSummary: `${item.source} reports ${item.summary || item.title} Region: ${item.region}. Key tags: ${item.tags.join(", ") || "GENERAL"}. Intel score ${item.score.toFixed(1)}.`,
+    });
+  };
+
+  const saveSettings = async () => {
+    try {
+      await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          llm: {
+            provider: llmProvider,
+            endpoint: llmEndpoint,
+            model: llmModel,
+            apiKey: llmApiKey || undefined,
+          },
+        }),
+      });
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 2000);
+    } catch {}
+  };
+
+  const requestAiSummary = async (intel: SelectedIntel) => {
+    if (aiSummaryLoading) return;
+    setAiSummaryLoading(true);
+    try {
+      const text = [
+        intel.name,
+        ...intel.quickFacts.map((f) => `${f.label}: ${f.value}`),
+        ...intel.fullFacts.map((f) => `${f.label}: ${f.value}`),
+      ].join("\n");
+      const res = await fetch("/api/ai/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, context: intel.kind }),
+      });
+      const data = await res.json();
+      if (data.summary) {
+        onSelectIntel({
+          ...intel,
+          analysisSummary: data.summary,
+        });
+      }
+    } catch {} finally {
+      setAiSummaryLoading(false);
+    }
+  };
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 text-[10px] text-[#b8bb26]">
@@ -471,7 +579,7 @@ export function HudOverlay({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[25] hidden h-7 items-center justify-between border-t border-[#3c3836] bg-[#1d2021e6] px-4 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374] md:flex">
         <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: {activeFeedCount}/{feedTotal}</span>
         <span>
-          Region {newsRegionFilter} · {activeRegionDigest?.posture ?? "STABLE"}
+          Region {newsRegionFilter} · {activeRegionDigest?.posture ?? "STABLE"}{clickedCoordinates ? ` · ${clickedCoordinates.lat.toFixed(3)}, ${clickedCoordinates.lon.toFixed(3)}` : ""}
         </span>
       </div>
 
@@ -600,6 +708,12 @@ export function HudOverlay({
             ))}
           </div>
 
+          {selectedIntel.analysisSummary ? (
+            <div className="mt-2 rounded-xl border border-[#5b4a1f] bg-[#2a2415] p-3 font-mono text-[11px] leading-relaxed text-[#f3d98b]">
+              {selectedIntel.analysisSummary}
+            </div>
+          ) : null}
+
           {selectedIntel.importance === "important" || showFullIntel ? (
             <div className="mt-2 max-h-[180px] overflow-auto rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
               {selectedIntel.fullFacts.map((fact) => (
@@ -656,6 +770,16 @@ export function HudOverlay({
             >
               Fly To
             </button>
+            {selectedIntel.externalUrl ? (
+              <a
+                href={selectedIntel.externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={actionButtonClass}
+              >
+                {selectedIntel.externalLabel ?? "External"}
+              </a>
+            ) : null}
             {(selectedIntel.kind === "flight" || selectedIntel.kind === "military" || selectedIntel.kind === "satellite") && (
               <button
                 type="button"
@@ -691,22 +815,16 @@ export function HudOverlay({
             </button>
           ) : null}
 
-          <button
-            type="button"
-            onClick={() => {
-              const summary = [
-                `AI Analysis — ${selectedIntel.name}`,
-                `Type: ${selectedIntel.kind} | ${selectedIntel.importance === "important" ? "Priority" : "Standard"} Target`,
-                "",
-                ...selectedIntel.quickFacts.map((f) => `${f.label}: ${f.value}`),
-                ...(selectedIntel.fullFacts.length ? ["", ...selectedIntel.fullFacts.map((f) => `${f.label}: ${f.value}`)] : []),
-              ].join("\n");
-              alert(summary);
-            }}
-            className="mt-2 w-full rounded-lg border border-[#fabd2f]/40 bg-[#fabd2f]/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#fabd2f] transition hover:border-[#fabd2f] hover:bg-[#fabd2f]/20"
-          >
-            AI Analysis / Summary
-          </button>
+          {!selectedIntel.analysisSummary ? (
+            <button
+              type="button"
+              onClick={() => requestAiSummary(selectedIntel)}
+              disabled={aiSummaryLoading}
+              className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#83a598] transition hover:border-[#83a598] disabled:opacity-50"
+            >
+              {aiSummaryLoading ? "Generating AI Summary..." : "Generate AI Summary"}
+            </button>
+          ) : null}
         </section>
       ) : null}
 
@@ -838,19 +956,28 @@ export function HudOverlay({
                         {new Date(item.publishedAt).toLocaleTimeString()}
                       </span>
                     </div>
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1 block font-mono text-[10px] leading-snug text-[#ebdbb2] hover:text-[#d5c4a1]"
+                    <button
+                      type="button"
+                      onClick={() => selectNewsIntel(item)}
+                      className="mt-1 block w-full text-left font-mono text-[10px] leading-snug text-[#ebdbb2] transition hover:text-[#d5c4a1]"
                     >
                       {item.title}
-                    </a>
+                    </button>
                     <div className="mt-1 flex items-center justify-between gap-2">
                       <span className="truncate font-mono text-[8px] text-[#a89984]">
                         {item.tags.join(" · ")}
                       </span>
-                      <span className="font-mono text-[8px] text-[#83a598]">{item.score.toFixed(1)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[8px] text-[#83a598]">{item.score.toFixed(1)}</span>
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#7298a8] hover:text-[#83a598]"
+                        >
+                          Open
+                        </a>
+                      </div>
                     </div>
                   </article>
                 ))}
@@ -1053,6 +1180,7 @@ export function HudOverlay({
 
           {/* INTEL FEEDS section */}
           {workspace === "feeds" && (
+          <>
           <CollapsibleSection
             title="Intel Feeds"
             badge={platformMode === "analytics" ? "Raster" : `${compact(totalLiveCount)}`}
@@ -1097,10 +1225,54 @@ export function HudOverlay({
                     {analyticsStatus}
                   </div>
                 ) : null}
+
+                <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                  <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">
+                    Intel Analytics Layers
+                  </div>
+                  <div className="space-y-1">
+                    {analyticsIntelDefs.map((layer) => {
+                      const valueMap: Record<LayerKey, number> = {
+                        flights: counts.flights,
+                        military: counts.military,
+                        satellites: counts.satellites,
+                        satelliteLinks: counts.satelliteLinks,
+                        seismic: counts.seismic,
+                        bases: counts.bases,
+                        outages: counts.outages,
+                        threats: counts.threats,
+                        gdelt: counts.gdelt,
+                      };
+                      const value = valueMap[layer.key];
+
+                      return (
+                        <button
+                          key={`analytics-${layer.key}`}
+                          type="button"
+                          onClick={() => toggleLayer(layer.key)}
+                          className="flex w-full items-center justify-between rounded border border-[#3c3836] bg-[#282828] px-2 py-1 text-left transition hover:border-[#83a598]"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate font-mono text-[10px] text-[#ebdbb2]">{layer.label}</div>
+                            <div className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#a89984]">{layer.feed}</div>
+                          </div>
+                          <div className="ml-2 flex items-center gap-2 font-mono text-[9px]">
+                            <span className="text-[#83a598]">{compact(value)}</span>
+                            <span className={layers[layer.key] ? "text-[#d5c4a1]" : "text-[#928374]"}>
+                              {layers[layer.key] ? "On" : "Off"}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-1">
-                {layerDefs.map((layer) => {
+                {layerDefs
+                  .filter((layer) => layer.key !== "outages" && layer.key !== "threats" && layer.key !== "gdelt")
+                  .map((layer) => {
                   const valueMap: Record<LayerKey, number> = {
                     flights: counts.flights,
                     military: counts.military,
@@ -1144,6 +1316,81 @@ export function HudOverlay({
               </div>
             )}
           </CollapsibleSection>
+          {platformMode !== "analytics" ? (
+            <CollapsibleSection title="Live Feeds" badge={`${LIVE_FEEDS.length}`}>
+              <div className="space-y-1">
+                {LIVE_FEEDS.map((feed) => (
+                  <div
+                    key={feed.id}
+                    className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{feed.title}</div>
+                        <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">
+                          {feed.region} · {feed.category}
+                        </div>
+                      </div>
+                      <span className="rounded border border-[#504945] bg-[#282828] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.16em] text-[#83a598]">
+                        Live
+                      </span>
+                    </div>
+                    <div className="mt-2 flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onSelectIntel({
+                            id: `live-feed-${feed.id}`,
+                            name: feed.title,
+                            kind: "live-feed",
+                            importance: "normal",
+                            quickFacts: [
+                              { label: "Region", value: feed.region },
+                              { label: "Category", value: feed.category },
+                            ],
+                            fullFacts: [
+                              { label: "Stream", value: feed.streamUrl },
+                              ...(feed.sourceUrl ? [{ label: "Source", value: feed.sourceUrl }] : []),
+                            ],
+                            streamUrl: feed.streamUrl,
+                            externalUrl: feed.sourceUrl,
+                            externalLabel: "Source",
+                            analysisSummary: `${feed.title} is a live external stream from ${feed.region}. Use this feed for real-time visual context.`,
+                          })
+                        }
+                        className="rounded border border-[#504945] bg-[#282828] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-[#d5c4a1] transition hover:border-[#83a598]"
+                      >
+                        Load Intel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEnlargedStream({
+                            src: feed.streamUrl,
+                            title: feed.title,
+                          })
+                        }
+                        className="rounded border border-[#504945] bg-[#282828] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-[#83a598] transition hover:border-[#83a598]"
+                      >
+                        Enlarge
+                      </button>
+                      {feed.sourceUrl ? (
+                        <a
+                          href={feed.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded border border-[#504945] bg-[#282828] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-[#7298a8] transition hover:border-[#83a598]"
+                        >
+                          Source
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+          ) : null}
+          </>
           )}
 
           {/* SIGNAL section */}
@@ -1189,6 +1436,68 @@ export function HudOverlay({
                 <div>REC 2026-02-12 {fmtDate(recTimestamp || null)}</div>
                 <div>ALT {camera.altMeters.toFixed(0)}m</div>
                 <div>{camera.lat.toFixed(4)}N {camera.lon.toFixed(4)}E</div>
+              </div>
+            </div>
+          </CollapsibleSection>
+          )}
+
+          {workspace === "settings" && (
+          <CollapsibleSection title="LLM Configuration" defaultOpen={true}>
+            <div className="space-y-2">
+              <label className="block">
+                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Provider</span>
+                <select
+                  className={`${controlInputClass} mt-1`}
+                  value={llmProvider}
+                  onChange={(e) => setLlmProvider(e.target.value as "ollama" | "openai_compatible")}
+                >
+                  <option value="ollama">Ollama</option>
+                  <option value="openai_compatible">OpenAI-Compatible</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Endpoint URL</span>
+                <input
+                  type="text"
+                  className={`${controlInputClass} mt-1`}
+                  value={llmEndpoint}
+                  onChange={(e) => setLlmEndpoint(e.target.value)}
+                  placeholder="http://localhost:11434"
+                />
+              </label>
+              <label className="block">
+                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Model</span>
+                <input
+                  type="text"
+                  className={`${controlInputClass} mt-1`}
+                  value={llmModel}
+                  onChange={(e) => setLlmModel(e.target.value)}
+                  placeholder="llama3"
+                />
+              </label>
+              {llmProvider === "openai_compatible" && (
+                <label className="block">
+                  <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">API Key (optional)</span>
+                  <input
+                    type="password"
+                    className={`${controlInputClass} mt-1`}
+                    value={llmApiKey}
+                    onChange={(e) => setLlmApiKey(e.target.value)}
+                    placeholder="sk-..."
+                  />
+                </label>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={saveSettings}
+                  className={actionButtonClass}
+                >
+                  {settingsSaved ? "Saved!" : "Save Settings"}
+                </button>
+              </div>
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">
+                Configure a local LLM (Ollama, LM Studio, etc.) to enable AI-powered intel summaries. Your keys stay on your server.
               </div>
             </div>
           </CollapsibleSection>
@@ -1267,10 +1576,13 @@ export function HudOverlay({
             <select
               className={`${controlInputClass} mt-1`}
               value={sceneMode}
-              onChange={(event) => setSceneMode(event.target.value as "globe" | "map")}
+              onChange={(event) => setSceneMode(event.target.value as SceneMode)}
             >
-              <option value="globe">Globe</option>
-              <option value="map">Map</option>
+              {sceneModeDefs.map((mode) => (
+                <option key={mode.key} value={mode.key}>
+                  {mode.label}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -1605,14 +1917,16 @@ export function HudOverlay({
                             <span className="truncate font-mono text-[8px] uppercase tracking-[0.14em] text-[#a89984]">{item.source}</span>
                             <span className="font-mono text-[8px] text-[#4e6a7a]">{new Date(item.publishedAt).toLocaleTimeString()}</span>
                           </div>
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-1 block font-mono text-[11px] leading-snug text-[#ebdbb2] hover:text-[#d5c4a1]"
+                          <button
+                            type="button"
+                            onClick={() => {
+                              selectNewsIntel(item);
+                              setMobileTab(null);
+                            }}
+                            className="mt-1 block w-full text-left font-mono text-[11px] leading-snug text-[#ebdbb2] hover:text-[#d5c4a1]"
                           >
                             {item.title}
-                          </a>
+                          </button>
                           <p className="mt-1 line-clamp-2 font-mono text-[9px] leading-relaxed text-[#7fb4c5]">{item.summary}</p>
                           <div className="mt-1 flex items-center justify-between gap-2">
                             <span className="truncate font-mono text-[8px] text-[#a89984]">{item.tags.join(" · ")}</span>
@@ -1639,7 +1953,7 @@ export function HudOverlay({
                       </div>
                       <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-2 py-2 text-center">
                         <div className="font-mono text-[8px] uppercase tracking-[0.16em] text-[#a89984]">View</div>
-                        <div className="mt-1 font-mono text-[11px] text-[#ebdbb2]">{sceneMode}</div>
+                        <div className="mt-1 font-mono text-[11px] text-[#ebdbb2]">{activeViewLabel}</div>
                       </div>
                       <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-2 py-2 text-center">
                         <div className="font-mono text-[8px] uppercase tracking-[0.16em] text-[#a89984]">Feeds</div>
@@ -1700,10 +2014,11 @@ export function HudOverlay({
                         <select
                           className={`${controlInputClass} mt-1`}
                           value={sceneMode}
-                          onChange={(event) => setSceneMode(event.target.value as "globe" | "map")}
+                          onChange={(event) => setSceneMode(event.target.value as SceneMode)}
                         >
-                          <option value="globe">Globe</option>
-                          <option value="map">Map</option>
+                          {sceneModeDefs.map((mode) => (
+                            <option key={mode.key} value={mode.key}>{mode.label}</option>
+                          ))}
                         </select>
                       </label>
 

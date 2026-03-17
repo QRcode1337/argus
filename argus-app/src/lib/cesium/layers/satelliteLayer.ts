@@ -14,7 +14,7 @@ import {
 } from "cesium";
 
 import { buildSatelliteLinkTargets } from "@/data/satelliteLinkTargets";
-import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
+import { createIssMarkerSvg, createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
 import { computeOrbitTrack, computeSatellitePositions } from "@/lib/ingest/tle";
 import type { PlaybackSatelliteSnapshot, SatelliteRecord } from "@/types/intel";
 
@@ -36,6 +36,11 @@ export class SatelliteLayer {
     fill: "#99ffca",
     glow: "#ceffe4",
     stroke: "#082015",
+  });
+  private readonly issMarker = createIssMarkerSvg({
+    fill: "#89c2ff",
+    glow: "#cee7ff",
+    stroke: "#0f2d53",
   });
 
   constructor(viewer: Viewer) {
@@ -92,13 +97,14 @@ export class SatelliteLayer {
 
       const record = this.records.find((item) => item.id === sat.id);
       if (!record) continue;
+      const isIss = this.isIssName(sat.name);
 
       const entity = this.viewer.entities.add({
         id: `sat-${sat.id}`,
         position,
         billboard: {
-          image: new ConstantProperty(this.marker),
-          scale: 0.72,
+          image: new ConstantProperty(isIss ? this.issMarker : this.marker),
+          scale: isIss ? 1.05 : 0.72,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.5, 25_000_000, 0.45),
         },
@@ -114,6 +120,7 @@ export class SatelliteLayer {
         properties: {
           kind: "satellite",
           name: sat.name,
+          isIss,
           classification: record.metadata?.objectType ?? "Unknown",
           orbitType: record.metadata?.orbitType ?? "Unknown",
           countryCode: record.metadata?.countryCode ?? "Unknown",
@@ -123,6 +130,8 @@ export class SatelliteLayer {
           inclinationDeg: record.metadata?.inclinationDeg,
           apogeeKm: record.metadata?.apogeeKm,
           perigeeKm: record.metadata?.perigeeKm,
+          sourceUrl: isIss ? "https://www.nasa.gov/international-space-station/" : undefined,
+          streamUrl: isIss ? "https://www.youtube.com/embed/21X5lGlDOfg" : undefined,
         },
       });
 
@@ -173,8 +182,8 @@ export class SatelliteLayer {
         position,
         show: this.visible,
         billboard: {
-          image: new ConstantProperty(this.marker),
-          scale: 0.72,
+          image: new ConstantProperty(this.isIssName(sat.name) ? this.issMarker : this.marker),
+          scale: this.isIssName(sat.name) ? 1.05 : 0.72,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.5, 25_000_000, 0.45),
         },
@@ -190,6 +199,9 @@ export class SatelliteLayer {
         properties: {
           kind: "satellite",
           name: sat.name,
+          isIss: this.isIssName(sat.name),
+          sourceUrl: this.isIssName(sat.name) ? "https://www.nasa.gov/international-space-station/" : undefined,
+          streamUrl: this.isIssName(sat.name) ? "https://www.youtube.com/embed/21X5lGlDOfg" : undefined,
         },
       });
 
@@ -355,5 +367,10 @@ export class SatelliteLayer {
     for (const entity of this.linkEntities.values()) {
       entity.show = visible && this.linksVisible;
     }
+  }
+
+  private isIssName(name: string): boolean {
+    const upper = name.toUpperCase();
+    return upper.includes("ISS") || upper.includes("ZARYA");
   }
 }

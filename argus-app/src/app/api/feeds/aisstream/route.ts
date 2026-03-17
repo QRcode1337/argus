@@ -25,14 +25,58 @@ type AisCache = {
   cachedAt: string;
 };
 
+type RawAisMessage = {
+  Message?: {
+    PositionReport?: {
+      Latitude?: unknown;
+      Longitude?: unknown;
+      UserID?: unknown;
+      MMSI?: unknown;
+      Sog?: unknown;
+      Cog?: unknown;
+      TrueHeading?: unknown;
+      NavigationalStatus?: unknown;
+    };
+  };
+  MetaData?: {
+    MMSI?: unknown;
+    time_utc?: string;
+    time?: string;
+    ShipName?: string;
+    CallSign?: string;
+  };
+};
+
+type WsLike = {
+  on: (event: string, listener: (...args: unknown[]) => void) => void;
+  send: (data: string) => void;
+  close: () => void;
+};
+
+type WsConstructor = new (
+  url: string,
+  options: { handshakeTimeout: number },
+) => WsLike;
+
 let cache: AisCache | null = null;
 
 const REQUEST_TIMEOUT_MS = Number(process.env.AISSTREAM_TIMEOUT_MS ?? 12000);
 const MAX_MESSAGES = Number(process.env.AISSTREAM_MAX_MESSAGES ?? 200);
 
-function normalizeAisMessage(raw: any): AisVessel | null {
-  const position = raw?.Message?.PositionReport;
-  const metadata = raw?.MetaData;
+function rawDataToString(data: unknown): string {
+  if (typeof data === "string") return data;
+  if (data instanceof Buffer) return data.toString("utf8");
+  if (data instanceof ArrayBuffer) return Buffer.from(data).toString("utf8");
+  if (Array.isArray(data) && data.every((item) => item instanceof Buffer)) {
+    return Buffer.concat(data).toString("utf8");
+  }
+  return String(data);
+}
+
+function normalizeAisMessage(raw: unknown): AisVessel | null {
+  const message = raw as RawAisMessage;
+  const position = message?.Message?.PositionReport;
+  const metadata = message?.MetaData;
   if (!position) return null;
 
   const lat = Number(position.Latitude);
@@ -61,8 +105,8 @@ async function fetchSnapshotFromWs(apiKey: string): Promise<AisPayload> {
   process.env.WS_NO_BUFFER_UTIL = "1";
   process.env.WS_NO_UTF_8_VALIDATE = "1";
 
-  const wsModule: any = await import("ws");
-  const WebSocket = wsModule.default ?? wsModule;
+  const wsModule = (await import("ws")) as { default?: WsConstructor };
+  const WebSocket = (wsModule.default ?? (wsModule as unknown as WsConstructor));
 
   return new Promise((resolve, reject) => {
     const vessels = new Map<number, AisVessel>();
@@ -97,9 +141,9 @@ async function fetchSnapshotFromWs(apiKey: string): Promise<AisPayload> {
       );
     });
 
-    ws.on("message", (data: any) => {
+    ws.on("message", (data: unknown) => {
       try {
-        const parsed = JSON.parse(data.toString());
+        const parsed = JSON.parse(rawDataToString(data));
         const vessel = normalizeAisMessage(parsed);
         if (vessel) vessels.set(vessel.mmsi, vessel);
 

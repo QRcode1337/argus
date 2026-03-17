@@ -1,4 +1,4 @@
-import type { OpenSkyState, TrackedFlight } from "@/types/intel";
+import type { FlightCategory, OpenSkyState, TrackedFlight } from "@/types/intel";
 
 const OPEN_SKY_STATE_INDEX = {
   icao24: 0,
@@ -31,6 +31,34 @@ const asStr = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
 const asBool = (value: unknown): boolean => value === true;
+
+const COMMERCIAL_CALLSIGN_PATTERN = /^[A-Z]{2,3}\d{1,4}[A-Z]?$/;
+const PRIVATE_CALLSIGN_PATTERN = /^(N\d{1,5}[A-Z]{0,2}|C[A-Z0-9]{2,5}|G[A-Z0-9]{2,5}|D[A-Z0-9]{2,5}|F[A-Z0-9]{2,5}|HB[A-Z0-9]{1,4}|JA[A-Z0-9]{1,4}|RA[A-Z0-9]{1,4}|VH[A-Z0-9]{1,4}|Z[A-Z0-9]{2,5})$/;
+
+const normalizeCallsign = (value: string | null): string => (value ?? "").replace(/\s+/g, "").toUpperCase();
+
+const classifyFlight = (callsign: string | null, originCountry: string): FlightCategory => {
+  const normalizedCallsign = normalizeCallsign(callsign);
+  if (!normalizedCallsign) return "unknown";
+
+  if (COMMERCIAL_CALLSIGN_PATTERN.test(normalizedCallsign)) {
+    return "commercial";
+  }
+
+  if (
+    PRIVATE_CALLSIGN_PATTERN.test(normalizedCallsign) ||
+    normalizedCallsign.length <= 3 ||
+    normalizedCallsign === originCountry.toUpperCase()
+  ) {
+    return "private";
+  }
+
+  if (/^\d+$/.test(normalizedCallsign)) {
+    return "unknown";
+  }
+
+  return "unknown";
+};
 
 const parseState = (row: unknown[]): OpenSkyState => ({
   icao24: (asStr(row[OPEN_SKY_STATE_INDEX.icao24]) ?? "unknown").toLowerCase(),
@@ -69,17 +97,23 @@ export async function fetchOpenSkyFlights(endpoint: string): Promise<TrackedFlig
   return states
     .map(parseState)
     .filter((state) => state.latitude !== null && state.longitude !== null)
-    .map((state) => ({
-      id: state.icao24,
-      callsign: state.callsign ?? state.icao24.toUpperCase(),
-      latitude: state.latitude as number,
-      longitude: state.longitude as number,
-      altitudeMeters: state.geoAltitude ?? state.baroAltitude ?? 0,
-      trueTrack: state.trueTrack ?? 0,
-      velocity: state.velocity ?? 0,
-      originCountry: state.originCountry,
-      verticalRate: state.verticalRate,
-      onGround: state.onGround,
-      squawk: state.squawk,
-    }));
+    .map((state) => {
+      const callsign = state.callsign ?? state.icao24.toUpperCase();
+      const category = classifyFlight(callsign, state.originCountry);
+
+      return {
+        id: state.icao24,
+        callsign,
+        latitude: state.latitude as number,
+        longitude: state.longitude as number,
+        altitudeMeters: state.geoAltitude ?? state.baroAltitude ?? 0,
+        trueTrack: state.trueTrack ?? 0,
+        velocity: state.velocity ?? 0,
+        originCountry: state.originCountry,
+        verticalRate: state.verticalRate,
+        onGround: state.onGround,
+        squawk: state.squawk,
+        category,
+      };
+    });
 }

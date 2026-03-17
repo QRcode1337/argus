@@ -9,7 +9,7 @@ import { ARGUS_CONFIG } from "@/lib/config";
 import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import type { GdeltEvent } from "@/types/gdelt";
 import { QUAD_CLASS_COLORS, QUAD_CLASS_LABELS } from "@/types/gdelt";
-import type { SelectedIntel } from "@/types/intel";
+import type { ClickedCoordinates, SelectedIntel } from "@/types/intel";
 
 const WORLD_TOPO_URL =
   "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -19,9 +19,10 @@ const MAX_ZOOM = 10;
 
 interface FlatMapViewProps {
   onSelectIntel?: (intel: SelectedIntel | null) => void;
+  onSelectCoordinates?: (coords: ClickedCoordinates) => void;
 }
 
-export function FlatMapView({ onSelectIntel }: FlatMapViewProps) {
+export function FlatMapView({ onSelectIntel, onSelectCoordinates }: FlatMapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -139,6 +140,7 @@ export function FlatMapView({ onSelectIntel }: FlatMapViewProps) {
                 { label: "Region", value: name },
               ],
               fullFacts: [],
+              analysisSummary: `${name} is a manually selected political boundary on the flat map. Use this as a geographic anchor for nearby incidents, flights, and intelligence layers.`,
             });
           });
 
@@ -188,7 +190,7 @@ export function FlatMapView({ onSelectIntel }: FlatMapViewProps) {
 
     void render();
     return () => { cancelled = true; };
-  }, []);
+  }, [onSelectIntel]);
 
   // Zoom via mouse wheel
   useEffect(() => {
@@ -249,7 +251,7 @@ export function FlatMapView({ onSelectIntel }: FlatMapViewProps) {
     onSelectIntel?.({
       id: `gdelt-${event.id}`,
       name: event.actionGeoName || "GDELT Event",
-      kind: "gdelt-event",
+      kind: "gdelt",
       importance: event.quadClass >= 3 ? "important" : "normal",
       quickFacts: [
         { label: "Classification", value: quadLabel },
@@ -266,6 +268,18 @@ export function FlatMapView({ onSelectIntel }: FlatMapViewProps) {
         { label: "Date", value: event.dateAdded },
         ...(event.sourceUrl ? [{ label: "Source", value: event.sourceUrl }] : []),
       ],
+      externalUrl: event.sourceUrl || undefined,
+      externalLabel: event.sourceUrl ? "Source Link" : undefined,
+      analysisSummary: [
+        `${event.actionGeoName || "This location"} registered a ${quadLabel.toLowerCase()} event.`,
+        `Actor flow: ${event.actor1Name || event.actor1Country || "Unknown"} → ${event.actor2Name || event.actor2Country || "Unknown"}.`,
+        `Coverage volume is ${event.numMentions} mentions across ${event.numSources} sources.`,
+        `Goldstein ${event.goldsteinScale.toFixed(1)}, tone ${event.avgTone.toFixed(2)}.`,
+      ].join(" "),
+      coordinates: {
+        lat: event.latitude,
+        lon: event.longitude,
+      },
     });
   }, [onSelectIntel]);
 
@@ -290,6 +304,26 @@ export function FlatMapView({ onSelectIntel }: FlatMapViewProps) {
           className="h-full w-full"
           role="img"
           aria-label="Zoomable world map"
+          onClick={(event) => {
+            const projectionInstance = (svgRef.current as unknown as { __projection?: d3.GeoProjection }).__projection;
+            if (!projectionInstance) return;
+
+            const bounds = svgRef.current?.getBoundingClientRect();
+            if (!bounds) return;
+
+            const viewBox = svgRef.current?.viewBox.baseVal;
+            const scaleX = viewBox && bounds.width ? viewBox.width / bounds.width : 1;
+            const scaleY = viewBox && bounds.height ? viewBox.height / bounds.height : 1;
+            const svgX = (event.clientX - bounds.left) * scaleX;
+            const svgY = (event.clientY - bounds.top) * scaleY;
+            const lonLat = projectionInstance.invert?.([svgX, svgY]);
+            if (!lonLat) return;
+
+            onSelectCoordinates?.({
+              lat: lonLat[1],
+              lon: lonLat[0],
+            });
+          }}
         >
           {gdeltVisible && projection && gdeltEvents.map((event) => {
             const coords = projection([event.longitude, event.latitude]);
