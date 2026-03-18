@@ -74,17 +74,30 @@ export function createIssMarkerSvg(palette: TacticalMarkerPalette): string {
   const glow = sanitize(palette.glow);
   const stroke = sanitize(palette.stroke);
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
     <defs>
       <filter id="g" x="-50%" y="-50%" width="200%" height="200%">
-        <feGaussianBlur stdDeviation="1.3" result="blur"/>
+        <feGaussianBlur stdDeviation="2.5" result="blur"/>
       </filter>
     </defs>
-    <circle cx="15" cy="15" r="10.8" fill="none" stroke="${stroke}" stroke-width="1.2" stroke-opacity="0.7"/>
-    <circle cx="15" cy="15" r="8.3" fill="${fill}" fill-opacity="0.16"/>
-    <circle cx="15" cy="15" r="5.6" fill="${glow}" fill-opacity="0.62" filter="url(#g)"/>
-    <path d="M8 15h14M15 8v14M10 11h10M10 19h10" stroke="${stroke}" stroke-width="0.9" stroke-linecap="round" opacity="0.86"/>
-    <circle cx="15" cy="15" r="1.8" fill="${stroke}"/>
+    <circle cx="24" cy="24" r="22" fill="none" stroke="${fill}" stroke-width="0.8" stroke-opacity="0.35" stroke-dasharray="3 3"/>
+    <circle cx="24" cy="24" r="10" fill="${glow}" fill-opacity="0.25" filter="url(#g)"/>
+    <!-- Solar panel left -->
+    <rect x="3" y="18" width="14" height="12" rx="1.5" fill="${fill}" fill-opacity="0.55" stroke="${stroke}" stroke-width="0.8"/>
+    <line x1="10" y1="18" x2="10" y2="30" stroke="${stroke}" stroke-width="0.5" opacity="0.6"/>
+    <line x1="3" y1="24" x2="17" y2="24" stroke="${stroke}" stroke-width="0.5" opacity="0.6"/>
+    <!-- Solar panel right -->
+    <rect x="31" y="18" width="14" height="12" rx="1.5" fill="${fill}" fill-opacity="0.55" stroke="${stroke}" stroke-width="0.8"/>
+    <line x1="38" y1="18" x2="38" y2="30" stroke="${stroke}" stroke-width="0.5" opacity="0.6"/>
+    <line x1="31" y1="24" x2="45" y2="24" stroke="${stroke}" stroke-width="0.5" opacity="0.6"/>
+    <!-- Truss -->
+    <rect x="17" y="22.5" width="14" height="3" rx="1" fill="${fill}" fill-opacity="0.7" stroke="${stroke}" stroke-width="0.7"/>
+    <!-- Modules -->
+    <rect x="20" y="16" width="8" height="16" rx="2.5" fill="${fill}" fill-opacity="0.8" stroke="${stroke}" stroke-width="0.8"/>
+    <rect x="22" y="13" width="4" height="22" rx="1.5" fill="${glow}" fill-opacity="0.45" stroke="${stroke}" stroke-width="0.6"/>
+    <!-- Center glow -->
+    <circle cx="24" cy="24" r="3" fill="${glow}" fill-opacity="0.9" filter="url(#g)"/>
+    <circle cx="24" cy="24" r="1.5" fill="white" fill-opacity="0.85"/>
   </svg>`;
 
   const encoded = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;

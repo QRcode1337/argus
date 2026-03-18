@@ -104,7 +104,7 @@ export class SatelliteLayer {
         position,
         billboard: {
           image: new ConstantProperty(isIss ? this.issMarker : this.marker),
-          scale: isIss ? 1.05 : 0.72,
+          scale: isIss ? 1.4 : 0.72,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.5, 25_000_000, 0.45),
         },
@@ -131,7 +131,7 @@ export class SatelliteLayer {
           apogeeKm: record.metadata?.apogeeKm,
           perigeeKm: record.metadata?.perigeeKm,
           sourceUrl: isIss ? "https://www.nasa.gov/international-space-station/" : undefined,
-          streamUrl: isIss ? "https://www.youtube.com/embed/21X5lGlDOfg" : undefined,
+          streamUrl: isIss ? "https://www.youtube.com/embed/zPH5KtjJFaQ?autoplay=1&rel=0" : undefined,
         },
       });
 

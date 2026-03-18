@@ -835,7 +835,7 @@ export function HudOverlay({
 
       {/* LEFT SIDEBAR - Collapsible Accordion Panels — desktop only */}
       {sidebarVisible ? (
-        <nav className="pointer-events-auto absolute left-4 top-[8.5rem] hidden w-[260px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md md:block">
+        <nav className="pointer-events-auto absolute left-4 top-[8.5rem] hidden max-h-[calc(100vh-11rem)] w-[260px] overflow-y-auto rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md md:block">
           {/* Sidebar header with hide button */}
           <div className="flex items-center justify-between border-b border-[#3c3836] px-3 py-2">
             <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#a89984]">
