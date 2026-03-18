@@ -4,6 +4,7 @@ import {
   ConstantProperty,
   ConstantPositionProperty,
   Entity,
+  LabelStyle,
   NearFarScalar,
   VerticalOrigin,
   type Viewer,
@@ -75,8 +76,14 @@ export class GdeltLayer {
         },
         label: {
           text: event.actionGeoName.length > 9 ? `${event.actionGeoName.slice(0, 9)}…` : event.actionGeoName,
-          font: "10px monospace",
+          font: "bold 11px monospace",
+          style: LabelStyle.FILL_AND_OUTLINE,
           fillColor: labelColor,
+          outlineColor: Color.BLACK,
+          outlineWidth: 2,
+          showBackground: true,
+          backgroundColor: Color.BLACK.withAlpha(0.55),
+          scaleByDistance: new NearFarScalar(1_000_000, 1.0, 20_000_000, 0.35),
         },
         properties: {
           kind: "gdelt",

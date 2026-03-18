@@ -62,7 +62,7 @@ export class BasesLayer {
         },
         label: {
           text: (() => { const t = `${typeTag} ${base.name}`; return t.length > 9 ? `${t.slice(0, 9)}…` : t; })(),
-          font: "10px monospace",
+          font: "bold 12px monospace",
           style: LabelStyle.FILL,
           fillColor: color,
           showBackground: true,

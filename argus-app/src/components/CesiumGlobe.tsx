@@ -76,8 +76,15 @@ type CesiumGlobeProps = {
 };
 
 type AnalyticsLayer = {
-  variable: string;
-  tile_url: string | null;
+  id: string;
+  label: string;
+  source: string;
+  type: string;
+  tileUrl: string;
+  available: boolean;
+  // legacy fields from old argus-api format
+  variable?: string;
+  tile_url?: string | null;
   source_file?: string | null;
   error?: string | null;
 };
@@ -85,6 +92,8 @@ type AnalyticsLayer = {
 type AnalyticsResponse = {
   layers: AnalyticsLayer[];
   available_file_count?: number;
+  fallback?: boolean;
+  error?: string;
 };
 
 const formatValue = (value: unknown): string => {
@@ -400,6 +409,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const threatLayerRef = useRef<ThreatLayer | null>(null);
   const gdeltLayerRef = useRef<GdeltLayer | null>(null);
   const rasterLayerRef = useRef<RasterLayer | null>(null);
+  const sentinelLayerRef = useRef<RasterLayer | null>(null);
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
   const platformModeRef = useRef<PlatformMode>("live");
@@ -426,8 +436,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const layers = useArgusStore((s) => s.layers);
   const platformMode = useArgusStore((s) => s.platformMode);
   const analyticsLayers = useArgusStore((s) => s.analyticsLayers);
-  const activeGfsCogPath = useArgusStore((s) => s.activeGfsCogPath);
-  const setActiveGfsCogPath = useArgusStore((s) => s.setActiveGfsCogPath);
   const visualMode = useArgusStore((s) => s.visualMode);
   const visualIntensity = useArgusStore((s) => s.visualIntensity);
   const visualParams = useArgusStore((s) => s.visualParams);
@@ -662,6 +670,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const threatLayer = new ThreatLayer(viewer);
     const gdeltLayer = new GdeltLayer(viewer);
     const rasterLayer = new RasterLayer(viewer);
+    const sentinelLayer = new RasterLayer(viewer);
     const visualController = new VisualModeController(viewer);
     const picker = new ScreenSpaceEventHandler(viewer.scene.canvas);
 
@@ -674,6 +683,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     threatLayerRef.current = threatLayer;
     gdeltLayerRef.current = gdeltLayer;
     rasterLayerRef.current = rasterLayer;
+    sentinelLayerRef.current = sentinelLayer;
 
     // Load static bases layer immediately
     const basesCount = basesLayer.load();
@@ -1362,54 +1372,54 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     }
   }, [layers.gdelt, layers.outages, layers.threats, platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
 
-  useEffect(() => {
-    if (platformMode !== "analytics") {
-      return;
-    }
+  // Fetch analytics tile URLs once on mount, store in refs
+  const gfsTileUrlRef = useRef<string | null>(null);
+  const sentinelTileUrlRef = useRef<string | null>(null);
 
+  useEffect(() => {
     void fetch("/api/analytics/layers", { cache: "no-store" })
       .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`Analytics endpoint returned ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Analytics endpoint returned ${response.status}`);
         return response.json() as Promise<AnalyticsResponse>;
       })
       .then((data) => {
-        const gfsLayer = data.layers.find((layer) => layer.variable === "t2m");
-        if (gfsLayer?.tile_url) {
-          setActiveGfsCogPath(gfsLayer.tile_url);
-          setAnalyticsStatus(
-            gfsLayer.source_file
-              ? `Using ${gfsLayer.source_file.split("/").pop()}`
-              : "GFS raster layer ready",
-          );
-          return;
+        for (const layer of data.layers) {
+          if (layer.id === "gfs_precip_radar" || layer.id === "gfs_satellite_ir") {
+            gfsTileUrlRef.current = layer.tileUrl;
+          } else if (layer.id === "sentinel_imagery") {
+            sentinelTileUrlRef.current = layer.tileUrl;
+          }
         }
-
-        setActiveGfsCogPath(null);
-        setAnalyticsStatus(
-          gfsLayer?.error ??
-            "No GFS raster output found yet. Let the ingestor produce a .tif/.tiff tile source.",
-        );
+        setAnalyticsStatus(`${data.layers.filter((l) => l.available).length} raster layers available`);
       })
-      .catch((error) => {
-        setActiveGfsCogPath(null);
-        setAnalyticsStatus(
-          error instanceof Error ? error.message : "Failed to load analytics layer metadata",
-        );
+      .catch(() => {
+        setAnalyticsStatus("Failed to load analytics layer metadata");
       });
-  }, [platformMode, setActiveGfsCogPath]);
+  }, []);
 
+  // Toggle GFS weather raster based on store toggle
   useEffect(() => {
     const rasterLayer = rasterLayerRef.current;
     if (!rasterLayer) return;
 
-    if (platformMode === "analytics" && analyticsLayers.gfs_weather && activeGfsCogPath) {
-      rasterLayer.load(activeGfsCogPath);
+    if (analyticsLayers.gfs_weather && gfsTileUrlRef.current) {
+      rasterLayer.load(gfsTileUrlRef.current);
     } else {
       rasterLayer.unload();
     }
-  }, [platformMode, analyticsLayers.gfs_weather, activeGfsCogPath]);
+  }, [analyticsLayers.gfs_weather]);
+
+  // Toggle Sentinel imagery raster based on store toggle
+  useEffect(() => {
+    const sentinel = sentinelLayerRef.current;
+    if (!sentinel) return;
+
+    if (analyticsLayers.sentinel_imagery && sentinelTileUrlRef.current) {
+      sentinel.load(sentinelTileUrlRef.current);
+    } else {
+      sentinel.unload();
+    }
+  }, [analyticsLayers.sentinel_imagery]);
 
   useEffect(() => {
     if (platformMode === "analytics") {

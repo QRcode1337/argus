@@ -50,7 +50,7 @@ export class ThreatLayer {
         },
         label: {
           text: (() => { const t = topLine; return t.length > 9 ? `${t.slice(0, 9)}…` : t; })(),
-          font: "10px monospace",
+          font: "bold 12px monospace",
           style: LabelStyle.FILL,
           fillColor: Color.fromCssColorString("#ff99bb"),
           showBackground: true,

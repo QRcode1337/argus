@@ -110,7 +110,7 @@ export class SatelliteLayer {
         },
         label: {
           text: sat.name.length > 9 ? `${sat.name.slice(0, 9)}…` : sat.name,
-          font: "10px monospace",
+          font: "bold 12px monospace",
           style: LabelStyle.FILL,
           fillColor: Color.LIME,
           showBackground: true,
@@ -189,7 +189,7 @@ export class SatelliteLayer {
         },
         label: {
           text: sat.name,
-          font: "10px monospace",
+          font: "bold 12px monospace",
           style: LabelStyle.FILL,
           fillColor: Color.LIME,
           showBackground: true,
