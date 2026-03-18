@@ -45,7 +45,7 @@ export function createAirplaneSvg(palette: TacticalMarkerPalette): string {
   const glow = sanitize(palette.glow);
   const stroke = sanitize(palette.stroke);
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
     <defs>
       <filter id="g" x="-50%" y="-50%" width="200%" height="200%">
         <feGaussianBlur stdDeviation="0.9" result="blur"/>

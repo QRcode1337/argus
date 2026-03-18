@@ -939,7 +939,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "cloudflare-radar",
       intervalMs: ARGUS_CONFIG.pollMs.cloudflareRadar,
       run: async () => {
-        if (platformModeRef.current !== "analytics") return;
         try {
           const outages = await fetchInternetOutages(ARGUS_CONFIG.endpoints.cloudflareRadar);
           const count = outageLayer.update(outages);
@@ -956,7 +955,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "otx",
       intervalMs: ARGUS_CONFIG.pollMs.otx,
       run: async () => {
-        if (platformModeRef.current !== "analytics") return;
         try {
           const threats = await fetchThreatPulses(ARGUS_CONFIG.endpoints.otx);
           const count = threatLayer.update(threats);
@@ -973,7 +971,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "fred",
       intervalMs: ARGUS_CONFIG.pollMs.fred,
       run: async () => {
-        if (platformModeRef.current !== "live") return;
         try {
           await fetchFredObservations(ARGUS_CONFIG.endpoints.fred);
           setFeedHealthy("fred");
@@ -987,7 +984,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "aisstream",
       intervalMs: ARGUS_CONFIG.pollMs.aisstream,
       run: async () => {
-        if (platformModeRef.current !== "live") return;
         try {
           await fetchAisSnapshotCount(ARGUS_CONFIG.endpoints.aisstream);
           setFeedHealthy("ais");
@@ -1001,7 +997,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "gdelt",
       intervalMs: ARGUS_CONFIG.pollMs.gdelt,
       run: async () => {
-        if (platformModeRef.current !== "analytics") return;
         try {
           const events = await fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt);
           const count = gdeltLayer.update(events);
