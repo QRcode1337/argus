@@ -1,5 +1,6 @@
 pub mod chaos;
 pub mod flight;
+pub mod seismic;
 pub mod types;
-// Note: seismic and ws modules are added in Tasks 3 and 4
-// Do NOT declare them here yet — the compiler will fail on missing files
+// Note: ws module is added in Task 4
+// Do NOT declare it here yet — the compiler will fail on missing files
