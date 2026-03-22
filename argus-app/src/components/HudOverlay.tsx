@@ -55,6 +55,7 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "outages", label: "Internet Outages", feed: "CF Radar" },
   { key: "threats", label: "Cyber Threats", feed: "OTX" },
   { key: "gdelt", label: "GDELT Events", feed: "GDELT" },
+  { key: "anomalies", label: "Chaos Anomalies", feed: "Phantom" },
 ];
 
 const analyticsIntelDefs: { key: LayerKey; label: string; feed: string }[] = [
