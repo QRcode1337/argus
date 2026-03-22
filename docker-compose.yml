@@ -43,8 +43,10 @@ services:
       - NEXT_PUBLIC_GLITCHTIP_DSN=${NEXT_PUBLIC_GLITCHTIP_DSN}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       - NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-0.05}
+      - NEXT_PUBLIC_PHANTOM_ENDPOINT=http://phantom:7700
     depends_on:
       - argus-api
+      - phantom
     networks:
       - argus_network
     restart: unless-stopped
@@ -124,6 +126,18 @@ services:
       - LOG_LEVEL=INFO
     volumes:
       - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/tiles:/data/tiles
+    networks:
+      - argus_network
+    restart: unless-stopped
+
+  phantom:
+    build: ./phantom
+    container_name: argus_phantom
+    expose:
+      - "7700"
+    environment:
+      - PHANTOM_ADDR=0.0.0.0:7700
+      - RUST_LOG=phantom=info
     networks:
       - argus_network
     restart: unless-stopped
