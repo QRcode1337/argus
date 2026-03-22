@@ -1242,6 +1242,7 @@ export function HudOverlay({
                         outages: counts.outages,
                         threats: counts.threats,
                         gdelt: counts.gdelt,
+                        anomalies: counts.anomalies,
                       };
                       const value = valueMap[layer.key];
 
@@ -1283,6 +1284,7 @@ export function HudOverlay({
                     outages: counts.outages,
                     threats: counts.threats,
                     gdelt: counts.gdelt,
+                    anomalies: counts.anomalies,
                   };
                   const value = valueMap[layer.key];
 

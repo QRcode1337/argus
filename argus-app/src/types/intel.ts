@@ -7,9 +7,10 @@ export type LayerKey =
   | "bases"
   | "outages"
   | "threats"
-  | "gdelt";
+  | "gdelt"
+  | "anomalies";
 export type SceneMode = "globe_sat" | "globe_street" | "globe_map" | "flat_map";
-export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "cfradar" | "otx" | "fred" | "ais" | "gdelt" | "threatradar";
+export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "cfradar" | "otx" | "fred" | "ais" | "gdelt" | "threatradar" | "phantom";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
 export type PlatformMode = "live" | "playback" | "analytics";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";
