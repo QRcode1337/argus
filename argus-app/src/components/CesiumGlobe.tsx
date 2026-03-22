@@ -32,6 +32,7 @@ import { RasterLayer } from "@/lib/cesium/layers/rasterLayer";
 import { BasesLayer } from "@/lib/cesium/layers/basesLayer";
 import { OutageLayer } from "@/lib/cesium/layers/outageLayer";
 import { ThreatLayer } from "@/lib/cesium/layers/threatLayer";
+import { AnomalyLayer } from "@/lib/cesium/layers/anomalyLayer";
 import { SatelliteLayer } from "@/lib/cesium/layers/satelliteLayer";
 import { SeismicLayer } from "@/lib/cesium/layers/seismicLayer";
 import { GdeltLayer } from "@/lib/cesium/layers/gdeltLayer";
@@ -46,6 +47,7 @@ import { fetchThreatPulses } from "@/lib/ingest/otx";
 import { fetchFredObservations } from "@/lib/ingest/fred";
 import { fetchAisSnapshotCount } from "@/lib/ingest/aisstream";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
+import { sendFlightsToPhantom, sendSeismicToPhantom } from "@/lib/ingest/phantom";
 import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import { fetchIssIntel } from "@/lib/ingest/iss";
 import { recordFlights, recordMilitary, recordSatellites, recordQuakes, recordOutages, recordThreats } from "@/lib/ingest/recorder";
@@ -54,9 +56,10 @@ import {
   analyzeMilitary,
   analyzeSatellites,
   analyzeSeismic,
+  analyzePhantomResults,
   generateBriefing,
 } from "@/lib/intel/analysisEngine";
-import type { IntelAlert } from "@/lib/intel/analysisEngine";
+import type { IntelAlert, PhantomAnomaly } from "@/lib/intel/analysisEngine";
 import { useArgusStore } from "@/store/useArgusStore";
 import type { SearchResult } from "@/store/useArgusStore";
 import type {
@@ -410,6 +413,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const gdeltLayerRef = useRef<GdeltLayer | null>(null);
   const rasterLayerRef = useRef<RasterLayer | null>(null);
   const sentinelLayerRef = useRef<RasterLayer | null>(null);
+  const anomalyLayerRef = useRef<AnomalyLayer | null>(null);
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
   const platformModeRef = useRef<PlatformMode>("live");
@@ -423,6 +427,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const militaryAlertsRef = useRef<IntelAlert[]>([]);
   const satelliteAlertsRef = useRef<IntelAlert[]>([]);
   const seismicAlertsRef = useRef<IntelAlert[]>([]);
+  const phantomAlertsRef = useRef<IntelAlert[]>([]);
+  const phantomRawRef = useRef<PhantomAnomaly[]>([]);
 
   const [selectedIntel, setSelectedIntel] = useState<SelectedIntel | null>(null);
   const [showFullIntel, setShowFullIntel] = useState(false);
@@ -717,6 +723,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const outageLayer = new OutageLayer(viewer);
     const threatLayer = new ThreatLayer(viewer);
     const gdeltLayer = new GdeltLayer(viewer);
+    const anomalyLayer = new AnomalyLayer(viewer);
     const rasterLayer = new RasterLayer(viewer);
     const sentinelLayer = new RasterLayer(viewer);
     const visualController = new VisualModeController(viewer);
@@ -730,6 +737,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     outageLayerRef.current = outageLayer;
     threatLayerRef.current = threatLayer;
     gdeltLayerRef.current = gdeltLayer;
+    anomalyLayerRef.current = anomalyLayer;
     rasterLayerRef.current = rasterLayer;
     sentinelLayerRef.current = sentinelLayer;
 
@@ -910,6 +918,28 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setFeedHealthy("opensky");
           flightAlertsRef.current = analyzeFlights(bounded);
           recordFlights(bounded);
+
+          // Phantom anomaly detection (non-blocking)
+          sendFlightsToPhantom(ARGUS_CONFIG.endpoints.phantom, bounded)
+            .then((anomalies) => {
+              if (anomalies.length > 0) {
+                phantomAlertsRef.current = [
+                  ...phantomAlertsRef.current.filter(
+                    (a) => Date.now() - a.timestamp < 60_000,
+                  ),
+                  ...analyzePhantomResults(anomalies),
+                ];
+                phantomRawRef.current = anomalies;
+                if (useArgusStore.getState().layers.anomalies) {
+                  anomalyLayer.update(anomalies);
+                  setCount("anomalies", anomalies.length);
+                }
+                setFeedHealthy("phantom");
+              }
+            })
+            .catch(() => {
+              // Phantom is optional — don't set feed error on every miss
+            });
         } catch (error) {
           setFeedError(
             "opensky",
@@ -987,6 +1017,31 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setFeedHealthy("usgs");
           seismicAlertsRef.current = analyzeSeismic(count);
           recordQuakes(quakes);
+
+          // Phantom seismic anomaly detection (non-blocking)
+          sendSeismicToPhantom(ARGUS_CONFIG.endpoints.phantom, quakes)
+            .then((anomalies) => {
+              if (anomalies.length > 0) {
+                phantomAlertsRef.current = [
+                  ...phantomAlertsRef.current.filter(
+                    (a) => Date.now() - a.timestamp < 300_000,
+                  ),
+                  ...analyzePhantomResults(anomalies),
+                ];
+                phantomRawRef.current = [
+                  ...phantomRawRef.current.filter(
+                    (a) => a.anomaly_type !== "magnitude_chaos" && a.anomaly_type !== "depth_cluster_chaos",
+                  ),
+                  ...anomalies,
+                ];
+                if (useArgusStore.getState().layers.anomalies) {
+                  anomalyLayer.update(phantomRawRef.current);
+                  setCount("anomalies", phantomRawRef.current.length);
+                }
+                setFeedHealthy("phantom");
+              }
+            })
+            .catch(() => {});
         } catch (error) {
           setFeedError("usgs", error instanceof Error ? error.message : "Failed to fetch USGS");
         }
@@ -1265,6 +1320,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         ...militaryAlertsRef.current,
         ...satelliteAlertsRef.current,
         ...seismicAlertsRef.current,
+        ...phantomAlertsRef.current,
       ];
 
       const briefing = generateBriefing(allAlerts);
@@ -1359,6 +1415,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       outageLayerRef.current?.setVisible(layers.outages);
       threatLayerRef.current?.setVisible(layers.threats);
       gdeltLayerRef.current?.setVisible(layers.gdelt);
+      anomalyLayerRef.current?.setVisible(layers.anomalies);
     } else if (platformMode === "playback") {
       const { layers } = useArgusStore.getState();
 
@@ -1371,6 +1428,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       outageLayerRef.current?.setVisible(false);
       threatLayerRef.current?.setVisible(false);
       gdeltLayerRef.current?.setVisible(false);
+      anomalyLayerRef.current?.setVisible(false);
       setIsPlaying(false);
 
       void fetch("/api/playback/range", { cache: "no-store" })
@@ -1417,8 +1475,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       outageLayerRef.current?.setVisible(false);
       threatLayerRef.current?.setVisible(false);
       gdeltLayerRef.current?.setVisible(false);
+      anomalyLayerRef.current?.setVisible(false);
     }
-  }, [layers.gdelt, layers.outages, layers.threats, platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
+  }, [layers.gdelt, layers.outages, layers.threats, layers.anomalies, platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
 
   // Fetch analytics tile URLs once on mount, store in refs
   const gfsTileUrlRef = useRef<string | null>(null);
@@ -1480,6 +1539,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       outageLayerRef.current?.setVisible(layers.outages);
       threatLayerRef.current?.setVisible(layers.threats);
       gdeltLayerRef.current?.setVisible(layers.gdelt);
+      anomalyLayerRef.current?.setVisible(layers.anomalies);
       return;
     }
 
@@ -1492,6 +1552,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     outageLayerRef.current?.setVisible(false);
     threatLayerRef.current?.setVisible(false);
     gdeltLayerRef.current?.setVisible(false);
+    anomalyLayerRef.current?.setVisible(false);
   }, [
     platformMode,
     layers.bases,

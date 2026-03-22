@@ -5,7 +5,7 @@ import type { MilitaryFlight, TrackedFlight } from "@/types/intel";
 // ---------------------------------------------------------------------------
 
 export type AlertSeverity = "INFO" | "WARNING" | "CRITICAL";
-export type AlertCategory = "FLIGHT" | "MILITARY" | "SATELLITE" | "SEISMIC" | "CAMERA";
+export type AlertCategory = "FLIGHT" | "MILITARY" | "SATELLITE" | "SEISMIC" | "CAMERA" | "PHANTOM";
 export type ThreatLevel = "GREEN" | "AMBER" | "RED";
 
 export interface IntelAlert {
@@ -381,6 +381,42 @@ export function analyzeSeismic(count: number): IntelAlert[] {
 }
 
 // ---------------------------------------------------------------------------
+// Phantom Anomaly Analysis
+// ---------------------------------------------------------------------------
+
+export interface PhantomAnomaly {
+  entity_id: string;
+  anomaly_type: string;
+  chaos_score: number;
+  severity: "Low" | "Medium" | "High" | "Critical";
+  lat: number;
+  lon: number;
+  detail: string;
+  detected_at: string;
+}
+
+const PHANTOM_SEVERITY_MAP: Record<string, AlertSeverity> = {
+  Critical: "CRITICAL",
+  High: "WARNING",
+  Medium: "WARNING",
+  Low: "INFO",
+};
+
+export function analyzePhantomResults(anomalies: PhantomAnomaly[]): IntelAlert[] {
+  const now = Date.now();
+  return anomalies.map((a) => ({
+    id: nextAlertId(),
+    severity: PHANTOM_SEVERITY_MAP[a.severity] ?? "INFO",
+    category: "PHANTOM" as AlertCategory,
+    title: `CHAOS ANOMALY — ${a.anomaly_type.toUpperCase().replace(/_/g, " ")}`,
+    detail: a.detail,
+    timestamp: now,
+    coordinates: { lat: a.lat, lon: a.lon },
+    entityId: a.entity_id,
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // Briefing Generator
 // ---------------------------------------------------------------------------
 
@@ -413,6 +449,7 @@ export function generateBriefing(alerts: IntelAlert[]): IntelBriefing {
     SATELLITE: 0.8,
     SEISMIC: 1.1,
     CAMERA: 0.7,
+    PHANTOM: 1.3,
   };
 
   const riskScore = Math.round(
