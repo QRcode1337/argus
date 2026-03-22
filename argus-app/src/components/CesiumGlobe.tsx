@@ -47,7 +47,6 @@ import { fetchThreatPulses } from "@/lib/ingest/otx";
 import { fetchFredObservations } from "@/lib/ingest/fred";
 import { fetchAisSnapshotCount } from "@/lib/ingest/aisstream";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
-import { sendFlightsToPhantom, sendSeismicToPhantom } from "@/lib/ingest/phantom";
 import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import { fetchIssIntel } from "@/lib/ingest/iss";
 import { recordFlights, recordMilitary, recordSatellites, recordQuakes, recordOutages, recordThreats } from "@/lib/ingest/recorder";
@@ -919,9 +918,20 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           flightAlertsRef.current = analyzeFlights(bounded);
           recordFlights(bounded);
 
-          // Phantom anomaly detection (non-blocking)
-          sendFlightsToPhantom(ARGUS_CONFIG.endpoints.phantom, bounded)
-            .then((anomalies) => {
+          // Phantom anomaly detection (non-blocking, via server proxy)
+          fetch("/api/phantom/flight", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ flights: bounded.map((f) => ({
+              flight_id: f.id, callsign: f.callsign,
+              lat: f.latitude, lon: f.longitude,
+              altitude: f.altitudeMeters, velocity: f.velocity,
+              timestamp: Date.now() / 1000,
+            })) }),
+            signal: AbortSignal.timeout(5000),
+          })
+            .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
+            .then(({ anomalies }: { anomalies: PhantomAnomaly[] }) => {
               if (anomalies.length > 0) {
                 phantomAlertsRef.current = [
                   ...phantomAlertsRef.current.filter(
@@ -1018,9 +1028,19 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           seismicAlertsRef.current = analyzeSeismic(count);
           recordQuakes(quakes);
 
-          // Phantom seismic anomaly detection (non-blocking)
-          sendSeismicToPhantom(ARGUS_CONFIG.endpoints.phantom, quakes)
-            .then((anomalies) => {
+          // Phantom seismic anomaly detection (non-blocking, via server proxy)
+          fetch("/api/phantom/seismic", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ events: quakes.map((q) => ({
+              id: q.id, lat: q.latitude, lon: q.longitude,
+              magnitude: q.magnitude, depth_km: q.depthKm,
+              timestamp: q.timestamp / 1000,
+            })) }),
+            signal: AbortSignal.timeout(5000),
+          })
+            .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
+            .then(({ anomalies }: { anomalies: PhantomAnomaly[] }) => {
               if (anomalies.length > 0) {
                 phantomAlertsRef.current = [
                   ...phantomAlertsRef.current.filter(
