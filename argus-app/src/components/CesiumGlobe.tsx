@@ -535,10 +535,40 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     if (!viewer || !selectedIntel) return;
 
     const entity = viewer.entities.getById(selectedIntel.id);
-    if (!entity) return;
+
+    // Fallback for intel items that are not Cesium entities (e.g. live feeds/news)
+    if (!entity) {
+      if (!selectedIntel.coordinates) return;
+
+      const cameraAlt = viewer.camera.positionCartographic.height;
+      const targetAlt = Math.max(cameraAlt, 500_000);
+      viewer.camera.flyTo({
+        destination: Cartesian3.fromDegrees(
+          selectedIntel.coordinates.lon,
+          selectedIntel.coordinates.lat,
+          targetAlt,
+        ),
+        duration: 1.5,
+      });
+      return;
+    }
 
     const position = entity.position?.getValue(JulianDate.now());
-    if (!position) return;
+    if (!position) {
+      if (!selectedIntel.coordinates) return;
+
+      const cameraAlt = viewer.camera.positionCartographic.height;
+      const targetAlt = Math.max(cameraAlt, 500_000);
+      viewer.camera.flyTo({
+        destination: Cartesian3.fromDegrees(
+          selectedIntel.coordinates.lon,
+          selectedIntel.coordinates.lat,
+          targetAlt,
+        ),
+        duration: 1.5,
+      });
+      return;
+    }
 
     const cameraAlt = viewer.camera.positionCartographic.height;
     const targetAlt = Math.max(cameraAlt, 50_000);

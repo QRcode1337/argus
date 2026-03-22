@@ -1338,7 +1338,7 @@ export function HudOverlay({
                     <div className="mt-2 flex gap-1.5">
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
                           onSelectIntel({
                             id: `live-feed-${feed.id}`,
                             name: feed.title,
@@ -1356,8 +1356,16 @@ export function HudOverlay({
                             externalUrl: feed.sourceUrl,
                             externalLabel: "Source",
                             analysisSummary: `${feed.title} is a live external stream from ${feed.region}. Use this feed for real-time visual context.`,
-                          })
-                        }
+                            ...(feed.lat != null && feed.lon != null
+                              ? { coordinates: { lat: feed.lat, lon: feed.lon } }
+                              : {}),
+                          });
+                          if (feed.lat != null && feed.lon != null) {
+                            // Ensure the globe is visible before flying to feed coordinates.
+                            setSceneMode("globe_sat");
+                            onFlyToCoordinates(feed.lat, feed.lon);
+                          }
+                        }}
                         className="rounded border border-[#504945] bg-[#282828] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-[#d5c4a1] transition hover:border-[#83a598]"
                       >
                         Load Intel
