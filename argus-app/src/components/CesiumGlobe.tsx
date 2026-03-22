@@ -46,6 +46,7 @@ import { fetchThreatPulses } from "@/lib/ingest/otx";
 import { fetchFredObservations } from "@/lib/ingest/fred";
 import { fetchAisSnapshotCount } from "@/lib/ingest/aisstream";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
+import { sendFlightsToPhantom, sendSeismicToPhantom } from "@/lib/ingest/phantom";
 import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import { fetchIssIntel } from "@/lib/ingest/iss";
 import { recordFlights, recordMilitary, recordSatellites, recordQuakes, recordOutages, recordThreats } from "@/lib/ingest/recorder";
@@ -54,6 +55,7 @@ import {
   analyzeMilitary,
   analyzeSatellites,
   analyzeSeismic,
+  analyzePhantomResults,
   generateBriefing,
 } from "@/lib/intel/analysisEngine";
 import type { IntelAlert } from "@/lib/intel/analysisEngine";
@@ -423,6 +425,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const militaryAlertsRef = useRef<IntelAlert[]>([]);
   const satelliteAlertsRef = useRef<IntelAlert[]>([]);
   const seismicAlertsRef = useRef<IntelAlert[]>([]);
+  const phantomAlertsRef = useRef<IntelAlert[]>([]);
 
   const [selectedIntel, setSelectedIntel] = useState<SelectedIntel | null>(null);
   const [showFullIntel, setShowFullIntel] = useState(false);
@@ -910,6 +913,23 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setFeedHealthy("opensky");
           flightAlertsRef.current = analyzeFlights(bounded);
           recordFlights(bounded);
+
+          // Phantom anomaly detection (non-blocking)
+          sendFlightsToPhantom(ARGUS_CONFIG.endpoints.phantom, bounded)
+            .then((anomalies) => {
+              if (anomalies.length > 0) {
+                phantomAlertsRef.current = [
+                  ...phantomAlertsRef.current.filter(
+                    (a) => Date.now() - a.timestamp < 60_000,
+                  ),
+                  ...analyzePhantomResults(anomalies),
+                ];
+                setFeedHealthy("phantom");
+              }
+            })
+            .catch(() => {
+              // Phantom is optional — don't set feed error on every miss
+            });
         } catch (error) {
           setFeedError(
             "opensky",
@@ -987,6 +1007,21 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setFeedHealthy("usgs");
           seismicAlertsRef.current = analyzeSeismic(count);
           recordQuakes(quakes);
+
+          // Phantom seismic anomaly detection (non-blocking)
+          sendSeismicToPhantom(ARGUS_CONFIG.endpoints.phantom, quakes)
+            .then((anomalies) => {
+              if (anomalies.length > 0) {
+                phantomAlertsRef.current = [
+                  ...phantomAlertsRef.current.filter(
+                    (a) => Date.now() - a.timestamp < 300_000,
+                  ),
+                  ...analyzePhantomResults(anomalies),
+                ];
+                setFeedHealthy("phantom");
+              }
+            })
+            .catch(() => {});
         } catch (error) {
           setFeedError("usgs", error instanceof Error ? error.message : "Failed to fetch USGS");
         }
@@ -1265,6 +1300,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         ...militaryAlertsRef.current,
         ...satelliteAlertsRef.current,
         ...seismicAlertsRef.current,
+        ...phantomAlertsRef.current,
       ];
 
       const briefing = generateBriefing(allAlerts);
