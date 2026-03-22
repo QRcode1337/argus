@@ -155,6 +155,7 @@ CREATE TABLE anomaly_streams (
 - **Testing + Deployment:** 1-2 hours
 
 ## Notes
+- Phantom source: https://github.com/QRcode1337/phantom
 - Phantom is compiled and ready (~/Documents/PROJECTS/phantom/)
 - ARGUS feeds already live (no setup needed)
 - Use PostGIS for spatial queries (already in VPS backend)

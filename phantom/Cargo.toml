@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Anomaly detection engine for ARGUS geospatial, weather markets, and price regime changes"
 license = "MIT"
+repository = "https://github.com/QRcode1337/phantom"
 
 [[bin]]
 name = "phantom"
