@@ -23,6 +23,7 @@ services:
         NEXT_PUBLIC_TITILER_URL: /tiles
         NEXT_PUBLIC_GLITCHTIP_DSN: ${NEXT_PUBLIC_GLITCHTIP_DSN}
         NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: ${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-0.05}
+        NEXT_PUBLIC_PHANTOM_ENDPOINT: http://phantom:7700
     container_name: argus_app
     expose:
       - "3000"
