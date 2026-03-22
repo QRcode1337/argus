@@ -540,6 +540,12 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     if (!entity) {
       if (!selectedIntel.coordinates) return;
 
+      setClickedCoordinates({
+        lat: selectedIntel.coordinates.lat,
+        lon: selectedIntel.coordinates.lon,
+        altMeters: selectedIntel.coordinates.altMeters ?? null,
+      });
+
       const cameraAlt = viewer.camera.positionCartographic.height;
       const targetAlt = Math.max(cameraAlt, 500_000);
       viewer.camera.flyTo({
@@ -556,6 +562,12 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const position = entity.position?.getValue(JulianDate.now());
     if (!position) {
       if (!selectedIntel.coordinates) return;
+
+      setClickedCoordinates({
+        lat: selectedIntel.coordinates.lat,
+        lon: selectedIntel.coordinates.lon,
+        altMeters: selectedIntel.coordinates.altMeters ?? null,
+      });
 
       const cameraAlt = viewer.camera.positionCartographic.height;
       const targetAlt = Math.max(cameraAlt, 500_000);
@@ -574,6 +586,12 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const targetAlt = Math.max(cameraAlt, 50_000);
     const cartographic = Cartographic.fromCartesian(position);
 
+    setClickedCoordinates({
+      lat: CesiumMath.toDegrees(cartographic.latitude),
+      lon: CesiumMath.toDegrees(cartographic.longitude),
+      altMeters: cartographic.height,
+    });
+
     viewer.camera.flyTo({
       destination: Cartesian3.fromRadians(
         cartographic.longitude,
@@ -582,7 +600,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       ),
       duration: 1.5,
     });
-  }, [selectedIntel]);
+  }, [selectedIntel, setClickedCoordinates]);
 
   const handleTrackEntity = useCallback(
     (entityId: string | null) => {

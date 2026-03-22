@@ -29,6 +29,7 @@ export function FlatMapView({ onSelectIntel, onSelectCoordinates }: FlatMapViewP
   const [gdeltEvents, setGdeltEvents] = useState<GdeltEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const gdeltVisible = useArgusStore((s) => s.layers.gdelt);
+  const clickedCoordinates = useArgusStore((s) => s.clickedCoordinates);
 
   // zoom/pan state
   const zoomRef = useRef(1);
@@ -245,6 +246,30 @@ export function FlatMapView({ onSelectIntel, onSelectCoordinates }: FlatMapViewP
   }, [applyTransform]);
 
   const [hoveredEvent, setHoveredEvent] = useState<string | null>(null);
+
+  // Recenter flat map whenever coordinates are selected elsewhere (e.g. Live Feed -> Load Intel / Fly To)
+  useEffect(() => {
+    if (!clickedCoordinates) return;
+
+    const projectionInstance = (svgRef.current as unknown as { __projection?: d3.GeoProjection }).__projection;
+    const container = containerRef.current;
+    if (!projectionInstance || !container) return;
+
+    const projected = projectionInstance([clickedCoordinates.lon, clickedCoordinates.lat]);
+    if (!projected) return;
+
+    const [x, y] = projected;
+    const bounds = container.getBoundingClientRect();
+
+    // Ensure target is visible and centered; keep some zoom for context.
+    const targetZoom = Math.max(zoomRef.current, 2.2);
+    zoomRef.current = targetZoom;
+    panRef.current = {
+      x: bounds.width / 2 - x * targetZoom,
+      y: bounds.height / 2 - y * targetZoom,
+    };
+    applyTransform();
+  }, [applyTransform, clickedCoordinates]);
 
   const handleEventClick = useCallback((event: GdeltEvent) => {
     const quadLabel = QUAD_CLASS_LABELS[event.quadClass] ?? "Unknown";
