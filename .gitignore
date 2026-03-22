@@ -27,3 +27,5 @@ certbot/duckdns.ini
 logs/
 .brv/
 node_modules/
+.vercel
+phantom/target/
