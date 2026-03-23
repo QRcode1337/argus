@@ -7,14 +7,23 @@ import { readSettings } from "@/lib/settings";
  * Returns PNEUMA's current cognitive state for the HUD overlay.
  */
 
-// Local singleton for the HUD route.
-let pneumaInstance: any = null;
+type PneumaHudInstance = {
+  initialize: () => void;
+  isInitialized: boolean;
+  getPhiRouter: () => { getLatestPhi: () => { value: number } | null };
+  getMoodRegime: () => { currentRegime?: string };
+  getMemoryGraph: () => { size: number };
+  getCycleCount: () => number;
+};
 
-async function getPneumaInstance(): Promise<any> {
+// Local singleton for the HUD route.
+let pneumaInstance: PneumaHudInstance | null = null;
+
+async function getPneumaInstance(): Promise<PneumaHudInstance | null> {
   if (!pneumaInstance) {
     try {
       const { PNEUMA } = await import("@/lib/pneuma/pneuma");
-      pneumaInstance = new PNEUMA();
+      pneumaInstance = new PNEUMA() as PneumaHudInstance;
       pneumaInstance.initialize();
     } catch {
       return null;

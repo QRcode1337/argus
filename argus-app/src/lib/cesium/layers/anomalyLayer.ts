@@ -66,6 +66,18 @@ export class AnomalyLayer {
           pixelOffset: new Cartesian2(0, -18),
           scaleByDistance: new NearFarScalar(500_000, 0.85, 8_000_000, 0),
         },
+        properties: {
+          kind: "anomaly",
+          entity_id: anomaly.entity_id,
+          anomaly_type: anomaly.anomaly_type,
+          chaos_score: anomaly.chaos_score,
+          severity: anomaly.severity,
+          lat: anomaly.lat,
+          lon: anomaly.lon,
+          detail: anomaly.detail,
+          detected_at: anomaly.detected_at,
+          name: label,
+        },
       });
       this.entities.set(entityId, entity);
     }
