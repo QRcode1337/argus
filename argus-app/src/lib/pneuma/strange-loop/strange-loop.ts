@@ -196,6 +196,16 @@ export class StrangeLoop {
       });
     }
 
+    // Fallback: if no candidate passed all gates, select the best-scoring
+    // candidate anyway rather than returning nothing. This prevents empty
+    // responses during early cycles when Phi history is thin.
+    if (!selectedResponse && candidates.length > 0) {
+      const fallbackScored = candidates
+        .map(c => ({ candidate: c, composite: this.compositeScore(c, defenseActivations) }))
+        .sort((a, b) => b.composite - a.composite);
+      selectedResponse = fallbackScored[0].candidate;
+    }
+
     const totalTimeMs = performance.now() - startTime;
 
     return {
