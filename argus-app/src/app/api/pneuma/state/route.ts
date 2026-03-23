@@ -1,36 +1,13 @@
 import { NextResponse } from "next/server";
 import { readSettings } from "@/lib/settings";
+import { getPneumaInstance } from "@/lib/ai/llmClient";
 
 /**
  * GET /api/pneuma/state
  *
  * Returns PNEUMA's current cognitive state for the HUD overlay.
+ * Reads from the same singleton instance used by /api/ai/summarize.
  */
-
-type PneumaHudInstance = {
-  initialize: () => void;
-  isInitialized: boolean;
-  getPhiRouter: () => { getLatestPhi: () => { value: number } | null };
-  getMoodRegime: () => { currentRegime?: string };
-  getMemoryGraph: () => { size: number };
-  getCycleCount: () => number;
-};
-
-// Local singleton for the HUD route.
-let pneumaInstance: PneumaHudInstance | null = null;
-
-async function getPneumaInstance(): Promise<PneumaHudInstance | null> {
-  if (!pneumaInstance) {
-    try {
-      const { PNEUMA } = await import("@/lib/pneuma/pneuma");
-      pneumaInstance = new PNEUMA() as PneumaHudInstance;
-      pneumaInstance.initialize();
-    } catch {
-      return null;
-    }
-  }
-  return pneumaInstance;
-}
 
 export async function GET() {
   const { llm } = await readSettings();
@@ -46,9 +23,14 @@ export async function GET() {
     });
   }
 
-  const pneuma = await getPneumaInstance();
+  let pneuma: any;
+  try {
+    pneuma = await getPneumaInstance();
+  } catch {
+    pneuma = null;
+  }
 
-  if (!pneuma) {
+  if (!pneuma || !pneuma.isInitialized) {
     return NextResponse.json({
       isActive: true,
       phi: 0,
