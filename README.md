@@ -40,6 +40,7 @@ All services communicate on `argus_network`.
 2. `cloudflared` forwards traffic to `nginx`.
 3. `nginx` routes:
    - `/` -> `argus-app`
+   - `/spatial/*` -> Zerve-hosted spatial FastAPI app
    - `/api/feeds/*` -> `argus-app` proxy routes
    - `/api/*` -> `argus-api`
    - `/tiles/*` -> `titiler`
@@ -156,6 +157,8 @@ Important keys include (non-exhaustive):
 - `FRED_API_KEY`, `FRED_SERIES_ID`
 - `AISSTREAM_API_KEY`, `AISSTREAM_ENDPOINT`
 - `OPENSKY_CLIENT_ID`, `OPENSKY_CLIENT_SECRET`
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
+- `CORS_ORIGIN` (comma-separated allowlist for `argus-api`)
 - GlitchTip / Sentry DSNs
 
 Do not commit secret-bearing files. `.gitignore` excludes local env variants.
