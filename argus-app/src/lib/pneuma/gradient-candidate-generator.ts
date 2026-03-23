@@ -205,17 +205,17 @@ export class GradientCandidateGenerator {
 
   constructor(config: GradientCandidateGeneratorConfig = {}) {
     this.modelAccessKey =
-      config.modelAccessKey ?? process.env.GRADIENT_MODEL_ACCESS_KEY ?? '';
+      config.modelAccessKey ?? process.env.GRADIENT_ENDPOINT_ACCESS_KEY ?? process.env.GRADIENT_MODEL_ACCESS_KEY ?? '';
 
     if (!this.modelAccessKey) {
       throw new Error(
-        'GradientCandidateGenerator requires a model access key. ' +
-          'Set GRADIENT_MODEL_ACCESS_KEY env var or pass modelAccessKey in config.',
+        'GradientCandidateGenerator requires an endpoint access key. ' +
+          'Set GRADIENT_ENDPOINT_ACCESS_KEY env var or pass modelAccessKey in config.',
       );
     }
 
-    this.baseUrl = 'https://cluster-api.do-ai.run/v1';
-    this.model = config.model ?? 'openai-gpt-oss-120b';
+    this.baseUrl = process.env.GRADIENT_BASE_URL ?? 'https://uwziiweo6bvm7fyvapqsmdxp.agents.do-ai.run/api/v1';
+    this.model = config.model ?? '';
     this.embedder = new LocalEmbedder(
       config.embeddingDim ?? 128,
       config.embeddingSeed ?? 42,
@@ -310,7 +310,7 @@ export class GradientCandidateGenerator {
             'Authorization': `Bearer ${this.modelAccessKey}`,
           },
           body: JSON.stringify({
-            model: this.model,
+            ...(this.model ? { model: this.model } : {}),
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userInput },
