@@ -9,7 +9,7 @@
 ## Tech Stack
 
 - TypeScript, Next.js 14 (App Router), React, Cesium.js, D3.js
-- Docker deployment on Raspberry Pi
+- Docker deployment droplet
 - Vercel for production hosting at argusweb.space (Cloudflare Tunnel)
 - Always run `npx tsc --noEmit` or `npx next build` after significant changes to verify nothing is broken.
 
