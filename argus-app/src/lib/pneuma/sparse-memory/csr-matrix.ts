@@ -10,7 +10,7 @@
  * for cache-friendly traversal during Forward Push.
  */
 
-import type { CSRMatrix } from '../types/index.js';
+import type { CSRMatrix } from '../types/index';
 
 /**
  * A single weighted edge for CSR construction.

@@ -24,7 +24,7 @@
  * reproducibility and performance.
  */
 
-import type { MoodRegime, ImpulseEvent, PneumaConfig } from '../types/index.js';
+import type { MoodRegime, ImpulseEvent, PneumaConfig } from '../types/index';
 
 // ---------------------------------------------------------------------------
 // PRNG: xorshift128+ for reproducible Gaussian noise

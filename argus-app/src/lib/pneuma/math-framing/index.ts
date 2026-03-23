@@ -6,7 +6,7 @@
  * Usage:
  *   import {
  *     classifyDomain, createFrame, applyFrame, classifyAndFrame,
- *   } from './math-framing/index.js';
+ *   } from './math-framing/index';
  */
 
 export {
@@ -16,4 +16,4 @@ export {
   createFrame,
   generateScaffold,
   selectNotation,
-} from './framing-engine.js';
+} from './framing-engine';

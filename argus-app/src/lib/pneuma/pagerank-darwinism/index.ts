@@ -10,10 +10,10 @@
  *   - decayCandidates    -- Penalize losers (Neural Darwinism)
  */
 
-export { ConversationGraph } from './conversation-graph.js';
+export { ConversationGraph } from './conversation-graph';
 
 export {
   decayCandidates,
   selectWinner,
   type PageRankResult,
-} from './pagerank-selection.js';
+} from './pagerank-selection';

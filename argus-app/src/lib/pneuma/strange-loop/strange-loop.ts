@@ -26,7 +26,7 @@ import type {
   StrangeLoopVerdict,
   StateModification,
   PneumaConfig,
-} from '../types/index.js';
+} from '../types/index';
 import { performance } from 'node:perf_hooks';
 
 // ---------------------------------------------------------------------------

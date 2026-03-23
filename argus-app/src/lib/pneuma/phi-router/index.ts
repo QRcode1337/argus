@@ -11,6 +11,6 @@
  *   - ResourceBudget     -- Output type for downstream subsystems
  */
 
-export { computePhi, phiAR, phiID, phiCompression } from './phi-approximation.js';
-export { allocateResources, type ResourceBudget } from './resource-allocator.js';
-export { PhiRouter } from './phi-router.js';
+export { computePhi, phiAR, phiID, phiCompression } from './phi-approximation';
+export { allocateResources, type ResourceBudget } from './resource-allocator';
+export { PhiRouter } from './phi-router';

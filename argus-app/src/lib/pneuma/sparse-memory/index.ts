@@ -7,7 +7,7 @@
  *   import {
  *     createMemoryGraph, addMemoryNode, addAssociation, rebuildCSR,
  *     retrieveMemories, forwardPush,
- *   } from './sparse-memory/index.js';
+ *   } from './sparse-memory/index';
  */
 
 // CSR matrix primitives
@@ -18,10 +18,10 @@ export {
   normalizeRows,
   transpose,
   type WeightedEdge,
-} from './csr-matrix.js';
+} from './csr-matrix';
 
 // Forward Push algorithm
-export { forwardPush, multiSourceForwardPush } from './forward-push.js';
+export { forwardPush, multiSourceForwardPush } from './forward-push';
 
 // Memory graph management
 export {
@@ -31,7 +31,7 @@ export {
   decayActivations,
   getEdges,
   rebuildCSR,
-} from './memory-graph.js';
+} from './memory-graph';
 
 // High-level retrieval API
 export {
@@ -39,4 +39,4 @@ export {
   findSeeds,
   retrieveFromNode,
   retrieveMemories,
-} from './retrieval.js';
+} from './retrieval';

@@ -17,9 +17,9 @@
  *   phiBudgetMs >= 80ms -> phi_id       (most faithful, full bipartition MI)
  */
 
-import type { PhiScore, PneumaConfig } from '../types/index.js';
-import { computePhi } from './phi-approximation.js';
-import { allocateResources, type ResourceBudget } from './resource-allocator.js';
+import type { PhiScore, PneumaConfig } from '../types/index';
+import { computePhi } from './phi-approximation';
+import { allocateResources, type ResourceBudget } from './resource-allocator';
 
 // ---------------------------------------------------------------------------
 // LRU cache for PhiScore values

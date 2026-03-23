@@ -21,7 +21,7 @@
  * No external dependencies.
  */
 
-import type { CompactVector } from '../types/index.js';
+import type { CompactVector } from '../types/index';
 
 // ---------------------------------------------------------------------------
 // PRNG for reproducible projection matrices

@@ -17,12 +17,12 @@ import type {
   MemoryGraph,
   MemoryNode,
   NodeId,
-} from '@/lib/pneuma/types/index.js';
+} from '@/lib/pneuma/types/index';
 
 import {
   addMemoryNode,
   rebuildCSR,
-} from '@/lib/pneuma/sparse-memory/index.js';
+} from '@/lib/pneuma/sparse-memory/index';
 
 import type {
   IntelAlert,

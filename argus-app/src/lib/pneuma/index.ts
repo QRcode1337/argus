@@ -16,7 +16,7 @@
  */
 
 // -- PNEUMA orchestrator --
-export { PNEUMA, type ProcessResult } from './pneuma.js';
+export { PNEUMA, type ProcessResult } from './pneuma';
 
 // -- Types --
 export type {
@@ -39,8 +39,8 @@ export type {
   PneumaConfig,
   StrangeLoopVerdict,
   TemporalPrediction,
-} from './types/index.js';
-export { createDefaultPneumaConfig } from './types/index.js';
+} from './types/index';
+export { createDefaultPneumaConfig } from './types/index';
 
 // -- S1: Phi Router --
 export {
@@ -51,7 +51,7 @@ export {
   phiCompression,
   phiID,
   type ResourceBudget,
-} from './phi-router/index.js';
+} from './phi-router/index';
 
 // -- S2: Consciousness --
 export {
@@ -71,7 +71,7 @@ export {
   broadcastToGWT,
   getProjectionMatrix,
   moodPersonaCoherence,
-} from './consciousness/index.js';
+} from './consciousness/index';
 
 // -- S3: Persona Blender --
 export {
@@ -81,7 +81,7 @@ export {
   isConvergent,
   effectiveDamping,
   type PersonaBlender,
-} from './persona-blender/index.js';
+} from './persona-blender/index';
 
 // -- S4: Freudian Router --
 export {
@@ -102,7 +102,7 @@ export {
   createFreudianRouter,
   FreudianRouter,
   type RoutingResult,
-} from './freudian-router/index.js';
+} from './freudian-router/index';
 
 // -- S5: Sparse Memory --
 export {
@@ -123,7 +123,7 @@ export {
   retrieveMemories,
   transpose,
   type WeightedEdge,
-} from './sparse-memory/index.js';
+} from './sparse-memory/index';
 
 // -- S6: PageRank Darwinism --
 export {
@@ -131,7 +131,7 @@ export {
   decayCandidates,
   selectWinner,
   type PageRankResult,
-} from './pagerank-darwinism/index.js';
+} from './pagerank-darwinism/index';
 
 // -- S7: Math Framing --
 export {
@@ -141,10 +141,10 @@ export {
   createFrame,
   generateScaffold,
   selectNotation,
-} from './math-framing/index.js';
+} from './math-framing/index';
 
 // -- S8: Strange Loop --
-export { StrangeLoop } from './strange-loop/index.js';
+export { StrangeLoop } from './strange-loop/index';
 
 // -- S9: Temporal Voice --
 export {
@@ -153,4 +153,4 @@ export {
   predict,
   trainESN,
   type ESNState,
-} from './temporal-voice/index.js';
+} from './temporal-voice/index';

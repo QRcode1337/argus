@@ -19,8 +19,8 @@
 import type {
   CandidateResponse,
   NodeId,
-} from '../types/index.js';
-import { ConversationGraph } from './conversation-graph.js';
+} from '../types/index';
+import { ConversationGraph } from './conversation-graph';
 
 // ---------------------------------------------------------------------------
 // PageRank result

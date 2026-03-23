@@ -28,7 +28,7 @@ import type {
   EpochNs,
   PneumaConfig,
   TemporalPrediction,
-} from '../types/index.js';
+} from '../types/index';
 
 // ---------------------------------------------------------------------------
 // ESN State

@@ -25,7 +25,7 @@ import type {
   DefenseMechanism,
   FreudianDecomposition,
   PneumaConfig,
-} from '../types/index.js';
+} from '../types/index';
 
 // ---------------------------------------------------------------------------
 // Helpers

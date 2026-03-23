@@ -7,4 +7,4 @@
  *   - StrangeLoop -- Main evaluation loop class
  */
 
-export { StrangeLoop } from './strange-loop.js';
+export { StrangeLoop } from './strange-loop';

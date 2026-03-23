@@ -28,12 +28,12 @@ import type {
   FreudianDecomposition,
   NodeId,
   PneumaConfig,
-} from '../types/index.js';
+} from '../types/index';
 import {
   computeFreudianCost,
   decomposeInput,
   getInfluenceWeights,
-} from './decomposition.js';
+} from './decomposition';
 import {
   addEthicalNode,
   addEthicalTransition,
@@ -41,7 +41,7 @@ import {
   findEthicalPath,
   type EthicalGraph,
   type EthicalPathResult,
-} from './ethical-pathfinder.js';
+} from './ethical-pathfinder';
 
 // ---------------------------------------------------------------------------
 // Router configuration

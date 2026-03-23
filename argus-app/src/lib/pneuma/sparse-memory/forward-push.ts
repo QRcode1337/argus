@@ -21,8 +21,8 @@
  * PageRank Vectors." FOCS 2006.
  */
 
-import type { MemoryGraph, NodeId } from '../types/index.js';
-import { getRow } from './csr-matrix.js';
+import type { MemoryGraph, NodeId } from '../types/index';
+import { getRow } from './csr-matrix';
 
 /**
  * Compute approximate Personalized PageRank via Forward Push.

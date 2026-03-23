@@ -28,7 +28,7 @@
 
 import { deflateSync } from 'node:zlib';
 import { performance } from 'node:perf_hooks';
-import type { PhiScore } from '../types/index.js';
+import type { PhiScore } from '../types/index';
 
 // ---------------------------------------------------------------------------
 // Utility: linear algebra on flat Float64Arrays (column-major)

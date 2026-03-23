@@ -8,7 +8,7 @@
  *     createFreudianRouter, FreudianRouter,
  *     computeDecomposition, decomposeInput,
  *     findEthicalPath, hasEthicalClearance,
- *   } from './freudian-router/index.js';
+ *   } from './freudian-router/index';
  */
 
 // Id/Ego/Superego decomposition
@@ -19,7 +19,7 @@ export {
   decomposeInput,
   evaluateDefenses,
   getInfluenceWeights,
-} from './decomposition.js';
+} from './decomposition';
 
 // A* ethical pathfinder
 export {
@@ -31,11 +31,11 @@ export {
   hasEthicalClearance,
   type EthicalGraph,
   type EthicalPathResult,
-} from './ethical-pathfinder.js';
+} from './ethical-pathfinder';
 
 // FreudianRouter main class
 export {
   createFreudianRouter,
   FreudianRouter,
   type RoutingResult,
-} from './freudian-router.js';
+} from './freudian-router';

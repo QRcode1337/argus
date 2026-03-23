@@ -31,7 +31,7 @@
  * No external dependencies.
  */
 
-import type { PersonaVector, MoodRegime, PneumaConfig, EpochMs } from '../types/index.js';
+import type { PersonaVector, MoodRegime, PneumaConfig, EpochMs } from '../types/index';
 
 // ---------------------------------------------------------------------------
 // PersonaBlender state

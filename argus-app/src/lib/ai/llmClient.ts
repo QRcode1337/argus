@@ -1,6 +1,6 @@
 import { readSettings } from "@/lib/settings";
-import { PNEUMA } from "@/lib/pneuma/pneuma.js";
-import { GradientCandidateGenerator } from "@/lib/pneuma/gradient-candidate-generator.js";
+import { PNEUMA } from "@/lib/pneuma/pneuma";
+import { GradientCandidateGenerator } from "@/lib/pneuma/gradient-candidate-generator";
 
 interface LlmResponse {
   text: string;

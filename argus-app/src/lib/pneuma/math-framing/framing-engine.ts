@@ -16,7 +16,7 @@
  * Source: psycho-symbolic.ts DomainAdaptationEngine
  */
 
-import type { MathematicalFrame } from '../types/index.js';
+import type { MathematicalFrame } from '../types/index';
 
 // ---------------------------------------------------------------------------
 // Domain type (re-exported from MathematicalFrame for convenience)

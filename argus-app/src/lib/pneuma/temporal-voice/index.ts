@@ -6,7 +6,7 @@
  * Usage:
  *   import {
  *     initializeESN, trainESN, predict, createESNFromConfig,
- *   } from './temporal-voice/index.js';
+ *   } from './temporal-voice/index';
  */
 
 export {
@@ -15,4 +15,4 @@ export {
   predict,
   trainESN,
   type ESNState,
-} from './temporal-predictor.js';
+} from './temporal-predictor';

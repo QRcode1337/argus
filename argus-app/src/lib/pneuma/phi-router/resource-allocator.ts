@@ -20,7 +20,7 @@
  * The midpoint and steepness k are calibrated per-subsystem.
  */
 
-import type { PhiScore, PneumaConfig } from '../types/index.js';
+import type { PhiScore, PneumaConfig } from '../types/index';
 
 // ---------------------------------------------------------------------------
 // ResourceBudget type

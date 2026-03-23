@@ -19,4 +19,4 @@ export {
   isConvergent,
   effectiveDamping,
   type PersonaBlender,
-} from './neumann-blender.js';
+} from './neumann-blender';

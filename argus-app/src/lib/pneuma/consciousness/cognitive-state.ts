@@ -27,8 +27,8 @@ import type {
   CompactVector,
   PneumaConfig,
   DefenseMechanism,
-} from '../types/index.js';
-import { createProjection, project, type JLProjectionMatrix } from './jl-projection.js';
+} from '../types/index';
+import { createProjection, project, type JLProjectionMatrix } from './jl-projection';
 
 // ---------------------------------------------------------------------------
 // Module state: projection matrix (initialized once per config)

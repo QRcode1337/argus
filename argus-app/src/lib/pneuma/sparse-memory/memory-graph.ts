@@ -21,8 +21,8 @@ import type {
   MemoryNode,
   NodeId,
   PneumaConfig,
-} from '../types/index.js';
-import { buildCSR, normalizeRows, transpose, type WeightedEdge } from './csr-matrix.js';
+} from '../types/index';
+import { buildCSR, normalizeRows, transpose, type WeightedEdge } from './csr-matrix';
 
 /**
  * Internal edge storage used before CSR construction.

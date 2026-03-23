@@ -27,7 +27,7 @@ import type {
   EpochMs,
   NodeId,
   PneumaConfig,
-} from '../types/index.js';
+} from '../types/index';
 
 // ---------------------------------------------------------------------------
 // Internal utterance node

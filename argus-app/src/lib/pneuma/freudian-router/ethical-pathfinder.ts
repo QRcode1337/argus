@@ -26,7 +26,7 @@ import type {
   EthicalTransition,
   NodeId,
   PneumaConfig,
-} from '../types/index.js';
+} from '../types/index';
 
 // ---------------------------------------------------------------------------
 // Ethical graph management

@@ -16,7 +16,7 @@ export {
   triggerImpulse,
   moodNorm,
   currentRegimeLabel,
-} from './mood-engine.js';
+} from './mood-engine';
 
 export {
   createProjection,
@@ -25,7 +25,7 @@ export {
   computeTargetDim,
   distortionRatio,
   type JLProjectionMatrix,
-} from './jl-projection.js';
+} from './jl-projection';
 
 export {
   createCognitiveState,
@@ -33,4 +33,4 @@ export {
   broadcastToGWT,
   getProjectionMatrix,
   moodPersonaCoherence,
-} from './cognitive-state.js';
+} from './cognitive-state';

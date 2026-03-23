@@ -26,32 +26,32 @@ import type {
   PneumaConfig,
   StrangeLoopVerdict,
   TemporalPrediction,
-} from './types/index.js';
-import { createDefaultPneumaConfig } from './types/index.js';
+} from './types/index';
+import { createDefaultPneumaConfig } from './types/index';
 
 // S1: Phi Router
-import { PhiRouter, type ResourceBudget } from './phi-router/index.js';
+import { PhiRouter, type ResourceBudget } from './phi-router/index';
 
 // S2: Consciousness (mood + JL projection + cognitive state)
 import {
   initializeMoodRegime,
   tickMood,
-} from './consciousness/index.js';
+} from './consciousness/index';
 import {
   createCognitiveState,
   updateState,
   broadcastToGWT,
-} from './consciousness/index.js';
+} from './consciousness/index';
 
 // S3: Persona Blender
 import {
   createPersonaBlender,
   blendPersonas,
   type PersonaBlender,
-} from './persona-blender/index.js';
+} from './persona-blender/index';
 
 // S4: Freudian Router
-import { FreudianRouter, type RoutingResult } from './freudian-router/index.js';
+import { FreudianRouter, type RoutingResult } from './freudian-router/index';
 
 // S5: Sparse Memory
 import {
@@ -59,7 +59,7 @@ import {
   addMemoryNode,
   rebuildCSR,
   retrieveMemories,
-} from './sparse-memory/index.js';
+} from './sparse-memory/index';
 
 // S6: PageRank Darwinism
 import {
@@ -67,20 +67,20 @@ import {
   selectWinner,
   decayCandidates,
   type PageRankResult,
-} from './pagerank-darwinism/index.js';
+} from './pagerank-darwinism/index';
 
 // S7: Math Framing
-import { createFrame } from './math-framing/index.js';
+import { createFrame } from './math-framing/index';
 
 // S8: Strange Loop
-import { StrangeLoop } from './strange-loop/index.js';
+import { StrangeLoop } from './strange-loop/index';
 
 // S9: Temporal Voice
 import {
   createESNFromConfig,
   predict,
   type ESNState,
-} from './temporal-voice/index.js';
+} from './temporal-voice/index';
 
 // ---------------------------------------------------------------------------
 // ProcessResult

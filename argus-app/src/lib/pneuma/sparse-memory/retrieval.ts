@@ -16,8 +16,8 @@
  * This is the main entry point consumed by the PNEUMA cognitive loop.
  */
 
-import type { CompactVector, MemoryGraph, MemoryNode, NodeId } from '../types/index.js';
-import { forwardPush, multiSourceForwardPush } from './forward-push.js';
+import type { CompactVector, MemoryGraph, MemoryNode, NodeId } from '../types/index';
+import { forwardPush, multiSourceForwardPush } from './forward-push';
 
 /**
  * Compute cosine similarity between two CompactVector (Float64Array) instances.

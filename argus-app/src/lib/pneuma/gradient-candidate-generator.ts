@@ -18,7 +18,7 @@ import type {
   CandidateResponse,
   CompactVector,
   NodeId,
-} from './types/index.js';
+} from './types/index';
 
 // ---------------------------------------------------------------------------
 // Exported types
