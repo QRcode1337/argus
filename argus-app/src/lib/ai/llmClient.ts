@@ -1,6 +1,4 @@
 import { readSettings } from "@/lib/settings";
-import { PNEUMA } from "@/lib/pneuma/pneuma";
-import { GradientCandidateGenerator } from "@/lib/pneuma/gradient-candidate-generator";
 
 interface LlmResponse {
   text: string;
@@ -9,10 +7,11 @@ interface LlmResponse {
 }
 
 // Singleton PNEUMA instance — initialized once, reused across requests
-let pneumaInstance: InstanceType<typeof PNEUMA> | null = null;
+let pneumaInstance: any = null;
 
-function getPneumaInstance(): InstanceType<typeof PNEUMA> {
+async function getPneumaInstance(): Promise<any> {
   if (!pneumaInstance) {
+    const { PNEUMA } = await import("@/lib/pneuma/pneuma");
     pneumaInstance = new PNEUMA();
   }
   return pneumaInstance;
@@ -60,18 +59,27 @@ export async function queryLlm(prompt: string, systemPrompt?: string): Promise<L
     }
 
     if (llm.provider === "pneuma") {
-      const pneuma = getPneumaInstance();
+      const pneuma = await getPneumaInstance();
+      pneuma.initialize();
+
+      const { GradientCandidateGenerator } = await import(
+        "@/lib/pneuma/gradient-candidate-generator"
+      );
       const generator = new GradientCandidateGenerator();
       const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
 
       // Generate 3 candidates: Id, Ego, Superego
-      const candidates = generator.generate(fullPrompt, 3);
+      const candidates = await generator.generateCandidates(fullPrompt, {
+        mood: "neutral",
+        memories: [],
+        persona: "balanced",
+      });
 
       // Create hash-based embedding from input text
       const embedding = hashEmbedding(fullPrompt);
 
       // Feed candidates + embedding through PNEUMA's cognitive pipeline
-      const result = await pneuma.processInput(candidates, embedding);
+      const result = pneuma.processInput(fullPrompt, embedding, candidates);
 
       return {
         text: result.selectedText ?? "",
