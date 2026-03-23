@@ -16,6 +16,7 @@ export const ARGUS_CONFIG = {
     threatRadarIoc: "/api/feeds/threatradar/ioc",
     phantom: process.env.NEXT_PUBLIC_PHANTOM_ENDPOINT ?? "http://localhost:7700",
     aiSummarize: "/api/ai/summarize",
+    zerveAnalysis: process.env.ZERVE_API_ENDPOINT ?? "/api/feeds/zerve",
     settings: "/api/settings",
     analyticsLayers: "/api/analytics/layers",
   },
@@ -32,6 +33,7 @@ export const ARGUS_CONFIG = {
     gdelt: 15 * 60_000,  // 15 minutes — matches GDELT update cadence
     phantom: 10_000,
     threatRadar: 300_000, // 5 minutes
+    zerve: 30 * 60_000, // 30 minutes — batch geospatial analysis cadence
   },
   limits: {
     maxFlights: 7000,
