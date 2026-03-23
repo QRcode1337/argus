@@ -9,6 +9,7 @@ import { useArgusStore } from "@/store/useArgusStore";
 import type { ClickedCoordinates, LayerKey, PlatformMode, PlaybackSpeed, SceneMode, SelectedIntel, VisualMode } from "@/types/intel";
 import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
 import { VideoOverlay } from "./VideoOverlay";
+import PneumaHud from "./PneumaHud";
 
 type HudOverlayProps = {
   onFlyToPoi: (poiId: string) => void;
@@ -2195,6 +2196,11 @@ export function HudOverlay({
           </button>
         </div>
       )}
+
+      {/* PNEUMA Cognitive State Indicator — bottom-right corner */}
+      <div className="pointer-events-auto absolute bottom-10 right-4 z-[26] hidden md:block">
+        <PneumaHud />
+      </div>
     </div>
   );
 }
