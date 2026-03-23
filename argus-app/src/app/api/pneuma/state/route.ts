@@ -1,36 +1,40 @@
 import { NextResponse } from "next/server";
+import { readSettings } from "@/lib/settings";
+import { getPneumaInstance } from "@/lib/ai/llmClient";
 
 /**
  * GET /api/pneuma/state
  *
  * Returns PNEUMA's current cognitive state for the HUD overlay.
- * Reads from the singleton instance shared with llmClient.
+ * Reads from the same singleton instance used by /api/ai/summarize.
  */
 
-// Import the same singleton getter used by llmClient
-let pneumaInstance: any = null;
-
-async function getPneumaInstance(): Promise<any> {
-  if (!pneumaInstance) {
-    try {
-      const { PNEUMA } = await import("@/lib/pneuma/pneuma");
-      pneumaInstance = new PNEUMA();
-      pneumaInstance.initialize();
-    } catch {
-      return null;
-    }
-  }
-  return pneumaInstance;
-}
-
 export async function GET() {
-  const pneuma = await getPneumaInstance();
+  const { llm } = await readSettings();
 
-  if (!pneuma || !pneuma.isInitialized) {
+  if (llm.provider !== "pneuma") {
     return NextResponse.json({
       isActive: false,
       phi: 0,
       moodRegime: "unknown",
+      memoryNodes: 0,
+      cycleCount: 0,
+      pipelineTimeMs: 0,
+    });
+  }
+
+  let pneuma: any;
+  try {
+    pneuma = await getPneumaInstance();
+  } catch {
+    pneuma = null;
+  }
+
+  if (!pneuma || !pneuma.isInitialized) {
+    return NextResponse.json({
+      isActive: true,
+      phi: 0,
+      moodRegime: "exploratory-curious",
       memoryNodes: 0,
       cycleCount: 0,
       pipelineTimeMs: 0,

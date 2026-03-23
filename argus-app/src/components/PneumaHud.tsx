@@ -81,7 +81,7 @@ export default function PneumaHud({ threatLevel = "GREEN" }: { threatLevel?: str
               : "border border-[#504945] bg-[#282828] text-[#928374]"
           }`}
         >
-          {state.isActive ? "ACTIVE" : "OFFLINE"}
+          {state.isActive ? "ENABLED" : "OFFLINE"}
         </span>
       </div>
 

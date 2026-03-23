@@ -9,7 +9,7 @@ interface LlmResponse {
 // Singleton PNEUMA instance — initialized once, reused across requests
 let pneumaInstance: any = null;
 
-async function getPneumaInstance(): Promise<any> {
+export async function getPneumaInstance(): Promise<any> {
   if (!pneumaInstance) {
     const { PNEUMA } = await import("@/lib/pneuma/pneuma");
     pneumaInstance = new PNEUMA();
@@ -60,7 +60,7 @@ export async function queryLlm(prompt: string, systemPrompt?: string): Promise<L
 
     if (llm.provider === "pneuma") {
       const pneuma = await getPneumaInstance();
-      pneuma.initialize();
+      if (!pneuma.isInitialized) pneuma.initialize();
 
       const { GradientCandidateGenerator } = await import(
         "@/lib/pneuma/gradient-candidate-generator"

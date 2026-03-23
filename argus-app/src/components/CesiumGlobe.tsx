@@ -152,6 +152,7 @@ const inferKindFromId = (id: string): string => {
   if (id.startsWith("mil-")) return "military";
   if (id.startsWith("sat-")) return "satellite";
   if (id.startsWith("quake-")) return "earthquake";
+  if (id.startsWith("anomaly-")) return "anomaly";
 
   if (id.startsWith("base-")) return "base";
   if (id.startsWith("outage-")) return "outage";
@@ -208,6 +209,16 @@ const buildAnalysisSummary = (kind: string, props: Record<string, unknown>, name
       ]
         .filter(Boolean)
         .join(" ");
+    case "anomaly":
+      return [
+        `${name} is a Phantom chaos anomaly.`,
+        props.anomaly_type ? `Type: ${props.anomaly_type}.` : null,
+        props.severity ? `Severity: ${props.severity}.` : null,
+        typeof props.chaos_score === "number" ? `Chaos score: ${Number(props.chaos_score).toFixed(2)}.` : null,
+        props.detail ? String(props.detail) : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
     default:
       return `${name} is the currently selected target. Review quick facts and full facts for supporting context.`;
   }
@@ -222,6 +233,14 @@ const PRIORITY_THRESHOLDS = {
 
 const classifyImportance = (kind: string, props: Record<string, unknown>): IntelImportance => {
   if (kind === "military" || kind === "threat") return "important";
+  if (kind === "anomaly") {
+    const severity = String(props.severity ?? "");
+    const chaosScore = toNumber(props.chaos_score);
+    if (severity === "Critical" || severity === "High" || (chaosScore !== null && chaosScore >= 0.7)) {
+      return "important";
+    }
+    return "normal";
+  }
   if (kind === "gdelt" && toNumber(props.goldsteinScale) !== null && (toNumber(props.goldsteinScale)! <= -7)) return "important";
 
   const magnitude = toNumber(props.magnitude);
@@ -308,6 +327,13 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("Inclination", props.inclinationDeg);
       pushQuick("Apogee (km)", props.apogeeKm);
       pushQuick("Perigee (km)", props.perigeeKm);
+      break;
+    case "anomaly":
+      pushQuick("Type", props.anomaly_type);
+      pushQuick("Severity", props.severity);
+      pushQuick("Chaos Score", props.chaos_score);
+      pushQuick("Detected", props.detected_at);
+      pushQuick("Detail", props.detail);
       break;
     case "threat":
       pushQuick("Adversary", props.adversary);
@@ -1584,6 +1610,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     layers.satellites,
     layers.seismic,
     layers.threats,
+    layers.anomalies,
   ]);
 
   // Globe ↔ Map scene mode toggle

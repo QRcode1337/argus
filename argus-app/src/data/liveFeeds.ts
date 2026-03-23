@@ -5,6 +5,8 @@ export interface LiveFeedItem {
   category: "City" | "Landmark" | "Nature" | "Space";
   streamUrl: string;
   sourceUrl?: string;
+  lat?: number;
+  lon?: number;
 }
 
 export const LIVE_FEEDS: LiveFeedItem[] = [
