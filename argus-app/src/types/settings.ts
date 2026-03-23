@@ -1,11 +1,10 @@
-export type LlmProvider = "ollama" | "openai_compatible" | "pneuma";
+export type LlmProvider = "ollama" | "openai_compatible";
 
 export interface LlmSettings {
   provider: LlmProvider;
   endpoint: string;
   model: string;
   apiKey?: string;
-  GRADIENT_MODEL_ACCESS_KEY?: string;
 }
 
 export interface AppSettings {
