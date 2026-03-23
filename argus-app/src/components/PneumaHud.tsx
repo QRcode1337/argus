@@ -1,13 +1,14 @@
 "use client";
 
-interface PneumaHudProps {
-  phi: number;           // 0-1, the Phi consciousness score
-  moodRegime: string;    // 'exploratory-curious' | 'focused-analytical' | 'empathetic-supportive' | 'creative-generative'
-  threatLevel: string;   // From analysisEngine: 'GREEN' | 'AMBER' | 'RED'
-  memoryNodes: number;   // Count of stored memory nodes
-  cycleCount: number;    // Number of cognitive cycles processed
-  pipelineTimeMs: number; // Last pipeline execution time
-  isActive: boolean;     // Whether PNEUMA is initialized
+import { useEffect, useState } from "react";
+
+interface PneumaState {
+  phi: number;
+  moodRegime: string;
+  memoryNodes: number;
+  cycleCount: number;
+  pipelineTimeMs: number;
+  isActive: boolean;
 }
 
 const MOOD_LABELS: Record<string, string> = {
@@ -24,26 +25,46 @@ const THREAT_COLORS: Record<string, string> = {
 };
 
 function getPhiColor(phi: number): string {
-  if (phi > 0.7) return "#b8bb26";   // green
-  if (phi >= 0.4) return "#fabd2f";  // yellow/amber
-  return "#fb4934";                   // red
+  if (phi > 0.7) return "#b8bb26";
+  if (phi >= 0.4) return "#fabd2f";
+  return "#fb4934";
 }
 
 function getPhiBarWidth(phi: number): string {
   return `${Math.max(0, Math.min(100, phi * 100))}%`;
 }
 
-export default function PneumaHud({
-  phi,
-  moodRegime,
-  threatLevel,
-  memoryNodes,
-  cycleCount,
-  pipelineTimeMs,
-  isActive,
-}: PneumaHudProps) {
-  const phiColor = getPhiColor(phi);
-  const moodLabel = MOOD_LABELS[moodRegime] ?? moodRegime.toUpperCase();
+export default function PneumaHud({ threatLevel = "GREEN" }: { threatLevel?: string }) {
+  const [state, setState] = useState<PneumaState>({
+    phi: 0,
+    moodRegime: "unknown",
+    memoryNodes: 0,
+    cycleCount: 0,
+    pipelineTimeMs: 0,
+    isActive: false,
+  });
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function poll() {
+      try {
+        const res = await fetch("/api/pneuma/state");
+        if (res.ok && mounted) {
+          setState(await res.json());
+        }
+      } catch {
+        // silently retry next interval
+      }
+    }
+
+    poll();
+    const interval = setInterval(poll, 5_000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
+  const phiColor = getPhiColor(state.phi);
+  const moodLabel = MOOD_LABELS[state.moodRegime] ?? state.moodRegime.toUpperCase();
   const threatColor = THREAT_COLORS[threatLevel] ?? "text-[#928374]";
 
   return (
@@ -55,12 +76,12 @@ export default function PneumaHud({
         </span>
         <span
           className={`rounded-sm px-1.5 py-0.5 text-[8px] font-bold tracking-[0.14em] ${
-            isActive
+            state.isActive
               ? "border border-[#98971a] bg-[#1a2e1a] text-[#b8bb26]"
               : "border border-[#504945] bg-[#282828] text-[#928374]"
           }`}
         >
-          {isActive ? "ACTIVE" : "OFFLINE"}
+          {state.isActive ? "ACTIVE" : "OFFLINE"}
         </span>
       </div>
 
@@ -70,13 +91,13 @@ export default function PneumaHud({
         <div>
           <div className="mb-0.5 flex items-center justify-between text-[#a89984]">
             <span>PHI</span>
-            <span style={{ color: phiColor }}>{phi.toFixed(2)}</span>
+            <span style={{ color: phiColor }}>{state.phi.toFixed(2)}</span>
           </div>
           <div className="h-1 w-full overflow-hidden rounded-sm bg-[#3c3836]">
             <div
               className="h-full rounded-sm transition-all duration-300"
               style={{
-                width: getPhiBarWidth(phi),
+                width: getPhiBarWidth(state.phi),
                 backgroundColor: phiColor,
               }}
             />
@@ -98,19 +119,19 @@ export default function PneumaHud({
         {/* MEM */}
         <div className="flex items-center justify-between text-[#a89984]">
           <span>MEM</span>
-          <span className="text-[#d5c4a1]">{memoryNodes.toLocaleString()}</span>
+          <span className="text-[#d5c4a1]">{state.memoryNodes.toLocaleString()}</span>
         </div>
 
         {/* CYCLES */}
         <div className="flex items-center justify-between text-[#a89984]">
           <span>CYCLES</span>
-          <span className="text-[#d5c4a1]">{cycleCount.toLocaleString()}</span>
+          <span className="text-[#d5c4a1]">{state.cycleCount.toLocaleString()}</span>
         </div>
 
         {/* PIPELINE */}
         <div className="flex items-center justify-between text-[#a89984]">
           <span>PIPELINE</span>
-          <span className="text-[#83a598]">{pipelineTimeMs}ms</span>
+          <span className="text-[#83a598]">{state.pipelineTimeMs}ms</span>
         </div>
       </div>
     </div>

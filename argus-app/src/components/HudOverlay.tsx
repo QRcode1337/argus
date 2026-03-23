@@ -2198,17 +2198,8 @@ export function HudOverlay({
       )}
 
       {/* PNEUMA Cognitive State Indicator — bottom-right corner */}
-      {/* TODO: Wire real PNEUMA state from cognitive engine / store instead of placeholder props */}
       <div className="pointer-events-auto absolute bottom-10 right-4 z-[26] hidden md:block">
-        <PneumaHud
-          phi={0.72}
-          moodRegime="focused-analytical"
-          threatLevel="GREEN"
-          memoryNodes={0}
-          cycleCount={0}
-          pipelineTimeMs={0}
-          isActive={false}
-        />
+        <PneumaHud />
       </div>
     </div>
   );
