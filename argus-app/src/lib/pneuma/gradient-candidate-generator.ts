@@ -12,8 +12,6 @@
  * All three Gradient API calls run concurrently via Promise.all.
  */
 
-import { AsyncGradient } from 'gradient';
-
 import type {
   CandidateResponse,
   CompactVector,
@@ -199,23 +197,24 @@ function cosine(a: CompactVector, b: CompactVector): number {
  * All three inference calls run concurrently via Promise.all.
  */
 export class GradientCandidateGenerator {
-  private readonly client: AsyncGradient;
+  private readonly modelAccessKey: string;
+  private readonly baseUrl: string;
   private readonly model: string;
   private readonly embedder: LocalEmbedder;
   private readonly maxRetries: number;
 
   constructor(config: GradientCandidateGeneratorConfig = {}) {
-    const modelAccessKey =
+    this.modelAccessKey =
       config.modelAccessKey ?? process.env.GRADIENT_MODEL_ACCESS_KEY ?? '';
 
-    if (!modelAccessKey) {
+    if (!this.modelAccessKey) {
       throw new Error(
         'GradientCandidateGenerator requires a model access key. ' +
           'Set GRADIENT_MODEL_ACCESS_KEY env var or pass modelAccessKey in config.',
       );
     }
 
-    this.client = new AsyncGradient({ model_access_key: modelAccessKey });
+    this.baseUrl = 'https://cluster-api.do-ai.run/v1';
     this.model = config.model ?? 'openai-gpt-oss-120b';
     this.embedder = new LocalEmbedder(
       config.embeddingDim ?? 128,
@@ -304,29 +303,38 @@ export class GradientCandidateGenerator {
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
-        const output = await this.client.chat.completions.create({
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userInput },
-          ],
-          model: this.model,
+        const res = await fetch(`${this.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.modelAccessKey}`,
+          },
+          body: JSON.stringify({
+            model: this.model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userInput },
+            ],
+            max_tokens: 512,
+          }),
         });
 
-        const content = output.choices?.[0]?.message?.content?.trim() ?? '';
-        if (content) {
-          return content;
+        if (!res.ok) {
+          const body = await res.text();
+          lastError = new Error(`${res.status}: ${body.slice(0, 200)}`);
+          if (res.status === 401 || res.status === 403) break;
+          continue;
         }
+
+        const data = await res.json() as {
+          choices?: Array<{ message?: { content?: string } }>;
+        };
+        const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+        if (content) return content;
 
         return `[Empty response from Gradient model ${this.model}]`;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        // Only retry on transient errors, not auth failures
-        if (
-          lastError.message.includes('401') ||
-          lastError.message.includes('403')
-        ) {
-          break;
-        }
       }
     }
 
