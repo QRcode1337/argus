@@ -1,9 +1,11 @@
 import {
   Cartesian3,
+  Color,
   ConstantProperty,
   ConstantPositionProperty,
   Entity,
   NearFarScalar,
+  PolylineGlowMaterialProperty,
   VerticalOrigin,
   type Viewer,
 } from "cesium";
@@ -12,10 +14,16 @@ import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
 import { lookupAircraftType } from "@/lib/data/aircraftTypes";
 import type { MilitaryFlight } from "@/types/intel";
 
+const MAX_TRAIL_POSITIONS = 60;
+
 export class MilitaryLayer {
   private viewer: Viewer;
 
   private entities = new Map<string, Entity>();
+  private positionHistory = new Map<string, Cartesian3[]>();
+  private trailEntity: Entity | null = null;
+  private activeTrailFlightId: string | null = null;
+
   private readonly marker = createTacticalMarkerSvg({
     fill: "#cc241d",
     glow: "#fb4934",
@@ -38,6 +46,17 @@ export class MilitaryLayer {
         Math.max(0, flight.altitudeMeters),
       );
 
+      // Append position to history (circular buffer)
+      let history = this.positionHistory.get(flight.id);
+      if (!history) {
+        history = [];
+        this.positionHistory.set(flight.id, history);
+      }
+      history.push(position);
+      if (history.length > MAX_TRAIL_POSITIONS) {
+        history.shift();
+      }
+
       const existing = this.entities.get(flight.id);
       if (existing) {
         const positionProperty = existing.position as ConstantPositionProperty | undefined;
@@ -46,6 +65,15 @@ export class MilitaryLayer {
         } else {
           existing.position = new ConstantPositionProperty(position);
         }
+
+        // Update trail if this flight is being tracked
+        if (this.activeTrailFlightId === flight.id && this.trailEntity) {
+          const polyline = this.trailEntity.polyline;
+          if (polyline) {
+            polyline.positions = new ConstantProperty(history.slice()) as any;
+          }
+        }
+
         continue;
       }
 
@@ -84,9 +112,69 @@ export class MilitaryLayer {
 
       this.viewer.entities.remove(entity);
       this.entities.delete(id);
+      this.positionHistory.delete(id);
+
+      if (this.activeTrailFlightId === id) {
+        this.hideTrail();
+      }
     }
 
     return this.entities.size;
+  }
+
+  showTrail(flightId: string): void {
+    // Only one trail at a time
+    this.hideTrail();
+
+    const history = this.positionHistory.get(flightId);
+    if (!history || history.length < 2) return;
+
+    const entity = this.entities.get(flightId);
+    const originCountry = entity?.properties?.aircraftOrigin?.getValue(this.viewer.clock.currentTime) ?? "";
+    const color = this.getCountryColor(originCountry);
+
+    this.trailEntity = this.viewer.entities.add({
+      id: `mil-trail-${flightId}`,
+      polyline: {
+        positions: new ConstantProperty(history.slice()) as any,
+        width: new ConstantProperty(3),
+        material: new PolylineGlowMaterialProperty({
+          glowPower: 0.3,
+          color,
+        }),
+      },
+    });
+
+    this.activeTrailFlightId = flightId;
+  }
+
+  hideTrail(): void {
+    if (this.trailEntity) {
+      this.viewer.entities.remove(this.trailEntity);
+      this.trailEntity = null;
+    }
+    this.activeTrailFlightId = null;
+  }
+
+  getCountryColor(country: string): Color {
+    switch (country) {
+      case "United States":
+        return Color.fromCssColorString("#2ad4ff");
+      case "Russia":
+      case "Russian Federation":
+        return Color.fromCssColorString("#fb4934");
+      case "China":
+        return Color.fromCssColorString("#fabd2f");
+      case "United Kingdom":
+        return Color.fromCssColorString("#458588");
+      case "France":
+        return Color.fromCssColorString("#b16286");
+      case "Germany":
+        return Color.fromCssColorString("#b8bb26");
+      default:
+        // Default to red for military flights with no country info
+        return Color.fromCssColorString(country ? "#ebdbb2" : "#fb4934");
+    }
   }
 
   setVisible(visible: boolean): void {

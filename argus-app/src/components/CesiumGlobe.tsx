@@ -36,6 +36,7 @@ import { AnomalyLayer } from "@/lib/cesium/layers/anomalyLayer";
 import { SatelliteLayer } from "@/lib/cesium/layers/satelliteLayer";
 import { SeismicLayer } from "@/lib/cesium/layers/seismicLayer";
 import { GdeltLayer } from "@/lib/cesium/layers/gdeltLayer";
+import { WeatherLayer } from "@/lib/cesium/layers/weatherLayer";
 import { VisualModeController } from "@/lib/cesium/shaders/visualModes";
 import { fetchMilitaryFlights } from "@/lib/ingest/adsb";
 import { fetchOpenSkyFlights } from "@/lib/ingest/opensky";
@@ -457,6 +458,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const rasterLayerRef = useRef<RasterLayer | null>(null);
   const sentinelLayerRef = useRef<RasterLayer | null>(null);
   const anomalyLayerRef = useRef<AnomalyLayer | null>(null);
+  const weatherLayerRef = useRef<WeatherLayer | null>(null);
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
   const platformModeRef = useRef<PlatformMode>("live");
@@ -767,6 +769,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const threatLayer = new ThreatLayer(viewer);
     const gdeltLayer = new GdeltLayer(viewer);
     const anomalyLayer = new AnomalyLayer(viewer);
+    const weatherLayer = new WeatherLayer(viewer);
+    void weatherLayer.init();
     const rasterLayer = new RasterLayer(viewer);
     const sentinelLayer = new RasterLayer(viewer);
     const visualController = new VisualModeController(viewer);
@@ -781,6 +785,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     threatLayerRef.current = threatLayer;
     gdeltLayerRef.current = gdeltLayer;
     anomalyLayerRef.current = anomalyLayer;
+    weatherLayerRef.current = weatherLayer;
     rasterLayerRef.current = rasterLayer;
     sentinelLayerRef.current = sentinelLayer;
 
@@ -1198,6 +1203,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       hoveredOriginalSizeRef.current = null;
       hoveredOriginalScaleRef.current = null;
 
+      weatherLayer.destroy();
       picker.destroy();
       visualController.destroy();
       viewer.destroy();
@@ -1212,6 +1218,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       threatLayerRef.current = null;
       gdeltLayerRef.current = null;
       rasterLayerRef.current = null;
+      weatherLayerRef.current = null;
       visualModeRef.current = null;
       pickerRef.current = null;
     };
@@ -1448,6 +1455,18 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     } else {
       satLayer.showOrbit(null, 0, 0);
     }
+
+    // Show trail for selected flights/military
+    if (selectedIntel?.kind === "flight") {
+      const rawId = selectedIntel.id.replace(/^flight-/, "");
+      flightLayerRef.current?.showTrail(rawId);
+    } else if (selectedIntel?.kind === "military") {
+      const rawId = selectedIntel.id.replace(/^mil-/, "");
+      militaryLayerRef.current?.showTrail(rawId);
+    } else {
+      flightLayerRef.current?.hideTrail();
+      militaryLayerRef.current?.hideTrail();
+    }
   }, [selectedIntel]);
 
   useEffect(() => {
@@ -1456,12 +1475,22 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
     if (!trackedEntityId) {
       viewer.trackedEntity = undefined;
+      flightLayerRef.current?.hideTrail();
+      militaryLayerRef.current?.hideTrail();
       return;
     }
 
     const entity = viewer.entities.getById(trackedEntityId);
     if (entity) {
       viewer.trackedEntity = entity;
+      // Show trail for tracked flights
+      if (trackedEntityId.startsWith("flight-")) {
+        const rawId = trackedEntityId.replace("flight-", "");
+        flightLayerRef.current?.showTrail(rawId);
+      } else if (trackedEntityId.startsWith("mil-")) {
+        const rawId = trackedEntityId.replace("mil-", "");
+        militaryLayerRef.current?.showTrail(rawId);
+      }
     }
   }, [trackedEntityId]);
 
@@ -1604,6 +1633,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       threatLayerRef.current?.setVisible(layers.threats);
       gdeltLayerRef.current?.setVisible(layers.gdelt);
       anomalyLayerRef.current?.setVisible(layers.anomalies);
+      weatherLayerRef.current?.setVisible(layers.weather);
       return;
     }
 
@@ -1617,6 +1647,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     threatLayerRef.current?.setVisible(false);
     gdeltLayerRef.current?.setVisible(false);
     anomalyLayerRef.current?.setVisible(false);
+    weatherLayerRef.current?.setVisible(layers.weather);
   }, [
     platformMode,
     layers.bases,
@@ -1629,6 +1660,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     layers.seismic,
     layers.threats,
     layers.anomalies,
+    layers.weather,
   ]);
 
   // Globe ↔ Map scene mode toggle
