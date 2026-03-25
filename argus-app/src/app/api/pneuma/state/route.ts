@@ -49,7 +49,7 @@ export async function GET() {
     return NextResponse.json({
       isActive: true,
       phi: phiRouter.getLatestPhi()?.value ?? 0,
-      moodRegime: moodRegime.currentRegime ?? "exploratory-curious",
+      moodRegime: moodRegime.regimeLabels?.[moodRegime.currentRegime] ?? "exploratory-curious",
       memoryNodes: memoryGraph.size ?? 0,
       cycleCount: pneuma.getCycleCount(),
       pipelineTimeMs: 0,

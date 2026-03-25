@@ -17,6 +17,19 @@ export async function getPneumaInstance(): Promise<any> {
   return pneumaInstance;
 }
 
+// Singleton Gradient generator — avoids re-parsing env vars per request
+let gradientGenerator: any = null;
+
+async function getGradientGenerator(): Promise<any> {
+  if (!gradientGenerator) {
+    const { GradientCandidateGenerator } = await import(
+      "@/lib/pneuma/gradient-candidate-generator"
+    );
+    gradientGenerator = new GradientCandidateGenerator();
+  }
+  return gradientGenerator;
+}
+
 /**
  * Create a simple hash-based embedding from input text.
  * Returns a Float64Array of length 128.
@@ -62,10 +75,7 @@ export async function queryLlm(prompt: string, systemPrompt?: string): Promise<L
       const pneuma = await getPneumaInstance();
       if (!pneuma.isInitialized) pneuma.initialize();
 
-      const { GradientCandidateGenerator } = await import(
-        "@/lib/pneuma/gradient-candidate-generator"
-      );
-      const generator = new GradientCandidateGenerator();
+      const generator = await getGradientGenerator();
       const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
 
       // Generate 3 candidates: Id, Ego, Superego

@@ -131,14 +131,32 @@ const toNumber = (value: unknown): number | null =>
 const readPropertyBag = (entity: Entity, at: JulianDate): Record<string, unknown> => {
   const values: Record<string, unknown> = {};
   const bag = entity.properties as
-    | (Record<string, unknown> & { propertyNames?: string[] })
+    | (Record<string, unknown> & { propertyNames?: string[]; getValue?: (time: JulianDate) => Record<string, unknown> })
     | undefined;
 
-  if (!bag || !Array.isArray(bag.propertyNames)) {
+  if (!bag) return values;
+
+  // Try PropertyBag.getValue() first — returns all properties as a plain object
+  if (typeof bag.getValue === "function") {
+    try {
+      const all = bag.getValue(at);
+      if (all && typeof all === "object") return all as Record<string, unknown>;
+    } catch { /* fall through */ }
+  }
+
+  // Standard path: iterate propertyNames
+  if (Array.isArray(bag.propertyNames)) {
+    for (const key of bag.propertyNames) {
+      const candidate = bag[key] as { getValue?: (time: JulianDate) => unknown } | undefined;
+      values[key] =
+        typeof candidate?.getValue === "function" ? candidate.getValue(at) : candidate;
+    }
     return values;
   }
 
-  for (const key of bag.propertyNames) {
+  // Fallback: iterate own keys (handles plain object properties)
+  for (const key of Object.keys(bag)) {
+    if (key === "propertyNames" || key === "definitionChanged" || key === "isConstant") continue;
     const candidate = bag[key] as { getValue?: (time: JulianDate) => unknown } | undefined;
     values[key] =
       typeof candidate?.getValue === "function" ? candidate.getValue(at) : candidate;

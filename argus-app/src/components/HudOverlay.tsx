@@ -289,6 +289,7 @@ export function HudOverlay({
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [showPneumaPanel, setShowPneumaPanel] = useState(false);
 
   useEffect(() => {
     const syncClock = () => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC"));
@@ -612,7 +613,24 @@ export function HudOverlay({
       {/* Top info strip */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] hidden h-8 items-center justify-between border-b border-[#3c3836] bg-[#1d2021e6] px-4 font-mono uppercase tracking-[0.22em] text-[#928374] md:flex">
         <span>Global Situation</span>
-        <span>{utcTimestamp || "SYNCING UTC"}</span>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              setShowPneumaPanel((prev) => !prev);
+              if (!showPneumaPanel) onCloseIntel();
+            }}
+            className={`pointer-events-auto rounded-md border px-3 py-0.5 text-[11px] font-black tracking-[0.35em] transition ${
+              showPneumaPanel
+                ? "border-[#fabd2f] bg-[#fabd2f]/20 text-[#fabd2f]"
+                : "border-[#504945] text-[#d5c4a1] hover:border-[#fabd2f] hover:text-[#fabd2f]"
+            }`}
+            style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}
+          >
+            PNEUMA
+          </button>
+          <span>{utcTimestamp || "SYNCING UTC"}</span>
+        </div>
       </div>
 
       {/* Bottom info strip */}
@@ -1111,7 +1129,33 @@ export function HudOverlay({
                               key={alert.id}
                               type="button"
                               onClick={() => {
-                                if (alert.entityId) {
+                                if (alert.category === "PHANTOM") {
+                                  setShowPneumaPanel(false);
+                                  onSelectIntel({
+                                    id: alert.id,
+                                    name: alert.title,
+                                    kind: "anomaly",
+                                    importance: alert.severity === "CRITICAL" ? "important" : "normal",
+                                    quickFacts: [
+                                      { label: "Severity", value: alert.severity },
+                                      { label: "Category", value: "Chaos Anomaly" },
+                                      { label: "Source", value: "Phantom Detection Engine" },
+                                      ...(alert.coordinates ? [
+                                        { label: "Latitude", value: alert.coordinates.lat.toFixed(4) },
+                                        { label: "Longitude", value: alert.coordinates.lon.toFixed(4) },
+                                      ] : []),
+                                    ],
+                                    fullFacts: [
+                                      { label: "Detail", value: alert.detail },
+                                      { label: "Detection", value: new Date(alert.timestamp).toUTCString() },
+                                      { label: "What is this?", value: "Chaos Anomalies are statistically improbable patterns detected across seismic, flight, and electromagnetic feeds. The Phantom engine flags correlated outliers that deviate from baseline models — potential indicators of novel geophysical, military, or infrastructure events." },
+                                    ],
+                                    coordinates: alert.coordinates,
+                                  });
+                                  if (alert.coordinates) {
+                                    onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
+                                  }
+                                } else if (alert.entityId) {
                                   onFlyToEntityById(alert.entityId);
                                 } else if (alert.coordinates) {
                                   onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
@@ -2244,10 +2288,42 @@ export function HudOverlay({
         </div>
       )}
 
-      {/* PNEUMA Cognitive State Indicator — bottom-right corner */}
-      <div className="pointer-events-auto absolute bottom-10 right-4 z-[26] hidden md:block">
-        <PneumaHud />
-      </div>
+      {/* PNEUMA Full Panel — replaces Target Intel on the right side */}
+      {showPneumaPanel && !selectedIntel ? (
+        <section className="pointer-events-auto absolute right-8 top-[5.5rem] hidden w-[348px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] p-4 shadow-[0_0_40px_rgba(250,189,47,0.15)] backdrop-blur-md md:block">
+          <div className="flex items-center justify-between">
+            <div className="font-mono text-[12px] font-black uppercase tracking-[0.3em] text-[#fabd2f]">PNEUMA</div>
+            <button
+              type="button"
+              onClick={() => setShowPneumaPanel(false)}
+              className="rounded-md border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#fabd2f]"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="mt-2 rounded-xl border border-[#5b4a1f] bg-[#2a2415] p-3 font-mono text-[10px] leading-relaxed text-[#f3d98b]">
+            PNEUMA is the cognitive awareness subsystem powering Argus&apos;s autonomous intelligence loop. It monitors the system&apos;s own reasoning state in real-time.
+          </div>
+
+          <PneumaHud threatLevel={intelBriefing?.threatLevel ?? "GREEN"} inline />
+
+          <div className="mt-3 space-y-2">
+            <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">
+              <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#fabd2f]">PHI — Consciousness Index</div>
+              Integrated Information Theory metric (0.0–1.0). Measures the degree of unified awareness across all active intelligence feeds. Higher values indicate richer cross-feed pattern recognition.
+            </div>
+            <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">
+              <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#fabd2f]">MOOD — Cognitive Regime</div>
+              Current reasoning posture: EXPLORATORY (broad scanning), ANALYTICAL (focused correlation), EMPATHETIC (human-impact priority), or CREATIVE (novel pattern synthesis).
+            </div>
+            <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">
+              <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#fabd2f]">MEM / CYCLES / PIPELINE</div>
+              MEM: active memory graph nodes. CYCLES: completed reasoning iterations. PIPELINE: end-to-end processing latency per intelligence cycle.
+            </div>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

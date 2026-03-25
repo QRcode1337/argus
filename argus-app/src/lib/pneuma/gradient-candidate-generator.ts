@@ -26,9 +26,9 @@ import type {
  * Configuration for the GradientCandidateGenerator.
  */
 export interface GradientCandidateGeneratorConfig {
-  /** Gradient model access key. Falls back to GRADIENT_MODEL_ACCESS_KEY env var. */
+  /** Gradient endpoint access key. Falls back to GRADIENT_ENDPOINT_ACCESS_KEY env var. */
   modelAccessKey?: string;
-  /** Model identifier for Gradient inference. Default: 'openai-gpt-oss-120b'. */
+  /** Model identifier for Gradient inference. Default: '' (agent handles routing). */
   model?: string;
   /** Embedding dimension for LocalEmbedder. Default: 128. */
   embeddingDim?: number;
@@ -214,7 +214,13 @@ export class GradientCandidateGenerator {
       );
     }
 
-    this.baseUrl = process.env.GRADIENT_BASE_URL ?? 'https://uwziiweo6bvm7fyvapqsmdxp.agents.do-ai.run/api/v1';
+    const baseUrl = process.env.GRADIENT_BASE_URL;
+    if (!baseUrl) {
+      throw new Error(
+        'GradientCandidateGenerator requires GRADIENT_BASE_URL env var.',
+      );
+    }
+    this.baseUrl = baseUrl;
     this.model = config.model ?? '';
     this.embedder = new LocalEmbedder(
       config.embeddingDim ?? 128,
