@@ -904,14 +904,14 @@ export function HudOverlay({
             </button>
           ) : null}
 
-          {!selectedIntel.analysisSummary ? (
+          {(!selectedIntel.analysisSummary || selectedIntel.kind === "gdelt" || selectedIntel.kind === "anomaly") ? (
             <button
               type="button"
               onClick={() => requestAiSummary(selectedIntel)}
               disabled={aiSummaryLoading}
               className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#83a598] transition hover:border-[#83a598] disabled:opacity-50"
             >
-              {aiSummaryLoading ? "Generating AI Summary..." : "Generate AI Summary"}
+              {aiSummaryLoading ? "Generating AI Summary..." : selectedIntel.analysisSummary ? "Generate Detailed AI Summary" : "Generate AI Summary"}
             </button>
           ) : null}
         </section>
