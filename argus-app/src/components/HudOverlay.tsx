@@ -501,6 +501,44 @@ export function HudOverlay({
   const mobileHeadlinePreview = useMemo(() => filteredNewsItems.slice(0, 8), [filteredNewsItems]);
   const activeViewLabel = sceneModeDefs.find((mode) => mode.key === sceneMode)?.label ?? sceneMode;
 
+  const openChaosInfoPanel = () => {
+    onSelectIntel({
+      id: "chaos-anomalies-info",
+      name: "Chaos Anomalies",
+      kind: "info",
+      importance: "important",
+      quickFacts: [
+        { label: "Source", value: "Phantom Analysis Engine" },
+        { label: "Active Anomalies", value: String(counts.anomalies) },
+        { label: "Feed Status", value: feedHealth.phantom.status.toUpperCase() },
+        { label: "Coverage", value: "Flight & Seismic" },
+      ],
+      fullFacts: [
+        {
+          label: "What is this?",
+          value:
+            "Chaos Anomalies are unusual patterns detected across live data feeds by the Phantom analysis engine. These include unexpected earthquake clusters, abnormal seismic depths, flight path deviations, unusual military activity, and other statistical outliers.",
+        },
+        {
+          label: "Severity Levels",
+          value:
+            "Critical (red) \u2014 extreme deviation requiring immediate attention. High (orange) \u2014 significant anomaly. Medium (yellow) \u2014 notable pattern. Low (cyan) \u2014 minor irregularity worth monitoring.",
+        },
+        {
+          label: "How it works",
+          value:
+            "The Phantom engine continuously analyzes incoming flight and seismic data, scoring each event for chaos indicators like magnitude spikes, depth clustering, trajectory deviations, and spatial anomalies. Events scoring above threshold are flagged on the globe.",
+        },
+        {
+          label: "Chaos Score",
+          value:
+            "Each anomaly receives a score from 0 to 1. Scores above 0.7 are marked as important. Click individual anomaly markers on the globe for detailed breakdowns.",
+        },
+      ],
+      analysisSummary: `Currently tracking ${counts.anomalies} anomalies across flight and seismic feeds. Toggle this layer to show or hide anomaly markers on the globe. Click individual markers for detailed analysis.`,
+    });
+  };
+
   const selectNewsIntel = (item: NewsItem) => {
     onSelectIntel({
       id: `news-${item.id}`,
@@ -1252,7 +1290,10 @@ export function HudOverlay({
                         <button
                           key={`analytics-${layer.key}`}
                           type="button"
-                          onClick={() => toggleLayer(layer.key)}
+                          onClick={() => {
+                            toggleLayer(layer.key);
+                            if (layer.key === "anomalies") openChaosInfoPanel();
+                          }}
                           className="flex w-full items-center justify-between rounded border border-[#3c3836] bg-[#282828] px-2 py-1 text-left transition hover:border-[#83a598]"
                         >
                           <div className="min-w-0">
@@ -1294,7 +1335,10 @@ export function HudOverlay({
                     <button
                       key={layer.key}
                       type="button"
-                      onClick={() => toggleLayer(layer.key)}
+                      onClick={() => {
+                        toggleLayer(layer.key);
+                        if (layer.key === "anomalies") openChaosInfoPanel();
+                      }}
                       className="flex w-full items-center justify-between rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-1.5 text-left transition hover:border-[#2eb8d4]"
                     >
                       <div className="min-w-0">
@@ -2073,7 +2117,10 @@ export function HudOverlay({
                           <button
                             key={layer.key}
                             type="button"
-                            onClick={() => toggleLayer(layer.key)}
+                            onClick={() => {
+                              toggleLayer(layer.key);
+                              if (layer.key === "anomalies") openChaosInfoPanel();
+                            }}
                             className="flex w-full items-center justify-between rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left"
                           >
                             <span className="font-mono text-[10px] text-[#ebdbb2]">{layer.label}</span>
