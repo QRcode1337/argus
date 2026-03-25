@@ -290,6 +290,7 @@ export function HudOverlay({
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [showPneumaPanel, setShowPneumaPanel] = useState(false);
+  const [gdeltDigestLoading, setGdeltDigestLoading] = useState(false);
 
   useEffect(() => {
     const syncClock = () => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC"));
@@ -605,6 +606,36 @@ export function HudOverlay({
       }
     } catch {} finally {
       setAiSummaryLoading(false);
+    }
+  };
+
+  const requestGdeltDigest = async () => {
+    if (gdeltDigestLoading) return;
+    setGdeltDigestLoading(true);
+    try {
+      const res = await fetch("/api/ai/gdelt-digest");
+      const data = await res.json();
+      if (data.summary) {
+        setShowPneumaPanel(false);
+        onSelectIntel({
+          id: `gdelt-digest-${Date.now()}`,
+          name: "GDELT Strategic Digest",
+          kind: "gdelt",
+          importance: "important",
+          quickFacts: [
+            { label: "Type", value: "AI-Generated Digest" },
+            { label: "Events Analyzed", value: `${data.analyzedCount ?? "?"} of ${data.eventCount ?? "?"}` },
+            { label: "Source", value: "GDELT Global Event Database" },
+            { label: "Generated", value: new Date().toUTCString() },
+          ],
+          fullFacts: [
+            { label: "What is GDELT?", value: "The Global Database of Events, Language, and Tone monitors news media worldwide, translating events into structured data with actors, locations, and sentiment scores. Goldstein scale ranges from -10 (extreme conflict) to +10 (extreme cooperation)." },
+          ],
+          analysisSummary: data.summary,
+        });
+      }
+    } catch {} finally {
+      setGdeltDigestLoading(false);
     }
   };
 
@@ -1105,6 +1136,18 @@ export function HudOverlay({
                       </button>
                     ))}
                   </div>
+
+                  {/* GDELT Digest button */}
+                  {counts.gdelt > 0 && (
+                    <button
+                      type="button"
+                      onClick={requestGdeltDigest}
+                      disabled={gdeltDigestLoading}
+                      className="w-full rounded-lg border border-[#3498db]/40 bg-[#3498db]/10 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#3498db] transition hover:border-[#3498db] hover:bg-[#3498db]/20 disabled:opacity-50"
+                    >
+                      {gdeltDigestLoading ? "Generating GDELT Digest..." : `Generate GDELT Digest (${compact(counts.gdelt)} events)`}
+                    </button>
+                  )}
 
                   {/* Alerts list — clickable, filterable, scrollable */}
                   {(() => {
