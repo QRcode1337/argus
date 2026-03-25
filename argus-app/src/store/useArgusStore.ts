@@ -37,6 +37,7 @@ type ArgusStore = {
     gdelt: number;
     anomalies: number;
     weather: number;
+    vessels: number;
   };
   feedHealth: Record<FeedKey, FeedHealth>;
   activePoiId: string | null;
@@ -61,7 +62,8 @@ type ArgusStore = {
       | "threats"
       | "gdelt"
       | "anomalies"
-      | "weather",
+      | "weather"
+      | "vessels",
     value: number,
   ) => void;
   setFeedHealthy: (key: FeedKey) => void;
@@ -127,6 +129,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     gdelt: true,
     anomalies: true,
     weather: false,
+    vessels: false,
   },
   counts: {
     flights: 0,
@@ -140,6 +143,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     gdelt: 0,
     anomalies: 0,
     weather: 0,
+    vessels: 0,
   },
   feedHealth: {
     opensky: emptyFeed(),

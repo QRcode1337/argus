@@ -58,6 +58,7 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "gdelt", label: "GDELT Events", feed: "GDELT" },
   { key: "anomalies", label: "Chaos Anomalies", feed: "Phantom" },
   { key: "weather", label: "Weather Radar", feed: "RainViewer" },
+  { key: "vessels", label: "AIS Vessels", feed: "AISStream" },
 ];
 
 const analyticsIntelDefs: { key: LayerKey; label: string; feed: string }[] = [
@@ -1372,6 +1373,7 @@ export function HudOverlay({
                         gdelt: counts.gdelt,
                         anomalies: counts.anomalies,
                         weather: counts.weather,
+                        vessels: counts.vessels,
                       };
                       const value = valueMap[layer.key];
 
@@ -1418,6 +1420,7 @@ export function HudOverlay({
                     gdelt: counts.gdelt,
                     anomalies: counts.anomalies,
                     weather: counts.weather,
+                    vessels: counts.vessels,
                   };
                   const value = valueMap[layer.key];
 

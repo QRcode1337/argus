@@ -37,6 +37,7 @@ import { SatelliteLayer } from "@/lib/cesium/layers/satelliteLayer";
 import { SeismicLayer } from "@/lib/cesium/layers/seismicLayer";
 import { GdeltLayer } from "@/lib/cesium/layers/gdeltLayer";
 import { WeatherLayer } from "@/lib/cesium/layers/weatherLayer";
+import { VesselLayer } from "@/lib/cesium/layers/vesselLayer";
 import { VisualModeController } from "@/lib/cesium/shaders/visualModes";
 import { fetchMilitaryFlights } from "@/lib/ingest/adsb";
 import { fetchOpenSkyFlights } from "@/lib/ingest/opensky";
@@ -46,7 +47,7 @@ import { computeSatellitePositions, fetchTleRecords } from "@/lib/ingest/tle";
 import { fetchInternetOutages } from "@/lib/ingest/cloudflareRadar";
 import { fetchThreatPulses } from "@/lib/ingest/otx";
 import { fetchFredObservations } from "@/lib/ingest/fred";
-import { fetchAisSnapshotCount } from "@/lib/ingest/aisstream";
+import { fetchAisVessels } from "@/lib/ingest/aisstream";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
 import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import { fetchIssIntel } from "@/lib/ingest/iss";
@@ -176,6 +177,7 @@ const inferKindFromId = (id: string): string => {
   if (id.startsWith("base-")) return "base";
   if (id.startsWith("outage-")) return "outage";
   if (id.startsWith("threat-")) return "threat";
+  if (id.startsWith("vessel-")) return "vessel";
   return "unknown";
 };
 
@@ -235,6 +237,15 @@ const buildAnalysisSummary = (kind: string, props: Record<string, unknown>, name
         props.severity ? `Severity: ${props.severity}.` : null,
         typeof props.chaos_score === "number" ? `Chaos score: ${Number(props.chaos_score).toFixed(2)}.` : null,
         props.detail ? String(props.detail) : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+    case "vessel":
+      return [
+        `${name} is an AIS-tracked vessel (MMSI: ${props.mmsi ?? "unknown"}).`,
+        typeof props.sog === "number" ? `Speed over ground: ${Number(props.sog).toFixed(1)} knots.` : null,
+        typeof props.cog === "number" ? `Course: ${Number(props.cog).toFixed(0)}°.` : null,
+        props.callsign ? `Callsign: ${props.callsign}.` : null,
       ]
         .filter(Boolean)
         .join(" ");
@@ -373,6 +384,15 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("Location", props.actionGeoName);
       pushQuick("Source", props.sourceUrl);
       break;
+    case "vessel":
+      pushQuick("MMSI", props.mmsi);
+      pushQuick("Name", props.vesselName);
+      pushQuick("Callsign", props.callsign);
+      pushQuick("Speed (kn)", props.sog);
+      pushQuick("Course", props.cog);
+      pushQuick("Heading", props.heading);
+      pushQuick("Nav Status", props.navStatus);
+      break;
     default:
       break;
   }
@@ -459,6 +479,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const sentinelLayerRef = useRef<RasterLayer | null>(null);
   const anomalyLayerRef = useRef<AnomalyLayer | null>(null);
   const weatherLayerRef = useRef<WeatherLayer | null>(null);
+  const vesselLayerRef = useRef<VesselLayer | null>(null);
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
   const platformModeRef = useRef<PlatformMode>("live");
@@ -769,6 +790,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const threatLayer = new ThreatLayer(viewer);
     const gdeltLayer = new GdeltLayer(viewer);
     const anomalyLayer = new AnomalyLayer(viewer);
+    const vesselLayer = new VesselLayer(viewer);
     const weatherLayer = new WeatherLayer(viewer);
     void weatherLayer.init();
     const rasterLayer = new RasterLayer(viewer);
@@ -785,6 +807,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     threatLayerRef.current = threatLayer;
     gdeltLayerRef.current = gdeltLayer;
     anomalyLayerRef.current = anomalyLayer;
+    vesselLayerRef.current = vesselLayer;
     weatherLayerRef.current = weatherLayer;
     rasterLayerRef.current = rasterLayer;
     sentinelLayerRef.current = sentinelLayer;
@@ -1167,7 +1190,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       intervalMs: ARGUS_CONFIG.pollMs.aisstream,
       run: async () => {
         try {
-          await fetchAisSnapshotCount(ARGUS_CONFIG.endpoints.aisstream);
+          const vessels = await fetchAisVessels(ARGUS_CONFIG.endpoints.aisstream);
+          const count = vesselLayer.upsertVessels(vessels);
+          setCount("vessels", count);
           setFeedHealthy("ais");
         } catch (error) {
           setFeedError("ais", error instanceof Error ? error.message : "Failed to fetch AISStream");
@@ -1463,9 +1488,13 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     } else if (selectedIntel?.kind === "military") {
       const rawId = selectedIntel.id.replace(/^mil-/, "");
       militaryLayerRef.current?.showTrail(rawId);
+    } else if (selectedIntel?.kind === "vessel") {
+      const rawId = selectedIntel.id.replace(/^vessel-/, "");
+      vesselLayerRef.current?.showTrail(rawId);
     } else {
       flightLayerRef.current?.hideTrail();
       militaryLayerRef.current?.hideTrail();
+      vesselLayerRef.current?.hideTrail();
     }
   }, [selectedIntel]);
 
@@ -1509,6 +1538,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       threatLayerRef.current?.setVisible(layers.threats);
       gdeltLayerRef.current?.setVisible(layers.gdelt);
       anomalyLayerRef.current?.setVisible(layers.anomalies);
+      vesselLayerRef.current?.setVisible(false);
     } else if (platformMode === "playback") {
       const { layers } = useArgusStore.getState();
 
@@ -1522,6 +1552,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       threatLayerRef.current?.setVisible(false);
       gdeltLayerRef.current?.setVisible(false);
       anomalyLayerRef.current?.setVisible(false);
+      vesselLayerRef.current?.setVisible(false);
       setIsPlaying(false);
 
       void fetch("/api/playback/range", { cache: "no-store" })
@@ -1569,8 +1600,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       threatLayerRef.current?.setVisible(false);
       gdeltLayerRef.current?.setVisible(false);
       anomalyLayerRef.current?.setVisible(false);
+      vesselLayerRef.current?.setVisible(layers.vessels);
     }
-  }, [layers.gdelt, layers.outages, layers.threats, layers.anomalies, platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
+  }, [layers.gdelt, layers.outages, layers.threats, layers.anomalies, layers.vessels, platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
 
   // Fetch analytics tile URLs once on mount, store in refs
   const gfsTileUrlRef = useRef<string | null>(null);
@@ -1633,6 +1665,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       threatLayerRef.current?.setVisible(layers.threats);
       gdeltLayerRef.current?.setVisible(layers.gdelt);
       anomalyLayerRef.current?.setVisible(layers.anomalies);
+      vesselLayerRef.current?.setVisible(false);
       weatherLayerRef.current?.setVisible(layers.weather);
       return;
     }
@@ -1647,6 +1680,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     threatLayerRef.current?.setVisible(false);
     gdeltLayerRef.current?.setVisible(false);
     anomalyLayerRef.current?.setVisible(false);
+    vesselLayerRef.current?.setVisible(layers.vessels);
     weatherLayerRef.current?.setVisible(layers.weather);
   }, [
     platformMode,
@@ -1660,6 +1694,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     layers.seismic,
     layers.threats,
     layers.anomalies,
+    layers.vessels,
     layers.weather,
   ]);
 
