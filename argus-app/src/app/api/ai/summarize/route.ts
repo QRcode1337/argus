@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryLlm } from "@/lib/ai/llmClient";
+import { logPneumaLatency } from "@/lib/telemetry/pneumaLatencyLogger";
 
 const DEFAULT_SYSTEM_PROMPT = `You are an intelligence analyst. Provide a concise 2-3 sentence summary and analysis of the following item. Focus on strategic significance, potential implications, and key facts. Be direct and factual.`;
 
@@ -14,6 +15,7 @@ function getSystemPrompt(context: string | undefined): string {
 }
 
 export async function POST(req: Request) {
+  const start = performance.now();
   const { text, context } = await req.json();
   if (!text) return NextResponse.json({ error: "text required" }, { status: 400 });
 
@@ -23,8 +25,24 @@ export async function POST(req: Request) {
     : `Item to analyze:\n${text}`;
 
   const result = await queryLlm(prompt, systemPrompt);
+  const latency_ms = Math.round(performance.now() - start);
+
   if (result.error) {
+    logPneumaLatency({
+      route: "/api/ai/summarize",
+      context: context ?? null,
+      latency_ms,
+      status_code: 502,
+    }).catch(console.error);
     return NextResponse.json({ summary: null, error: result.error }, { status: 502 });
   }
+
+  logPneumaLatency({
+    route: "/api/ai/summarize",
+    context: context ?? null,
+    latency_ms,
+    status_code: 200,
+  }).catch(console.error);
+
   return NextResponse.json({ summary: result.text });
 }

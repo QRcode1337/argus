@@ -5,7 +5,7 @@ import type { MilitaryFlight, TrackedFlight } from "@/types/intel";
 // ---------------------------------------------------------------------------
 
 export type AlertSeverity = "INFO" | "WARNING" | "CRITICAL";
-export type AlertCategory = "FLIGHT" | "MILITARY" | "SATELLITE" | "SEISMIC" | "CAMERA" | "PHANTOM";
+export type AlertCategory = "FLIGHT" | "MILITARY" | "SATELLITE" | "SEISMIC" | "CAMERA" | "PHANTOM" | "ZERVE";
 export type ThreatLevel = "GREEN" | "AMBER" | "RED";
 
 export interface IntelAlert {
@@ -402,6 +402,83 @@ const PHANTOM_SEVERITY_MAP: Record<string, AlertSeverity> = {
   Low: "INFO",
 };
 
+// ---------------------------------------------------------------------------
+// Unified Anomaly Taxonomy
+// ---------------------------------------------------------------------------
+
+export type AnomalySourceEngine = "PHANTOM" | "ZERVE";
+
+export type PhantomSubType =
+  | "trajectory_chaos"
+  | "anomalous_velocity"
+  | "extreme_climb"
+  | "extreme_descent";
+
+export type ZerveSubType = "cluster" | "proximity" | "trend";
+
+export type AnomalySubType = PhantomSubType | ZerveSubType;
+
+export type ConfidenceTier = "high" | "moderate" | "low";
+
+export interface UnifiedAnomaly {
+  entity_id: string;
+  source_engine: AnomalySourceEngine;
+  anomaly_type: AnomalySubType;
+  chaos_score: number;
+  confidence: number;
+  confidence_tier: ConfidenceTier;
+  severity: "Critical" | "High" | "Medium" | "Low";
+  importance: "important" | "routine";
+  lat: number;
+  lon: number;
+  detail: string;
+  detected_at: string;
+  context: "anomaly";
+}
+
+/** Compute confidence tier from a 0-1 confidence score. Returns null if below threshold (filtered). */
+export function getConfidenceTier(confidence: number): ConfidenceTier | null {
+  if (confidence >= 0.9) return "high";
+  if (confidence >= 0.7) return "moderate";
+  if (confidence >= 0.5) return "low";
+  return null; // Below 0.5: filtered out
+}
+
+/** Determine importance flag: "important" if severity is Critical/High OR chaos_score >= 0.70 */
+export function getImportance(
+  severity: UnifiedAnomaly["severity"],
+  chaosScore: number,
+): "important" | "routine" {
+  if (severity === "Critical" || severity === "High") return "important";
+  if (chaosScore >= 0.70) return "important";
+  return "routine";
+}
+
+/** Convert a PhantomAnomaly to the unified taxonomy format. */
+export function toUnifiedAnomaly(
+  phantom: PhantomAnomaly,
+  confidence: number = 0.8,
+): UnifiedAnomaly | null {
+  const tier = getConfidenceTier(confidence);
+  if (!tier) return null; // Filtered: below 0.5
+
+  return {
+    entity_id: phantom.entity_id,
+    source_engine: "PHANTOM",
+    anomaly_type: phantom.anomaly_type as PhantomSubType,
+    chaos_score: phantom.chaos_score,
+    confidence,
+    confidence_tier: tier,
+    severity: phantom.severity,
+    importance: getImportance(phantom.severity, phantom.chaos_score),
+    lat: phantom.lat,
+    lon: phantom.lon,
+    detail: phantom.detail,
+    detected_at: phantom.detected_at,
+    context: "anomaly",
+  };
+}
+
 export function analyzePhantomResults(anomalies: PhantomAnomaly[]): IntelAlert[] {
   const now = Date.now();
   return anomalies.map((a) => ({
@@ -414,6 +491,22 @@ export function analyzePhantomResults(anomalies: PhantomAnomaly[]): IntelAlert[]
     coordinates: { lat: a.lat, lon: a.lon },
     entityId: a.entity_id,
   }));
+}
+
+export function analyzeZerveResults(anomalies: UnifiedAnomaly[]): IntelAlert[] {
+  const now = Date.now();
+  return anomalies
+    .filter((a) => a.source_engine === "ZERVE")
+    .map((a) => ({
+      id: nextAlertId(),
+      severity: PHANTOM_SEVERITY_MAP[a.severity] ?? ("INFO" as AlertSeverity),
+      category: "ZERVE" as AlertCategory,
+      title: `SPATIAL ANOMALY — ${a.anomaly_type.toUpperCase()}`,
+      detail: `${a.detail} [confidence: ${a.confidence_tier}, importance: ${a.importance}]`,
+      timestamp: now,
+      coordinates: { lat: a.lat, lon: a.lon },
+      entityId: a.entity_id,
+    }));
 }
 
 // ---------------------------------------------------------------------------
@@ -450,6 +543,7 @@ export function generateBriefing(alerts: IntelAlert[]): IntelBriefing {
     SEISMIC: 1.1,
     CAMERA: 0.7,
     PHANTOM: 1.3,
+    ZERVE: 1.1,
   };
 
   const riskScore = Math.round(
