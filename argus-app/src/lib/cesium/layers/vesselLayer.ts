@@ -39,6 +39,8 @@ export class VesselLayer {
     for (const vessel of vessels) {
       seen.add(vessel.mmsi);
 
+      if (!Number.isFinite(vessel.lon) || !Number.isFinite(vessel.lat)) continue;
+
       const position = Cartesian3.fromDegrees(
         vessel.lon,
         vessel.lat,
@@ -51,9 +53,12 @@ export class VesselLayer {
         history = [];
         this.positionHistory.set(vessel.mmsi, history);
       }
-      history.push(position);
-      if (history.length > MAX_TRAIL_POSITIONS) {
-        history.shift();
+      const last = history[history.length - 1];
+      if (!last || !Cartesian3.equals(last, position)) {
+        history.push(position);
+        if (history.length > MAX_TRAIL_POSITIONS) {
+          history.shift();
+        }
       }
 
       const existing = this.entities.get(vessel.mmsi);
@@ -68,7 +73,7 @@ export class VesselLayer {
         // Update trail if this vessel is being tracked
         if (this.activeTrailVesselId === vessel.mmsi && this.trailEntity) {
           const polyline = this.trailEntity.polyline;
-          if (polyline) {
+          if (polyline && history.length >= 2) {
             polyline.positions = new ConstantProperty(history.slice()) as any;
           }
         }

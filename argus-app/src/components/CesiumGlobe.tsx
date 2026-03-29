@@ -1717,12 +1717,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
     const satelliteProvider = new UrlTemplateImageryProvider({
       url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      maximumLevel: 19,
     });
     const streetProvider = new UrlTemplateImageryProvider({
       url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      maximumLevel: 19,
     });
     const darkProvider = new UrlTemplateImageryProvider({
       url: "https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+      maximumLevel: 19,
     });
 
     const provider =

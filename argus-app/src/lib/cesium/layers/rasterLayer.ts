@@ -23,7 +23,11 @@ export class RasterLayer {
    */
   load(tileUrl: string): void {
     this.unload();
-    const provider = new UrlTemplateImageryProvider({ url: tileUrl });
+    const provider = new UrlTemplateImageryProvider({
+      url: tileUrl,
+      minimumLevel: 0,
+      maximumLevel: 12,
+    });
     this.layer = this.viewer.imageryLayers.addImageryProvider(provider);
     this.layer.alpha = 0.8;
   }

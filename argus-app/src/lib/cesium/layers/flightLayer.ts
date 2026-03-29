@@ -39,10 +39,12 @@ export class FlightLayer {
     for (const flight of flights) {
       seen.add(flight.id);
 
+      if (!Number.isFinite(flight.longitude) || !Number.isFinite(flight.latitude)) continue;
+
       const position = Cartesian3.fromDegrees(
         flight.longitude,
         flight.latitude,
-        Math.max(0, flight.altitudeMeters),
+        Math.max(0, flight.altitudeMeters || 0),
       );
 
       // Append position to history (circular buffer)
@@ -51,9 +53,12 @@ export class FlightLayer {
         history = [];
         this.positionHistory.set(flight.id, history);
       }
-      history.push(position);
-      if (history.length > MAX_TRAIL_POSITIONS) {
-        history.shift();
+      const last = history[history.length - 1];
+      if (!last || !Cartesian3.equals(last, position)) {
+        history.push(position);
+        if (history.length > MAX_TRAIL_POSITIONS) {
+          history.shift();
+        }
       }
 
       const existing = this.entities.get(flight.id);
@@ -68,7 +73,7 @@ export class FlightLayer {
         // Update trail if this flight is being tracked
         if (this.activeTrailFlightId === flight.id && this.trailEntity) {
           const polyline = this.trailEntity.polyline;
-          if (polyline) {
+          if (polyline && history.length >= 2) {
             polyline.positions = new ConstantProperty(history.slice()) as any;
           }
         }

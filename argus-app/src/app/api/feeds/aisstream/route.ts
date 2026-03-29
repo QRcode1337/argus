@@ -3,7 +3,7 @@ import { reportFeedHealth } from "@/lib/feedHealth";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_BOUNDS = [[[[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]]];
+const DEFAULT_BOUNDS = [[[-90, -180], [90, 180]]];
 
 type AisVessel = {
   mmsi: number;
