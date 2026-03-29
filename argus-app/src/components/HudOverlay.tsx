@@ -1077,7 +1077,7 @@ export function HudOverlay({
           )}
 
           {/* INTEL BRIEF section */}
-          {workspace === "intel" && platformMode === "live" && (
+          {workspace === "intel" && (platformMode === "live" || platformMode === "analytics") && (
             <CollapsibleSection
               title="Intel Brief"
               badge={
@@ -1250,7 +1250,7 @@ export function HudOverlay({
           )}
 
           {/* SEARCH section */}
-          {workspace === "intel" && platformMode === "live" && (
+          {workspace === "intel" && (platformMode === "live" || platformMode === "analytics") && (
             <CollapsibleSection title="Search" badge={searchResults.length > 0 ? `${searchResults.length}` : null}>
               <div className="space-y-1.5">
                 <input
@@ -1312,9 +1312,66 @@ export function HudOverlay({
           <>
           <CollapsibleSection
             title="Intel Feeds"
-            badge={platformMode === "analytics" ? "Raster" : `${compact(totalLiveCount)}`}
+            badge={`${compact(totalLiveCount)}`}
           >
-            {platformMode === "analytics" ? (
+              <div className="space-y-1">
+                {layerDefs
+                  .filter((layer) => layer.key !== "outages" && layer.key !== "threats" && layer.key !== "gdelt")
+                  .map((layer) => {
+                  const valueMap: Record<LayerKey, number> = {
+                    flights: counts.flights,
+                    military: counts.military,
+                    satellites: counts.satellites,
+                    satelliteLinks: counts.satelliteLinks,
+                    seismic: counts.seismic,
+                    bases: counts.bases,
+                    outages: counts.outages,
+                    threats: counts.threats,
+                    gdelt: counts.gdelt,
+                    anomalies: counts.anomalies,
+                    weather: counts.weather,
+                    vessels: counts.vessels,
+                  };
+                  const value = valueMap[layer.key];
+
+                  return (
+                    <button
+                      key={layer.key}
+                      type="button"
+                      onClick={() => {
+                        toggleLayer(layer.key);
+                        if (layer.key === "anomalies") openChaosInfoPanel();
+                      }}
+                      className="flex w-full items-center justify-between rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-1.5 text-left transition hover:border-[#2eb8d4]"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
+                        <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">{layer.feed}</div>
+                      </div>
+                      <div className="ml-2 flex shrink-0 items-center gap-2 text-right font-mono">
+                        <span className="text-[11px] text-[#a5f0ff]">{compact(value)}</span>
+                        <span
+                          className={`rounded-md border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] ${
+                            layers[layer.key]
+                              ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                              : "border-[#504945] bg-[#282828] text-[#a89984]"
+                          }`}
+                        >
+                          {layers[layer.key] ? "On" : "Off"}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+          </CollapsibleSection>
+
+          {platformMode === "analytics" && (
+          <CollapsibleSection
+            title="Analytics Raster"
+            badge="Raster"
+            defaultOpen
+          >
               <div className="space-y-1.5">
                 {analyticsLayerDefs.map((layer) => (
                   <button
@@ -1403,60 +1460,8 @@ export function HudOverlay({
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-1">
-                {layerDefs
-                  .filter((layer) => layer.key !== "outages" && layer.key !== "threats" && layer.key !== "gdelt")
-                  .map((layer) => {
-                  const valueMap: Record<LayerKey, number> = {
-                    flights: counts.flights,
-                    military: counts.military,
-                    satellites: counts.satellites,
-                    satelliteLinks: counts.satelliteLinks,
-                    seismic: counts.seismic,
-                    bases: counts.bases,
-                    outages: counts.outages,
-                    threats: counts.threats,
-                    gdelt: counts.gdelt,
-                    anomalies: counts.anomalies,
-                    weather: counts.weather,
-                    vessels: counts.vessels,
-                  };
-                  const value = valueMap[layer.key];
-
-                  return (
-                    <button
-                      key={layer.key}
-                      type="button"
-                      onClick={() => {
-                        toggleLayer(layer.key);
-                        if (layer.key === "anomalies") openChaosInfoPanel();
-                      }}
-                      className="flex w-full items-center justify-between rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-1.5 text-left transition hover:border-[#2eb8d4]"
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
-                        <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">{layer.feed}</div>
-                      </div>
-                      <div className="ml-2 flex shrink-0 items-center gap-2 text-right font-mono">
-                        <span className="text-[11px] text-[#a5f0ff]">{compact(value)}</span>
-                        <span
-                          className={`rounded-md border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] ${
-                            layers[layer.key]
-                              ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
-                              : "border-[#504945] bg-[#282828] text-[#a89984]"
-                          }`}
-                        >
-                          {layers[layer.key] ? "On" : "Off"}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-
-              </div>
-            )}
           </CollapsibleSection>
+          )}
           {platformMode !== "analytics" ? (
             <CollapsibleSection title="Live Feeds" badge={`${LIVE_FEEDS.length}`}>
               <div className="space-y-1">

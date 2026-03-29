@@ -8,18 +8,25 @@ import {
   Cartesian2,
   Cartesian3,
   Color,
+  ColorMaterialProperty,
+  ConstantProperty,
   createOsmBuildingsAsync,
   createWorldTerrainAsync,
   Entity,
   HeadingPitchRoll,
+  HorizontalOrigin,
   Ion,
   JulianDate,
+  LabelStyle,
   Math as CesiumMath,
+  NearFarScalar,
   PolylineGlowMaterialProperty,
+  Rectangle,
   SceneMode as CesiumSceneMode,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
   UrlTemplateImageryProvider,
+  VerticalOrigin,
   Viewer,
   defined,
 } from "cesium";
@@ -99,6 +106,22 @@ type AnalyticsResponse = {
   fallback?: boolean;
   error?: string;
 };
+
+/** Zoom-box hotspot regions rendered as rectangles on the globe */
+const ZOOM_REGIONS = [
+  { id: "zr-mideast", label: "MIDEAST", west: 30, south: 12, east: 63, north: 42, color: "#fb4934", height: 1_200_000 },
+  { id: "zr-europe", label: "EUROPE", west: -12, south: 35, east: 45, north: 72, color: "#83a598", height: 2_500_000 },
+  { id: "zr-east-asia", label: "E. ASIA", west: 100, south: 18, east: 150, north: 50, color: "#fabd2f", height: 3_000_000 },
+  { id: "zr-south-asia", label: "S. ASIA", west: 60, south: 5, east: 100, north: 40, color: "#d3869b", height: 2_000_000 },
+  { id: "zr-north-am", label: "N. AMERICA", west: -130, south: 24, east: -65, north: 55, color: "#8ec07c", height: 4_000_000 },
+  { id: "zr-south-am", label: "S. AMERICA", west: -82, south: -56, east: -34, north: 14, color: "#fe8019", height: 4_000_000 },
+  { id: "zr-africa", label: "AFRICA", west: -18, south: -36, east: 52, north: 38, color: "#b8bb26", height: 4_500_000 },
+  { id: "zr-arctic", label: "ARCTIC", west: -180, south: 66, east: 180, north: 90, color: "#458588", height: 3_500_000 },
+  { id: "zr-oceania", label: "OCEANIA", west: 110, south: -48, east: 180, north: -8, color: "#689d6a", height: 3_500_000 },
+  { id: "zr-ukraine", label: "UKRAINE", west: 22, south: 44, east: 41, north: 53, color: "#fb4934", height: 800_000 },
+  { id: "zr-taiwan-str", label: "TAIWAN STR.", west: 115, south: 21, east: 125, north: 28, color: "#fb4934", height: 600_000 },
+  { id: "zr-horn-africa", label: "HORN / RED SEA", west: 36, south: 2, east: 55, north: 18, color: "#fe8019", height: 800_000 },
+] as const;
 
 const formatValue = (value: unknown): string => {
   if (value === null || value === undefined) {
@@ -819,6 +842,50 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     pickerRef.current = picker;
     viewerRef.current = viewer;
 
+    // --- Zoom-box hotspot regions ---
+    for (const zr of ZOOM_REGIONS) {
+      const baseColor = Color.fromCssColorString(zr.color);
+      viewer.entities.add({
+        id: zr.id,
+        name: zr.label,
+        rectangle: {
+          coordinates: Rectangle.fromDegrees(zr.west, zr.south, zr.east, zr.north),
+          material: new ColorMaterialProperty(baseColor.withAlpha(0.08)),
+          outline: true,
+          outlineColor: new ConstantProperty(baseColor.withAlpha(0.45)),
+          outlineWidth: new ConstantProperty(1),
+          height: 0,
+        },
+        label: {
+          text: zr.label,
+          font: "11px monospace",
+          style: LabelStyle.FILL_AND_OUTLINE,
+          outlineWidth: 3,
+          outlineColor: Color.fromCssColorString("#0b1118"),
+          fillColor: baseColor.withAlpha(0.85),
+          horizontalOrigin: HorizontalOrigin.CENTER,
+          verticalOrigin: VerticalOrigin.CENTER,
+          scaleByDistance: new NearFarScalar(1_500_000, 1.2, 20_000_000, 0.4),
+          translucencyByDistance: new NearFarScalar(500_000, 0, 2_000_000, 1),
+          pixelOffset: new Cartesian2(0, 0),
+          showBackground: true,
+          backgroundColor: Color.fromCssColorString("#0b1118").withAlpha(0.55),
+          backgroundPadding: new Cartesian2(6, 3),
+        },
+        position: Cartesian3.fromDegrees(
+          (zr.west + zr.east) / 2,
+          (zr.south + zr.north) / 2,
+          0,
+        ),
+        properties: {
+          zoomRegion: true,
+          zoomHeight: zr.height,
+          centerLon: (zr.west + zr.east) / 2,
+          centerLat: (zr.south + zr.north) / 2,
+        } as unknown as Record<string, unknown>,
+      });
+    }
+
     picker.setInputAction((event: { position: Cartesian2 }) => {
       const picked = viewer.scene.pick(event.position);
       if (
@@ -838,6 +905,22 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         }
         setSelectedIntel(null);
         setShowFullIntel(false);
+        return;
+      }
+
+      // Handle zoom-region box clicks — fly to region center
+      const clickedEntity = picked.id as Entity;
+      if (clickedEntity.id?.startsWith("zr-") && clickedEntity.properties) {
+        const props = clickedEntity.properties;
+        const cLon = props.centerLon?.getValue(JulianDate.now()) as number | undefined;
+        const cLat = props.centerLat?.getValue(JulianDate.now()) as number | undefined;
+        const zH = props.zoomHeight?.getValue(JulianDate.now()) as number | undefined;
+        if (cLon != null && cLat != null && zH != null) {
+          viewer.camera.flyTo({
+            destination: Cartesian3.fromDegrees(cLon, cLat, zH),
+            duration: 1.8,
+          });
+        }
         return;
       }
 
