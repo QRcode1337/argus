@@ -72,29 +72,58 @@ export async function queryLlm(prompt: string, systemPrompt?: string): Promise<L
     }
 
     if (llm.provider === "pneuma") {
-      const pneuma = await getPneumaInstance();
-      if (!pneuma.isInitialized) pneuma.initialize();
+      try {
+        const pneuma = await getPneumaInstance();
+        if (!pneuma.isInitialized) pneuma.initialize();
 
-      const generator = await getGradientGenerator();
-      const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
+        const generator = await getGradientGenerator();
+        const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
 
-      // Generate 3 candidates: Id, Ego, Superego
-      const candidates = await generator.generateCandidates(fullPrompt, {
-        mood: "neutral",
-        memories: [],
-        persona: "balanced",
-      });
+        // Generate 3 candidates: Id, Ego, Superego
+        const candidates = await generator.generateCandidates(fullPrompt, {
+          mood: "neutral",
+          memories: [],
+          persona: "balanced",
+        });
 
-      // Create hash-based embedding from input text
-      const embedding = hashEmbedding(fullPrompt);
+        // Create hash-based embedding from input text
+        const embedding = hashEmbedding(fullPrompt);
 
-      // Feed candidates + embedding through PNEUMA's cognitive pipeline
-      const result = pneuma.processInput(fullPrompt, embedding, candidates);
+        // Feed candidates + embedding through PNEUMA's cognitive pipeline
+        const result = pneuma.processInput(fullPrompt, embedding, candidates);
 
-      return {
-        text: result.selectedText ?? "",
-        pneumaState: result,
-      };
+        const text = result.selectedText ?? "";
+        if (text) {
+          return { text, pneumaState: result };
+        }
+        // Empty result — fall through to Ollama backup
+      } catch (e: unknown) {
+        console.warn("[PNEUMA] Gradient failed, falling back to Ollama:", e instanceof Error ? e.message : e);
+      }
+
+      // Ollama fallback for PNEUMA provider
+      if (llm.endpoint) {
+        try {
+          const res = await fetch(`${llm.endpoint}/api/generate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: llm.model || "llama3",
+              prompt: systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt,
+              stream: false,
+            }),
+            signal: controller.signal,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.response) return { text: data.response };
+          }
+        } catch {
+          // Ollama also unavailable
+        }
+      }
+
+      return { text: "", error: "PNEUMA and Ollama fallback both failed" };
     }
 
     // OpenAI-compatible

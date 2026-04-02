@@ -420,10 +420,14 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       break;
   }
 
+  const quickLabels = new Set(quickFacts.map((f) => f.label));
   const fullFacts: IntelDatum[] = [{ label: "Entity ID", value: entity.id }];
   for (const [key, value] of Object.entries(props)) {
     if (value === null || value === undefined || key === "kind") continue;
-    fullFacts.push({ label: key, value: formatValue(value) });
+    const formatted = formatValue(value);
+    // Skip properties already shown in quickFacts
+    if (quickLabels.has(key) || quickFacts.some((f) => f.value === formatted)) continue;
+    fullFacts.push({ label: key, value: formatted });
   }
 
   if (cartographic) {
