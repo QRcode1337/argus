@@ -594,10 +594,11 @@ export function HudOverlay({
         ...intel.quickFacts.map((f) => `${f.label}: ${f.value}`),
         ...intel.fullFacts.map((f) => `${f.label}: ${f.value}`),
       ].join("\n");
+      const context = intel.kind === "info" ? "anomaly" : intel.kind;
       const res = await fetch("/api/ai/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, context: intel.kind }),
+        body: JSON.stringify({ text, context }),
       });
       const data = await res.json();
       if (data.summary) {
@@ -605,8 +606,18 @@ export function HudOverlay({
           ...intel,
           analysisSummary: data.summary,
         });
+      } else if (data.error) {
+        onSelectIntel({
+          ...intel,
+          analysisSummary: `[AI Summary unavailable: ${data.error}]`,
+        });
       }
-    } catch {} finally {
+    } catch (err) {
+      onSelectIntel({
+        ...intel,
+        analysisSummary: `[AI Summary failed: ${err instanceof Error ? err.message : "network error"}]`,
+      });
+    } finally {
       setAiSummaryLoading(false);
     }
   };
@@ -906,7 +917,7 @@ export function HudOverlay({
             </button>
           ) : null}
 
-          {(!selectedIntel.analysisSummary || selectedIntel.kind === "gdelt" || selectedIntel.kind === "anomaly") ? (
+          {(!selectedIntel.analysisSummary || selectedIntel.kind === "gdelt" || selectedIntel.kind === "anomaly" || selectedIntel.kind === "info") ? (
             <button
               type="button"
               onClick={() => requestAiSummary(selectedIntel)}
