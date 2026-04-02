@@ -89,6 +89,7 @@ export class VesselLayer {
           scale: 0.7,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(500_000, 1.5, 10_000_000, 0.3),
+          disableDepthTestDistance: 0,
         },
         properties: {
           kind: "vessel",

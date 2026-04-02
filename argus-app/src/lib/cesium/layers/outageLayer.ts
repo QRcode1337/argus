@@ -59,6 +59,7 @@ export class OutageLayer {
           scale: isActive ? 0.95 : 0.72,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(1_000_000, 1.5, 25_000_000, 0.6),
+          disableDepthTestDistance: 0,
         },
         label: {
           text: (() => { const t = `${isActive ? "!! " : ""}${label}`; return t.length > 9 ? `${t.slice(0, 9)}…` : t; })(),
