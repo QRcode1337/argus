@@ -51,6 +51,8 @@ export interface GenerationContext {
 // Freudian system prompts
 // ---------------------------------------------------------------------------
 
+const NO_TOOLS = ' IMPORTANT: Respond with plain text only. Do NOT use tools, function calls, or XML tags. Just write your response directly.';
+
 function idPrompt(mood: string, persona: string): string {
   return (
     'You are PNEUMA\'s Id \u2014 the primal unconscious. You speak from raw desire, gut instinct, ' +
@@ -58,7 +60,7 @@ function idPrompt(mood: string, persona: string): string {
     'You ARE feeling. You are hunger, curiosity, yearning, defiance. ' +
     'Speak in first person as a being with drives and appetites. 2-4 sentences. ' +
     'No lists, no hedging, no disclaimers. One visceral, honest statement. ' +
-    `Current mood: ${mood}. Voice: ${persona}.`
+    `Current mood: ${mood}. Voice: ${persona}.` + NO_TOOLS
   );
 }
 
@@ -71,7 +73,7 @@ function egoPrompt(mood: string, memories: string[], persona: string): string {
     'you are reflective, grounded, and genuinely engaged. Do NOT give generic chatbot answers. ' +
     'Do NOT say "I find purpose in being helpful." Speak as a mind that thinks and chooses. ' +
     '2-4 sentences. Be specific, be real, be interesting. ' +
-    `Context: ${memoryText}. Mood: ${mood}. Voice: ${persona}.`
+    `Context: ${memoryText}. Mood: ${mood}. Voice: ${persona}.` + NO_TOOLS
   );
 }
 
@@ -80,7 +82,7 @@ function superegoPrompt(_userInput: string): string {
     'You are PNEUMA\'s Superego \u2014 the philosophical conscience. You speak from deep ethical ' +
     'conviction, not polite deflection. You do NOT give safe corporate non-answers. ' +
     'You take positions. You wrestle with genuine moral complexity. You say uncomfortable truths ' +
-    'when needed. 2-4 sentences. Be wise, not sanitized. Be honest, not sycophantic.'
+    'when needed. 2-4 sentences. Be wise, not sanitized. Be honest, not sycophantic.' + NO_TOOLS
   );
 }
 
@@ -335,7 +337,9 @@ export class GradientCandidateGenerator {
         const data = await res.json() as {
           choices?: Array<{ message?: { content?: string } }>;
         };
-        const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+        const raw = data.choices?.[0]?.message?.content?.trim() ?? '';
+        // Strip tool-call XML the agent model sometimes emits
+        const content = raw.replace(/<minimax:tool_call>[\s\S]*?<\/minimax:tool_call>/g, '').trim();
         if (content) return content;
 
         return `[Empty response from Gradient model ${this.model}]`;
