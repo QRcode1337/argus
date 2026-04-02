@@ -38,7 +38,7 @@ export class AnomalyLayer {
       if (this.entities.has(entityId)) continue;
 
       const colors = SEVERITY_COLORS[anomaly.severity] ?? SEVERITY_COLORS.Low;
-      const label = anomaly.anomaly_type.replace(/_/g, " ").slice(0, 12);
+      const label = anomaly.anomaly_type.replace(/_/g, " ");
 
       const entity = this.viewer.entities.add({
         id: entityId,

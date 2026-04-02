@@ -1679,10 +1679,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       seismicLayerRef.current?.setVisible(layers.seismic);
 
       basesLayerRef.current?.setVisible(layers.bases);
-      outageLayerRef.current?.setVisible(false);
-      threatLayerRef.current?.setVisible(false);
-      gdeltLayerRef.current?.setVisible(false);
-      anomalyLayerRef.current?.setVisible(false);
+      outageLayerRef.current?.setVisible(layers.outages);
+      threatLayerRef.current?.setVisible(layers.threats);
+      gdeltLayerRef.current?.setVisible(layers.gdelt);
+      anomalyLayerRef.current?.setVisible(layers.anomalies);
       vesselLayerRef.current?.setVisible(layers.vessels);
     }
   }, [layers.gdelt, layers.outages, layers.threats, layers.anomalies, layers.vessels, platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
@@ -1759,10 +1759,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     satLayerRef.current?.setLinkVisible(layers.satellites && layers.satelliteLinks);
     seismicLayerRef.current?.setVisible(layers.seismic);
     basesLayerRef.current?.setVisible(layers.bases);
-    outageLayerRef.current?.setVisible(false);
-    threatLayerRef.current?.setVisible(false);
-    gdeltLayerRef.current?.setVisible(false);
-    anomalyLayerRef.current?.setVisible(false);
+    outageLayerRef.current?.setVisible(layers.outages);
+    threatLayerRef.current?.setVisible(layers.threats);
+    gdeltLayerRef.current?.setVisible(layers.gdelt);
+    anomalyLayerRef.current?.setVisible(layers.anomalies);
     vesselLayerRef.current?.setVisible(layers.vessels);
     weatherLayerRef.current?.setVisible(layers.weather);
   }, [
