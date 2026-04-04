@@ -117,6 +117,22 @@ type AnalyticsResponse = {
   error?: string;
 };
 
+type TileErrorLike = {
+  message?: unknown;
+  error?: unknown;
+  retry?: boolean;
+};
+
+type ImageryProviderWithErrorEvent = {
+  errorEvent?: {
+    addEventListener?: (listener: (error: TileErrorLike) => void) => (() => void) | void;
+  };
+};
+
+type ImageryLayerWithProvider = {
+  imageryProvider?: ImageryProviderWithErrorEvent;
+};
+
 /** Zoom-box hotspot regions rendered as rectangles on the globe */
 const ZOOM_REGIONS = [
   { id: "zr-mideast", label: "MIDEAST", west: 30, south: 12, east: 63, north: 42, color: "#fb4934", height: 1_200_000 },
@@ -132,6 +148,93 @@ const ZOOM_REGIONS = [
   { id: "zr-taiwan-str", label: "TAIWAN STR.", west: 115, south: 21, east: 125, north: 28, color: "#fb4934", height: 600_000 },
   { id: "zr-horn-africa", label: "HORN / RED SEA", west: 36, south: 2, east: 55, north: 18, color: "#fe8019", height: 800_000 },
 ] as const;
+
+const UNSUPPORTED_ZOOM_ERROR = /zoom level not supported/i;
+
+const isUnsupportedZoomError = (value: unknown): boolean => {
+  if (!value) {
+    return false;
+  }
+
+  if (typeof value === "string") {
+    return UNSUPPORTED_ZOOM_ERROR.test(value);
+  }
+
+  if (value instanceof Error) {
+    return UNSUPPORTED_ZOOM_ERROR.test(value.message);
+  }
+
+  if (typeof value === "object") {
+    const candidate = value as Record<string, unknown>;
+    return (
+      isUnsupportedZoomError(candidate.message) ||
+      isUnsupportedZoomError(candidate.error) ||
+      isUnsupportedZoomError(candidate.title)
+    );
+  }
+
+  return false;
+};
+
+const suppressUnsupportedZoomErrors = (viewer: Viewer): (() => void) => {
+  const cleanupFns: Array<() => void> = [];
+  const seenProviders = new WeakSet<object>();
+  const imageryLayers = viewer.imageryLayers;
+  const widget = viewer.cesiumWidget as unknown as {
+    showErrorPanel?: (...args: unknown[]) => void;
+  };
+
+  const attachProvider = (provider?: ImageryProviderWithErrorEvent) => {
+    if (!provider || typeof provider !== "object" || seenProviders.has(provider)) {
+      return;
+    }
+
+    seenProviders.add(provider);
+    const removeListener = provider.errorEvent?.addEventListener?.((tileError) => {
+      if (isUnsupportedZoomError(tileError)) {
+        tileError.retry = false;
+      }
+    });
+
+    if (typeof removeListener === "function") {
+      cleanupFns.push(removeListener);
+    }
+  };
+
+  for (let index = 0; index < imageryLayers.length; index += 1) {
+    attachProvider(imageryLayers.get(index) as ImageryLayerWithProvider);
+  }
+
+  const removeLayerAddedListener = imageryLayers.layerAdded.addEventListener((layer) => {
+    attachProvider(layer as ImageryLayerWithProvider);
+  });
+  if (typeof removeLayerAddedListener === "function") {
+    cleanupFns.push(removeLayerAddedListener);
+  }
+
+  const originalShowErrorPanel = widget.showErrorPanel;
+  if (typeof originalShowErrorPanel === "function") {
+    widget.showErrorPanel = (...args: unknown[]) => {
+      if (args.some(isUnsupportedZoomError)) {
+        const errorPanel = viewer.container.querySelector(".cesium-widget-errorPanel");
+        errorPanel?.remove();
+        return;
+      }
+
+      originalShowErrorPanel.apply(widget, args);
+    };
+
+    cleanupFns.push(() => {
+      widget.showErrorPanel = originalShowErrorPanel;
+    });
+  }
+
+  return () => {
+    for (const cleanup of cleanupFns.reverse()) {
+      cleanup();
+    }
+  };
+};
 
 const formatValue = (value: unknown): string => {
   if (value === null || value === undefined) {
@@ -784,6 +887,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       timeline: false,
       shouldAnimate: true,
     });
+    const restoreUnsupportedZoomHandling = suppressUnsupportedZoomErrors(viewer);
     const cameraController = viewer.scene.screenSpaceCameraController;
     cameraController.enableCollisionDetection = collisionEnabledRef.current;
     cameraController.inertiaSpin = 0.82;
@@ -1337,6 +1441,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       poller.stopAll();
       rasterLayer.unload();
       viewer.camera.changed.removeEventListener(onCameraChanged);
+      restoreUnsupportedZoomHandling();
 
       if (selectionRingRef.current) {
         viewer.entities.remove(selectionRingRef.current);
@@ -1365,7 +1470,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       visualModeRef.current = null;
       pickerRef.current = null;
     };
-  }, [setCamera, setClickedCoordinates, setCount, setFeedError, setFeedHealthy]);
+  }, [pushIncidents, setCamera, setClickedCoordinates, setCount, setFeedError, setFeedHealthy]);
 
   // DVR playback data loop
   const playbackModeState = useArgusStore((s) => s.platformMode);
@@ -1974,38 +2079,38 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
       {!epicFuryActive && (
         <HudOverlay
-        onFlyToPoi={flyToPoi}
-        onResetCamera={resetCamera}
-        onToggleCollision={toggleCollisionDetection}
-        collisionEnabled={collisionEnabled}
-        analyticsStatus={platformMode !== "analytics" ? null : analyticsStatus}
-        selectedIntel={selectedIntel}
-        showFullIntel={showFullIntel}
-        onToggleFullIntel={() => setShowFullIntel((current) => !current)}
-        onCloseIntel={() => {
-          setSelectedIntel(null);
-          setShowFullIntel(false);
-          if (trackedEntityId) {
-            setTrackedEntityId(null);
-          }
-        }}
-        onFlyToEntity={flyToSelectedEntity}
-        onTrackEntity={handleTrackEntity}
-        trackedEntityId={trackedEntityId}
-        intelBriefing={intelBriefing}
-        onFlyToCoordinates={flyToCoordinates}
-        onFlyToEntityById={flyToEntityById}
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onTiltUp={tiltUp}
-        onTiltDown={tiltDown}
-        onRotateLeft={rotateLeft}
-        onRotateRight={rotateRight}
-        onPlayPause={handlePlayPause}
-        onSeek={handleSeek}
-        clickedCoordinates={clickedCoordinates}
-        onSelectIntel={setSelectedIntel}
-      />
+          onFlyToPoi={flyToPoi}
+          onResetCamera={resetCamera}
+          onToggleCollision={toggleCollisionDetection}
+          collisionEnabled={collisionEnabled}
+          analyticsStatus={platformMode !== "analytics" ? null : analyticsStatus}
+          selectedIntel={selectedIntel}
+          showFullIntel={showFullIntel}
+          onToggleFullIntel={() => setShowFullIntel((current) => !current)}
+          onCloseIntel={() => {
+            setSelectedIntel(null);
+            setShowFullIntel(false);
+            if (trackedEntityId) {
+              setTrackedEntityId(null);
+            }
+          }}
+          onFlyToEntity={flyToSelectedEntity}
+          onTrackEntity={handleTrackEntity}
+          trackedEntityId={trackedEntityId}
+          intelBriefing={intelBriefing}
+          onFlyToCoordinates={flyToCoordinates}
+          onFlyToEntityById={flyToEntityById}
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onTiltUp={tiltUp}
+          onTiltDown={tiltDown}
+          onRotateLeft={rotateLeft}
+          onRotateRight={rotateRight}
+          onPlayPause={handlePlayPause}
+          onSeek={handleSeek}
+          clickedCoordinates={clickedCoordinates}
+          onSelectIntel={setSelectedIntel}
+        />
       )}
     </div>
   );

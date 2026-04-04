@@ -1,7 +1,11 @@
 "use client";
 
-import React from "react";
-import { useEpicFuryStore, type TimeWindow } from "@/store/useEpicFuryStore";
+import React, { useMemo } from "react";
+import {
+  filterEpicFuryIncidents,
+  useEpicFuryStore,
+  type TimeWindow,
+} from "@/store/useEpicFuryStore";
 
 const TIME_WINDOWS: TimeWindow[] = ["1h", "6h", "24h", "7d", "all"];
 
@@ -33,7 +37,11 @@ export const EpicFuryHud: React.FC<{
   const timeWindow = useEpicFuryStore((s) => s.timeWindow);
   const setTimeWindow = useEpicFuryStore((s) => s.setTimeWindow);
   const lockedRegion = useEpicFuryStore((s) => s.lockedRegion);
-  const incidents = useEpicFuryStore((s) => s.filteredIncidents());
+  const allIncidents = useEpicFuryStore((s) => s.incidents);
+  const incidents = useMemo(
+    () => filterEpicFuryIncidents(allIncidents, timeWindow, lockedRegion),
+    [allIncidents, lockedRegion, timeWindow],
+  );
 
   return (
     <div className="absolute top-[5.5rem] left-8 w-[400px] bg-[#0d1520]/90 border border-cyan-900/50 rounded-lg p-4 font-mono text-xs text-cyan-500 shadow-[0_0_20px_rgba(8,145,178,0.2)] z-50 backdrop-blur-md">

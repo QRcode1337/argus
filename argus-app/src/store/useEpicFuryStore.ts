@@ -47,6 +47,39 @@ function isInRegion(lat: number, lon: number, r: ZoomRegion): boolean {
   return lat >= r.south && lat <= r.north && lon >= r.west && lon <= r.east;
 }
 
+export function filterEpicFuryIncidents(
+  incidents: EpicFuryIncident[],
+  timeWindow: TimeWindow,
+  lockedRegion: ZoomRegion | null,
+  now = Date.now(),
+): EpicFuryIncident[] {
+  const cutoff = timeWindow === "all" ? 0 : now - TIME_WINDOW_MS[timeWindow];
+  return incidents.filter((incident) => {
+    if (incident.timestamp < cutoff) return false;
+    if (lockedRegion && !isInRegion(incident.lat, incident.lon, lockedRegion)) return false;
+    return true;
+  });
+}
+
+export function computeEpicFuryRegionStats(
+  incidents: EpicFuryIncident[],
+  lockedRegion: ZoomRegion | null,
+  now = Date.now(),
+): RegionStats {
+  if (!lockedRegion) {
+    return { militaryInRegion: 0, vesselsInRegion: 0, incidentsLastHour: 0, seismicInRegion: 0 };
+  }
+
+  const inRegion = incidents.filter((incident) => isInRegion(incident.lat, incident.lon, lockedRegion));
+  const oneHourAgo = now - 3_600_000;
+  return {
+    militaryInRegion: inRegion.filter((incident) => incident.type === "military").length,
+    vesselsInRegion: inRegion.filter((incident) => incident.type === "vessel").length,
+    incidentsLastHour: inRegion.filter((incident) => incident.timestamp >= oneHourAgo).length,
+    seismicInRegion: inRegion.filter((incident) => incident.type === "seismic").length,
+  };
+}
+
 type EpicFuryStore = {
   active: boolean;
   timeWindow: TimeWindow;
@@ -84,24 +117,11 @@ export const useEpicFuryStore = create<EpicFuryStore>((set, get) => ({
 
   filteredIncidents: () => {
     const { incidents, timeWindow, lockedRegion } = get();
-    const cutoff = timeWindow === "all" ? 0 : Date.now() - TIME_WINDOW_MS[timeWindow];
-    return incidents.filter((i) => {
-      if (i.timestamp < cutoff) return false;
-      if (lockedRegion && !isInRegion(i.lat, i.lon, lockedRegion)) return false;
-      return true;
-    });
+    return filterEpicFuryIncidents(incidents, timeWindow, lockedRegion);
   },
 
   regionStats: () => {
     const { incidents, lockedRegion } = get();
-    if (!lockedRegion) return { militaryInRegion: 0, vesselsInRegion: 0, incidentsLastHour: 0, seismicInRegion: 0 };
-    const inRegion = incidents.filter((i) => isInRegion(i.lat, i.lon, lockedRegion));
-    const oneHourAgo = Date.now() - 3_600_000;
-    return {
-      militaryInRegion: inRegion.filter((i) => i.type === "military").length,
-      vesselsInRegion: inRegion.filter((i) => i.type === "vessel").length,
-      incidentsLastHour: inRegion.filter((i) => i.timestamp >= oneHourAgo).length,
-      seismicInRegion: inRegion.filter((i) => i.type === "seismic").length,
-    };
+    return computeEpicFuryRegionStats(incidents, lockedRegion);
   },
 }));

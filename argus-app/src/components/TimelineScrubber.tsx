@@ -1,7 +1,11 @@
 "use client";
 
-import React from "react";
-import { useEpicFuryStore, type TimeWindow } from "@/store/useEpicFuryStore";
+import React, { useMemo } from "react";
+import {
+  filterEpicFuryIncidents,
+  useEpicFuryStore,
+  type TimeWindow,
+} from "@/store/useEpicFuryStore";
 
 const TIME_WINDOWS: TimeWindow[] = ["1h", "6h", "24h", "7d", "all"];
 
@@ -16,7 +20,12 @@ const WINDOW_LABELS: Record<TimeWindow, string> = {
 export const TimelineScrubber: React.FC = () => {
   const timeWindow = useEpicFuryStore((s) => s.timeWindow);
   const setTimeWindow = useEpicFuryStore((s) => s.setTimeWindow);
-  const incidents = useEpicFuryStore((s) => s.filteredIncidents());
+  const lockedRegion = useEpicFuryStore((s) => s.lockedRegion);
+  const allIncidents = useEpicFuryStore((s) => s.incidents);
+  const incidents = useMemo(
+    () => filterEpicFuryIncidents(allIncidents, timeWindow, lockedRegion),
+    [allIncidents, lockedRegion, timeWindow],
+  );
 
   const newest = incidents.length > 0 ? incidents[0].timestamp : null;
 

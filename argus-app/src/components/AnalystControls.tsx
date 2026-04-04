@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { useEpicFuryStore } from "@/store/useEpicFuryStore";
+import React, { useMemo } from "react";
+import { computeEpicFuryRegionStats, useEpicFuryStore } from "@/store/useEpicFuryStore";
 import { useArgusStore } from "@/store/useArgusStore";
 import type { LayerKey } from "@/types/intel";
 
@@ -19,7 +19,11 @@ export const AnalystControls: React.FC = () => {
   const toggleLayer = useArgusStore((s) => s.toggleLayer);
   const lockedRegion = useEpicFuryStore((s) => s.lockedRegion);
   const unlockRegion = useEpicFuryStore((s) => s.unlockRegion);
-  const stats = useEpicFuryStore((s) => s.regionStats());
+  const incidents = useEpicFuryStore((s) => s.incidents);
+  const stats = useMemo(
+    () => computeEpicFuryRegionStats(incidents, lockedRegion),
+    [incidents, lockedRegion],
+  );
 
   return (
     <div className="absolute top-[5.5rem] right-8 w-80 bg-[#0d1520]/90 border border-cyan-900/50 rounded-lg p-4 font-mono text-xs text-cyan-500 shadow-[0_0_20px_rgba(8,145,178,0.2)] z-50 backdrop-blur-md">
