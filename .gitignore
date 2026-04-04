@@ -29,3 +29,4 @@ logs/
 node_modules/
 .vercel
 phantom/target/
+.worktrees/
