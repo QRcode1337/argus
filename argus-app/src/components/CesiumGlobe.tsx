@@ -1,5 +1,4 @@
 "use client";
-import { AnalystControls } from "./AnalystControls";
 import { TimelineScrubber } from "./TimelineScrubber";
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
@@ -150,7 +149,8 @@ const ZOOM_REGIONS = [
   { id: "zr-horn-africa", label: "HORN / RED SEA", west: 36, south: 2, east: 55, north: 18, color: "#fe8019", height: 800_000 },
 ] as const;
 
-const UNSUPPORTED_ZOOM_ERROR = /zoom level not supported/i;
+const UNSUPPORTED_ZOOM_ERROR =
+  /zoom level not supported|unsupported zoom|outside.*zoom|not available.*zoom|invalid.*zoom/i;
 
 const isUnsupportedZoomError = (value: unknown): boolean => {
   if (!value) {
@@ -1860,7 +1860,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       })
       .then((data) => {
         for (const layer of data.layers) {
-          if (layer.id === "gfs_precip_radar" || layer.id === "gfs_satellite_ir") {
+          if (layer.id === "gfs_precip_radar") {
             gfsTileUrlRef.current = layer.tileUrl;
             gfsMaxLevelRef.current = layer.maximumLevel;
           } else if (layer.id === "sentinel_imagery") {
@@ -2081,7 +2081,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       {epicFuryActive && (
         <>
           <EpicFuryHud onFlyToCoordinates={flyToCoordinates} />
-          <AnalystControls />
           <TimelineScrubber />
         </>
       )}
@@ -2100,41 +2099,40 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         </button>
       </div>
 
-      {!epicFuryActive && (
-        <HudOverlay
-          onFlyToPoi={flyToPoi}
-          onResetCamera={resetCamera}
-          onToggleCollision={toggleCollisionDetection}
-          collisionEnabled={collisionEnabled}
-          analyticsStatus={platformMode !== "analytics" ? null : analyticsStatus}
-          selectedIntel={selectedIntel}
-          showFullIntel={showFullIntel}
-          onToggleFullIntel={() => setShowFullIntel((current) => !current)}
-          onCloseIntel={() => {
-            setSelectedIntel(null);
-            setShowFullIntel(false);
-            if (trackedEntityId) {
-              setTrackedEntityId(null);
-            }
-          }}
-          onFlyToEntity={flyToSelectedEntity}
-          onTrackEntity={handleTrackEntity}
-          trackedEntityId={trackedEntityId}
-          intelBriefing={intelBriefing}
-          onFlyToCoordinates={flyToCoordinates}
-          onFlyToEntityById={flyToEntityById}
-          onZoomIn={zoomIn}
-          onZoomOut={zoomOut}
-          onTiltUp={tiltUp}
-          onTiltDown={tiltDown}
-          onRotateLeft={rotateLeft}
-          onRotateRight={rotateRight}
-          onPlayPause={handlePlayPause}
-          onSeek={handleSeek}
-          clickedCoordinates={clickedCoordinates}
-          onSelectIntel={setSelectedIntel}
-        />
-      )}
+      <HudOverlay
+        onFlyToPoi={flyToPoi}
+        onResetCamera={resetCamera}
+        onToggleCollision={toggleCollisionDetection}
+        collisionEnabled={collisionEnabled}
+        analyticsStatus={platformMode !== "analytics" ? null : analyticsStatus}
+        selectedIntel={selectedIntel}
+        showFullIntel={showFullIntel}
+        onToggleFullIntel={() => setShowFullIntel((current) => !current)}
+        onCloseIntel={() => {
+          setSelectedIntel(null);
+          setShowFullIntel(false);
+          if (trackedEntityId) {
+            setTrackedEntityId(null);
+          }
+        }}
+        onFlyToEntity={flyToSelectedEntity}
+        onTrackEntity={handleTrackEntity}
+        trackedEntityId={trackedEntityId}
+        intelBriefing={intelBriefing}
+        onFlyToCoordinates={flyToCoordinates}
+        onFlyToEntityById={flyToEntityById}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onTiltUp={tiltUp}
+        onTiltDown={tiltDown}
+        onRotateLeft={rotateLeft}
+        onRotateRight={rotateRight}
+        onPlayPause={handlePlayPause}
+        onSeek={handleSeek}
+        clickedCoordinates={clickedCoordinates}
+        onSelectIntel={setSelectedIntel}
+        epicFuryActive={epicFuryActive}
+      />
     </div>
   );
 }

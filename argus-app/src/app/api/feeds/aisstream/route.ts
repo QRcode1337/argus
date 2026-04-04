@@ -110,6 +110,7 @@ async function fetchSnapshotFromWs(apiKey: string): Promise<AisPayload> {
 
   return new Promise((resolve, reject) => {
     const vessels = new Map<number, AisVessel>();
+    let upstreamError: string | null = null;
 
     const ws = new WebSocket("wss://stream.aisstream.io/v0/stream", {
       handshakeTimeout: REQUEST_TIMEOUT_MS,
@@ -144,6 +145,12 @@ async function fetchSnapshotFromWs(apiKey: string): Promise<AisPayload> {
     ws.on("message", (data: unknown) => {
       try {
         const parsed = JSON.parse(rawDataToString(data));
+        if (parsed && typeof parsed === "object" && typeof (parsed as { error?: unknown }).error === "string") {
+          upstreamError = (parsed as { error: string }).error;
+          try { ws.close(); } catch {}
+          finish(() => reject(new Error(upstreamError ?? "AISStream upstream error")));
+          return;
+        }
         const vessel = normalizeAisMessage(parsed);
         if (vessel) vessels.set(vessel.mmsi, vessel);
 
@@ -163,7 +170,7 @@ async function fetchSnapshotFromWs(apiKey: string): Promise<AisPayload> {
     ws.on("close", () => {
       finish(() => {
         if (vessels.size > 0) resolve({ vessels: Array.from(vessels.values()) });
-        else reject(new Error("AISStream connection closed without data"));
+        else reject(new Error(upstreamError ?? "AISStream connection closed without data"));
       });
     });
   });

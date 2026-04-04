@@ -8,6 +8,7 @@ import { fetchNewsFeed, type NewsItem, type RegionDigest } from "@/lib/ingest/ne
 import { useArgusStore } from "@/store/useArgusStore";
 import type { ClickedCoordinates, LayerKey, PlatformMode, PlaybackSpeed, SceneMode, SelectedIntel, VisualMode } from "@/types/intel";
 import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
+import { AnalystControls } from "./AnalystControls";
 import { VideoOverlay } from "./VideoOverlay";
 import PneumaHud from "./PneumaHud";
 
@@ -38,6 +39,7 @@ type HudOverlayProps = {
   onPlaybackSpeedChange?: (speed: number) => void;
   clickedCoordinates: ClickedCoordinates | null;
   onSelectIntel: (intel: SelectedIntel | null) => void;
+  epicFuryActive?: boolean;
 };
 
 type SliderDef = {
@@ -234,6 +236,7 @@ export function HudOverlay({
   onPlaybackSpeedChange,
   clickedCoordinates,
   onSelectIntel,
+  epicFuryActive = false,
 }: HudOverlayProps) {
   const {
     layers,
@@ -292,12 +295,26 @@ export function HudOverlay({
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [showPneumaPanel, setShowPneumaPanel] = useState(false);
+  const [rightPanelMode, setRightPanelMode] = useState<"target" | "epicFury">("target");
   const [gdeltDigestLoading, setGdeltDigestLoading] = useState(false);
+  const [gdeltDigestDocument, setGdeltDigestDocument] = useState<{
+    title: string;
+    content: string;
+    analyzedCount?: number;
+    eventCount?: number;
+    generatedAt: string;
+  } | null>(null);
   const [hypotheses, setHypotheses] = useState([
     { id: 1, text: "Submarine cable cut in Atlantic linked to observed vessel patterns.", score: 0 },
     { id: 2, text: "Unusual troop movement correlates with recent cyber outages.", score: 0 },
   ]);
   const [cognitiveLens, setCognitiveLens] = useState<"tactical" | "strategic" | "anomaly">("tactical");
+
+  useEffect(() => {
+    if (!epicFuryActive && rightPanelMode === "epicFury") {
+      setRightPanelMode("target");
+    }
+  }, [epicFuryActive, rightPanelMode]);
 
   useEffect(() => {
     const syncClock = () => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC"));
@@ -635,26 +652,40 @@ export function HudOverlay({
       const data = await res.json();
       if (data.summary) {
         setShowPneumaPanel(false);
-        onSelectIntel({
-          id: `gdelt-digest-${Date.now()}`,
-          name: "GDELT Strategic Digest",
-          kind: "gdelt",
-          importance: "important",
-          quickFacts: [
-            { label: "Type", value: "AI-Generated Digest" },
-            { label: "Events Analyzed", value: `${data.analyzedCount ?? "?"} of ${data.eventCount ?? "?"}` },
-            { label: "Source", value: "GDELT Global Event Database" },
-            { label: "Generated", value: new Date().toUTCString() },
-          ],
-          fullFacts: [
-            { label: "What is GDELT?", value: "The Global Database of Events, Language, and Tone monitors news media worldwide, translating events into structured data with actors, locations, and sentiment scores. Goldstein scale ranges from -10 (extreme conflict) to +10 (extreme cooperation)." },
-          ],
-          analysisSummary: data.summary,
+        setGdeltDigestDocument({
+          title: "GDELT Strategic Digest",
+          content: data.summary,
+          analyzedCount: data.analyzedCount,
+          eventCount: data.eventCount,
+          generatedAt: new Date().toUTCString(),
         });
       }
     } catch {} finally {
       setGdeltDigestLoading(false);
     }
+  };
+
+  const exportGdeltDigest = () => {
+    if (!gdeltDigestDocument) return;
+    const body = [
+      `# ${gdeltDigestDocument.title}`,
+      "",
+      `Generated: ${gdeltDigestDocument.generatedAt}`,
+      `Events Analyzed: ${gdeltDigestDocument.analyzedCount ?? "?"} of ${gdeltDigestDocument.eventCount ?? "?"}`,
+      `Region Filter: ${newsRegionFilter}`,
+      "",
+      gdeltDigestDocument.content,
+      "",
+    ].join("\n");
+    const blob = new Blob([body], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `gdelt-strategic-digest-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.md`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -796,151 +827,191 @@ export function HudOverlay({
       </section>
 
       {/* Selected intel panel (right side) — desktop only */}
-      {selectedIntel ? (
+      {selectedIntel || epicFuryActive ? (
         <section className="pointer-events-auto absolute right-8 top-[5.5rem] hidden w-[348px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] p-4 shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md md:block">
           <div className="flex items-center justify-between">
-            <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#fabd2f]">Target Intel</div>
-            <button
-              type="button"
-              onClick={onCloseIntel}
-              className="rounded-md border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#83a598]"
-            >
-              Clear
-            </button>
-          </div>
-
-          <div className="mt-2 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono">
-            <div className="text-[15px] text-[#ebdbb2]">{selectedIntel.name}</div>
-            <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[#a89984]">
-              {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority Target" : "Standard Target"}
-            </div>
-          </div>
-
-          <div className="mt-2 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
-            {selectedIntel.quickFacts.map((fact) => (
-              <div key={`quick-${fact.label}`}>
-                {fact.label}: {fact.value}
+            <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#fabd2f]">Target Data Intel</div>
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-md border border-[#504945] bg-[#282828] p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setRightPanelMode("target")}
+                  className={`rounded px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] transition ${
+                    rightPanelMode === "target"
+                      ? "bg-[#504945] text-[#ebdbb2]"
+                      : "text-[#a89984] hover:text-[#d5c4a1]"
+                  }`}
+                >
+                  Target
+                </button>
+                {epicFuryActive ? (
+                  <button
+                    type="button"
+                    onClick={() => setRightPanelMode("epicFury")}
+                    className={`rounded px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] transition ${
+                      rightPanelMode === "epicFury"
+                        ? "bg-[#14526b] text-cyan-300"
+                        : "text-[#7298a8] hover:text-cyan-300"
+                    }`}
+                  >
+                    Epic Fury
+                  </button>
+                ) : null}
               </div>
-            ))}
+              {selectedIntel ? (
+                <button
+                  type="button"
+                  onClick={onCloseIntel}
+                  className="rounded-md border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#83a598]"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
           </div>
 
-          {selectedIntel.analysisSummary ? (
-            <div className="mt-2 rounded-xl border border-[#5b4a1f] bg-[#2a2415] p-3 font-mono text-[11px] leading-relaxed text-[#f3d98b]">
-              {selectedIntel.analysisSummary}
+          {rightPanelMode === "epicFury" && epicFuryActive ? (
+            <div className="mt-3">
+              <AnalystControls embedded />
             </div>
-          ) : null}
-
-          {selectedIntel.importance === "important" || showFullIntel ? (
-            <div className="mt-2 max-h-[180px] overflow-auto rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
-              {selectedIntel.fullFacts.map((fact) => (
-                <div key={`full-${fact.label}`}>
-                  {fact.label}: {fact.value}
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          {selectedIntel.streamUrl ? (
-            <div className="relative mt-2">
-              <iframe
-                src={selectedIntel.streamUrl}
-                title={selectedIntel.name}
-                className="h-44 w-full rounded border border-[#504945]"
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-                sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setEnlargedStream({
-                    src: selectedIntel.streamUrl!,
-                    title: selectedIntel.name,
-                  })
-                }
-                className="absolute right-1.5 top-1.5 rounded border border-[#504945] bg-[#282828]/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#83a598] transition hover:border-[#83a598] hover:bg-[#282828]"
-              >
-                Enlarge
-              </button>
-              <div className="absolute left-1.5 top-1.5 flex items-center gap-1">
-                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-                <span className="font-mono text-[8px] uppercase tracking-wider text-red-400/80">Live</span>
-              </div>
-            </div>
-          ) : selectedIntel.imageUrl ? (
+          ) : selectedIntel ? (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={selectedIntel.imageUrl}
-                alt={selectedIntel.name}
-                className="mt-2 h-32 w-full rounded border border-[#504945] object-cover"
-              />
-            </>
-          ) : null}
+              <div className="mt-2 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono">
+                <div className="text-[15px] text-[#ebdbb2]">{selectedIntel.name}</div>
+                <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[#a89984]">
+                  {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority Target" : "Standard Target"}
+                </div>
+              </div>
 
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={onFlyToEntity}
-              className={actionButtonClass}
-            >
-              Fly To
-            </button>
-            {selectedIntel.externalUrl ? (
-              <a
-                href={selectedIntel.externalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={actionButtonClass}
-              >
-                {selectedIntel.externalLabel ?? "External"}
-              </a>
-            ) : null}
-            {(selectedIntel.kind === "flight" || selectedIntel.kind === "military" || selectedIntel.kind === "satellite") && (
+              <div className="mt-2 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
+                {selectedIntel.quickFacts.map((fact) => (
+                  <div key={`quick-${fact.label}`}>
+                    {fact.label}: {fact.value}
+                  </div>
+                ))}
+              </div>
+
+              {selectedIntel.analysisSummary ? (
+                <div className="mt-2 rounded-xl border border-[#5b4a1f] bg-[#2a2415] p-3 font-mono text-[11px] leading-relaxed text-[#f3d98b]">
+                  {selectedIntel.analysisSummary}
+                </div>
+              ) : null}
+
+              {selectedIntel.importance === "important" || showFullIntel ? (
+                <div className="mt-2 max-h-[180px] overflow-auto rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
+                  {selectedIntel.fullFacts.map((fact) => (
+                    <div key={`full-${fact.label}`}>
+                      {fact.label}: {fact.value}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {selectedIntel.streamUrl ? (
+                <div className="relative mt-2">
+                  <iframe
+                    src={selectedIntel.streamUrl}
+                    title={selectedIntel.name}
+                    className="h-44 w-full rounded border border-[#504945]"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                    sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEnlargedStream({
+                        src: selectedIntel.streamUrl!,
+                        title: selectedIntel.name,
+                      })
+                    }
+                    className="absolute right-1.5 top-1.5 rounded border border-[#504945] bg-[#282828]/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#83a598] transition hover:border-[#83a598] hover:bg-[#282828]"
+                  >
+                    Enlarge
+                  </button>
+                  <div className="absolute left-1.5 top-1.5 flex items-center gap-1">
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                    <span className="font-mono text-[8px] uppercase tracking-wider text-red-400/80">Live</span>
+                  </div>
+                </div>
+              ) : selectedIntel.imageUrl ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={selectedIntel.imageUrl}
+                    alt={selectedIntel.name}
+                    className="mt-2 h-32 w-full rounded border border-[#504945] object-cover"
+                  />
+                </>
+              ) : null}
+
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={onFlyToEntity}
+                  className={actionButtonClass}
+                >
+                  Fly To
+                </button>
+                {selectedIntel.externalUrl ? (
+                  <a
+                    href={selectedIntel.externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={actionButtonClass}
+                  >
+                    {selectedIntel.externalLabel ?? "External"}
+                  </a>
+                ) : null}
+                {(selectedIntel.kind === "flight" || selectedIntel.kind === "military" || selectedIntel.kind === "satellite") && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      trackedEntityId === selectedIntel.id
+                        ? onTrackEntity(null)
+                        : onTrackEntity(selectedIntel.id)
+                    }
+                    className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition ${
+                      trackedEntityId === selectedIntel.id
+                        ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                        : "border-[#504945] bg-[#282828] text-[#d5c4a1] hover:border-[#83a598]"
+                    }`}
+                  >
+                    {trackedEntityId === selectedIntel.id ? "Stop Tracking" : "Track"}
+                  </button>
+                )}
+              </div>
+
+              {trackedEntityId === selectedIntel.id && (
+                <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#83a598]">
+                  Tracking Active
+                </div>
+              )}
+
+              {selectedIntel.importance !== "important" ? (
+                <button
+                  type="button"
+                  onClick={onToggleFullIntel}
+                  className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#83a598]"
+                >
+                  {showFullIntel ? "Hide Full Intel" : "Load Full Intel"}
+                </button>
+              ) : null}
+
               <button
                 type="button"
-                onClick={() =>
-                  trackedEntityId === selectedIntel.id
-                    ? onTrackEntity(null)
-                    : onTrackEntity(selectedIntel.id)
-                }
-                className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition ${
-                  trackedEntityId === selectedIntel.id
-                    ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
-                    : "border-[#504945] bg-[#282828] text-[#d5c4a1] hover:border-[#83a598]"
-                }`}
+                onClick={() => requestAiSummary(selectedIntel)}
+                disabled={aiSummaryLoading}
+                className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#83a598] transition hover:border-[#83a598] disabled:opacity-50"
               >
-                {trackedEntityId === selectedIntel.id ? "Stop Tracking" : "Track"}
+                {aiSummaryLoading ? "Generating AI Summary..." : selectedIntel.analysisSummary ? "Generate Detailed AI Summary" : "Generate AI Summary"}
               </button>
-            )}
-          </div>
-
-          {trackedEntityId === selectedIntel.id && (
-            <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#83a598]">
-              Tracking Active
+            </>
+          ) : (
+            <div className="mt-3 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] leading-relaxed text-[#7fb4c5]">
+              No target is selected. Pick a flight, vessel, event, or map point to open AI summary and detailed target intel here.
             </div>
           )}
-
-          {selectedIntel.importance !== "important" ? (
-            <button
-              type="button"
-              onClick={onToggleFullIntel}
-              className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#83a598]"
-            >
-              {showFullIntel ? "Hide Full Intel" : "Load Full Intel"}
-            </button>
-          ) : null}
-
-          {(!selectedIntel.analysisSummary || selectedIntel.kind === "gdelt" || selectedIntel.kind === "anomaly" || selectedIntel.kind === "info") ? (
-            <button
-              type="button"
-              onClick={() => requestAiSummary(selectedIntel)}
-              disabled={aiSummaryLoading}
-              className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#83a598] transition hover:border-[#83a598] disabled:opacity-50"
-            >
-              {aiSummaryLoading ? "Generating AI Summary..." : selectedIntel.analysisSummary ? "Generate Detailed AI Summary" : "Generate AI Summary"}
-            </button>
-          ) : null}
         </section>
       ) : null}
 
@@ -1172,7 +1243,11 @@ export function HudOverlay({
                       disabled={gdeltDigestLoading}
                       className="w-full rounded-lg border border-[#3498db]/40 bg-[#3498db]/10 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#3498db] transition hover:border-[#3498db] hover:bg-[#3498db]/20 disabled:opacity-50"
                     >
-                      {gdeltDigestLoading ? "Generating GDELT Digest..." : `Generate GDELT Digest (${compact(counts.gdelt)} events)`}
+                      {gdeltDigestLoading
+                        ? "Generating GDELT Digest..."
+                        : gdeltDigestDocument
+                          ? `Refresh GDELT Digest (${compact(counts.gdelt)} events)`
+                          : `Generate GDELT Digest (${compact(counts.gdelt)} events)`}
                     </button>
                   )}
 
@@ -2315,6 +2390,76 @@ export function HudOverlay({
           onClose={() => setEnlargedStream(null)}
         />
       )}
+
+      {gdeltDigestDocument ? (
+        <div className="pointer-events-auto absolute inset-0 z-[55] flex items-center justify-center bg-black/35 px-6 py-10">
+          <div className="relative h-[78vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-[#5b4a1f] bg-[#14181bcc] shadow-[0_0_60px_rgba(0,0,0,0.45)] backdrop-blur-md">
+            <div className="flex items-center justify-between border-b border-[#3c3836] bg-[#1d2021cc] px-5 py-3">
+              <div>
+                <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#fabd2f]">
+                  Strategic Document
+                </div>
+                <div className="mt-1 font-mono text-[18px] text-[#ebdbb2]">
+                  {gdeltDigestDocument.title}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={exportGdeltDigest}
+                  className="rounded-lg border border-[#83a598] bg-[#1f2c2a] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#b8e0d2] transition hover:border-[#b8e0d2]"
+                >
+                  Export
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGdeltDigestDocument(null)}
+                  className="rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#a89984] transition hover:border-[#83a598]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 border-b border-[#3c3836] bg-[#171b1ecc] px-5 py-3 md:grid-cols-4">
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-3 py-2">
+                <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Generated</div>
+                <div className="mt-1 font-mono text-[11px] text-[#d5c4a1]">{gdeltDigestDocument.generatedAt}</div>
+              </div>
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-3 py-2">
+                <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Events Analyzed</div>
+                <div className="mt-1 font-mono text-[11px] text-[#d5c4a1]">
+                  {gdeltDigestDocument.analyzedCount ?? "?"} of {gdeltDigestDocument.eventCount ?? "?"}
+                </div>
+              </div>
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-3 py-2">
+                <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Region Filter</div>
+                <div className="mt-1 font-mono text-[11px] text-[#d5c4a1]">{newsRegionFilter}</div>
+              </div>
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-3 py-2">
+                <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Source</div>
+                <div className="mt-1 font-mono text-[11px] text-[#d5c4a1]">GDELT Global Event Database</div>
+              </div>
+            </div>
+
+            <div className="h-[calc(78vh-10.5rem)] overflow-y-auto px-5 py-5">
+              <div className="mx-auto max-w-3xl rounded-xl border border-[#3c3836] bg-[#191d20cc] px-6 py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+                <div className="mb-4 border-b border-[#3c3836] pb-3">
+                  <div className="font-serif text-[30px] leading-tight text-[#f3e7c2]">
+                    {gdeltDigestDocument.title}
+                  </div>
+                  <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[#83a598]">
+                    Produced Intelligence Brief
+                  </div>
+                </div>
+                <div className="whitespace-pre-wrap font-serif text-[16px] leading-8 text-[#d7dbe0]">
+                  {gdeltDigestDocument.content}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Playback Timeline Bar */}
       {platformMode === "playback" && playbackTimeRange && (

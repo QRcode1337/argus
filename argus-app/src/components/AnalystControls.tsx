@@ -17,7 +17,10 @@ const CONFLICT_LAYERS: { key: LayerKey; label: string }[] = [
   { key: "flights", label: "FLIGHTS" },
 ];
 
-export const AnalystControls: React.FC = () => {
+export const AnalystControls: React.FC<{ embedded?: boolean; className?: string }> = ({
+  embedded = false,
+  className = "",
+}) => {
   const layers = useArgusStore((s) => s.layers);
   const toggleLayer = useArgusStore((s) => s.toggleLayer);
   const lockedRegion = useEpicFuryStore((s) => s.lockedRegion);
@@ -39,7 +42,14 @@ export const AnalystControls: React.FC = () => {
   );
 
   return (
-    <div className="absolute top-[5.5rem] right-8 w-80 bg-[#0d1520]/90 border border-cyan-900/50 rounded-lg p-4 font-mono text-xs text-cyan-500 shadow-[0_0_20px_rgba(8,145,178,0.2)] z-50 backdrop-blur-md">
+    <div
+      className={[
+        embedded
+          ? "w-full bg-[#0d1520]/90 border border-cyan-900/50 rounded-xl p-4 font-mono text-xs text-cyan-500 shadow-[0_0_20px_rgba(8,145,178,0.12)] backdrop-blur-md"
+          : "absolute top-[5.5rem] right-8 w-80 bg-[#0d1520]/90 border border-cyan-900/50 rounded-lg p-4 font-mono text-xs text-cyan-500 shadow-[0_0_20px_rgba(8,145,178,0.2)] z-50 backdrop-blur-md",
+        className,
+      ].join(" ").trim()}
+    >
       {/* Theater Stats */}
       <div className="text-[10px] text-cyan-700 font-bold mb-2">{EPIC_FURY_THEATER.label} COUNTS</div>
       <div className="grid grid-cols-2 gap-2 mb-4">
