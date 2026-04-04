@@ -1981,6 +1981,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         clickedCoordinates={clickedCoordinates}
         onSelectIntel={setSelectedIntel}
       />
+      )}
     </div>
   );
 }
