@@ -1,7 +1,7 @@
+"use client";
 import { AnalystControls } from "./AnalystControls";
 import { CrossingEvents } from "./CrossingEvents";
 import { TimelineScrubber } from "./TimelineScrubber";
-"use client";
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
