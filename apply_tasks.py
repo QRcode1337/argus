@@ -1,4 +1,9 @@
-const express = require("express");
+import os
+import re
+
+# Task 1: Refactor analytics.js
+with open("/home/volta/argus/argus-api/src/routes/analytics.js", "w") as f:
+    f.write("""const express = require("express");
 const db = require("../db");
 
 const router = express.Router();
@@ -59,3 +64,6 @@ router.get("/layers", async (_req, res) => {
 });
 
 module.exports = router;
+""")
+
+print("Task 1 applied.")

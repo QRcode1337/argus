@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useArgusStore } from "@/store/useArgusStore";
 
 interface PneumaState {
   phi: number;
@@ -35,6 +36,7 @@ function getPhiBarWidth(phi: number): string {
 }
 
 export default function PneumaHud({ threatLevel = "GREEN", inline = false }: { threatLevel?: string; inline?: boolean }) {
+  const camera = useArgusStore((s) => s.camera);
   const [state, setState] = useState<PneumaState>({
     phi: 0,
     moodRegime: "unknown",
@@ -132,6 +134,14 @@ export default function PneumaHud({ threatLevel = "GREEN", inline = false }: { t
         <div className="flex items-center justify-between text-[#a89984]">
           <span>PIPELINE</span>
           <span className="text-[#83a598]">{state.pipelineTimeMs}ms</span>
+        </div>
+
+        {/* Geospatial Anchor */}
+        <div className="flex items-center justify-between text-[#a89984] pt-1 border-t border-[#3c3836]">
+          <span>ANCHOR</span>
+          <span className="text-[#83a598]">
+            {camera.lat.toFixed(3)}N {camera.lon.toFixed(3)}E
+          </span>
         </div>
       </div>
     </div>

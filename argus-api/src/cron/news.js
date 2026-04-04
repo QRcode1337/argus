@@ -1,7 +1,6 @@
-const express = require("express");
+const cron = require("node-cron");
 const { createHash } = require("node:crypto");
-
-const router = express.Router();
+const redis = require("../redis");
 
 const DEFAULT_NEWS_SOURCES = [
   { name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml", weight: 1.0 },
@@ -31,26 +30,6 @@ const TAG_KEYWORDS = {
   SPACE: ["satellite", "orbit", "launch", "space", "gps"],
 };
 
-async function proxyUpstream(res, upstream, options = {}) {
-  const { contentType = "application/json", headers = {} } = options;
-
-  try {
-    const response = await fetch(upstream, {
-      cache: "no-store",
-      headers,
-    });
-    const body = await response.text();
-
-    res.status(response.status);
-    res.type(contentType);
-    return res.send(body);
-  } catch (error) {
-    return res.status(502).json({
-      error: error instanceof Error ? error.message : "Upstream proxy failed",
-    });
-  }
-}
-
 function parseNewsSources() {
   const raw = process.env.NEWS_RSS_FEEDS?.trim();
   if (!raw) return DEFAULT_NEWS_SOURCES;
@@ -64,7 +43,7 @@ function cleanText(value) {
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/<[^>]+>/g, " ")
     .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, "\"")
+    .replace(/&quot;/g, '\"')
     .replace(/&#39;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -199,77 +178,94 @@ function buildRegionSummary(region, items) {
   };
 }
 
-router.get("/opensky", async (_req, res) => {
-  const upstream = process.env.OPENSKY_ENDPOINT ?? "https://opensky-network.org/api/states/all";
-  await proxyUpstream(res, upstream, {
-    contentType: "application/json",
-    headers: {
-      Accept: "application/json",
-    },
-  });
-});
+async function fetchNews() {
+  console.log("Fetching news...");
+  const sources = parseNewsSources();
+  const maxItems = Math.max(10, Math.min(500, Number(process.env.NEWS_MAX_ITEMS ?? 100)));
 
-router.get("/adsb-military", async (_req, res) => {
-  const upstream = process.env.ADSB_MIL_ENDPOINT ?? "https://api.adsb.lol/v2/mil";
-  const headers = {
-    Accept: "application/json",
+  const feedResults = await Promise.all(
+    sources.map(async (source) => {
+      try {
+        const response = await fetch(source.url, {
+          cache: "no-store",
+          headers: {
+            Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9",
+            "User-Agent": "ArgusNewsBot/1.0",
+          },
+        });
+        if (!response.ok) return { source, items: [] };
+        const xml = await response.text();
+        return { source, items: parseFeed(xml, source.name) };
+      } catch {
+        return { source, items: [] };
+      }
+    }),
+  );
+
+  const weightBySource = new Map(feedResults.map((entry) => [entry.source.name, entry.source.weight]));
+  const deduped = [];
+  const seenUrls = new Set();
+  const seenSignatures = new Set();
+
+  for (const item of feedResults.flatMap((entry) => entry.items)) {
+    const url = canonicalizeUrl(item.url);
+    if (!url || seenUrls.has(url)) continue;
+    const sig = titleSignature(item.title);
+    if (sig && seenSignatures.has(sig)) continue;
+
+    const tags = classifyTags(`${item.title} ${item.summary}`);
+    const region = classifyRegion(`${item.title} ${item.summary}`);
+    const score = computeScore(item, weightBySource.get(item.source) ?? 0.75, tags);
+    deduped.push({
+      ...item,
+      id: createHash("sha1").update(`${item.title}|${url}`).digest("hex").slice(0, 12),
+      url,
+      tags,
+      region,
+      score,
+    });
+    seenUrls.add(url);
+    if (sig) seenSignatures.add(sig);
+  }
+
+  const items = deduped
+    .sort((a, b) => b.score - a.score || b.publishedAt.localeCompare(a.publishedAt))
+    .slice(0, maxItems);
+
+  const buckets = {
+    WORLDCOM: [...items],
+    CENTCOM: [],
+    NORTHCOM: [],
+    SOUTHCOM: [],
+    EUCOM: [],
+    AFRICOM: [],
+    INDOPACOM: [],
+  };
+  for (const item of items) {
+    if (item.region !== "WORLDCOM" && buckets[item.region]) {
+      buckets[item.region].push(item);
+    }
+  }
+
+  const regions = {};
+  for (const region of COMMAND_REGIONS) {
+    regions[region] = buildRegionSummary(region, buckets[region].slice(0, 15));
+  }
+
+  const result = {
+    items,
+    meta: {
+      sourcesChecked: sources.length,
+      fetchedAt: new Date().toISOString(),
+      dedupedCount: items.length,
+    },
+    regions,
   };
 
-  if (process.env.ADSB_MIL_API_KEY) {
-    headers.Authorization = `Bearer ${process.env.ADSB_MIL_API_KEY}`;
-  }
+  await redis.set("argus:news", JSON.stringify(result));
+  console.log(`News fetched and cached in Redis. ${items.length} items.`);
+}
 
-  await proxyUpstream(res, upstream, {
-    contentType: "application/json",
-    headers,
-  });
-});
-
-router.get("/usgs", async (_req, res) => {
-  const upstream =
-    process.env.USGS_ENDPOINT ??
-    "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson";
-  await proxyUpstream(res, upstream, {
-    contentType: "application/json",
-    headers: {
-      Accept: "application/json",
-    },
-  });
-});
-
-router.get("/celestrak", async (_req, res) => {
-  const upstream =
-    process.env.CELESTRAK_ENDPOINT ??
-    "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle";
-  await proxyUpstream(res, upstream, {
-    contentType: "text/plain; charset=utf-8",
-  });
-});
-
-router.get("/tfl-cctv", async (_req, res) => {
-  const upstream = process.env.CCTV_TFL_ENDPOINT ?? "https://api.tfl.gov.uk/Place/Type/JamCam";
-  await proxyUpstream(res, upstream, {
-    contentType: "application/json",
-    headers: {
-      Accept: "application/json",
-    },
-  });
-});
-
-
-const redis = require("../redis");
-
-router.get("/news", async (_req, res) => {
-  try {
-    const data = await redis.get("argus:news");
-    if (data) {
-      return res.json(JSON.parse(data));
-    }
-    return res.json({ items: [], meta: { sourcesChecked: 0, fetchedAt: new Date().toISOString(), dedupedCount: 0 }, regions: {} });
-  } catch (error) {
-    console.error("Error reading news from Redis:", error);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-module.exports = router;
+cron.schedule("*/10 * * * *", fetchNews);
+// Run immediately on startup
+setTimeout(fetchNews, 1000);

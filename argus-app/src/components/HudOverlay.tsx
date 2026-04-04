@@ -293,6 +293,11 @@ export function HudOverlay({
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [showPneumaPanel, setShowPneumaPanel] = useState(false);
   const [gdeltDigestLoading, setGdeltDigestLoading] = useState(false);
+  const [hypotheses, setHypotheses] = useState([
+    { id: 1, text: "Submarine cable cut in Atlantic linked to observed vessel patterns.", score: 0 },
+    { id: 2, text: "Unusual troop movement correlates with recent cyber outages.", score: 0 },
+  ]);
+  const [cognitiveLens, setCognitiveLens] = useState<"tactical" | "strategic" | "anomaly">("tactical");
 
   useEffect(() => {
     const syncClock = () => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC"));
@@ -2327,14 +2332,26 @@ export function HudOverlay({
             {new Date(playbackCurrentTime).toLocaleTimeString()}
           </span>
 
-          <input
-            type="range"
-            min={playbackTimeRange.start}
-            max={playbackTimeRange.end}
-            value={playbackCurrentTime}
-            onChange={(e) => onSeek?.(Number(e.target.value))}
-            className="h-1 w-48 cursor-pointer accent-cyan-500"
-          />
+          <div className="flex flex-col gap-1">
+            <input
+              type="range"
+              min={playbackTimeRange.start}
+              max={playbackTimeRange.end}
+              value={playbackCurrentTime}
+              onChange={(e) => onSeek?.(Number(e.target.value))}
+              className="h-1.5 w-48 cursor-pointer appearance-none rounded-full bg-cyan-900/40 accent-cyan-400 outline-none"
+              title="Time Track"
+            />
+            <input
+              type="range"
+              min={playbackTimeRange.start}
+              max={playbackTimeRange.end}
+              value={playbackCurrentTime}
+              readOnly
+              className="h-0.5 w-48 cursor-default appearance-none rounded-full bg-blue-900/40 accent-blue-500 outline-none opacity-80"
+              title="Intelligence Density Track"
+            />
+          </div>
 
           <select
             value={playbackSpeed}
@@ -2394,6 +2411,44 @@ export function HudOverlay({
             <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">
               <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#fabd2f]">MEM / CYCLES / PIPELINE</div>
               MEM: active memory graph nodes. CYCLES: completed reasoning iterations. PIPELINE: end-to-end processing latency per intelligence cycle.
+            </div>
+
+            <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">
+              <div className="mb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-[#fabd2f]">COGNITIVE LENS</div>
+              <div className="flex gap-2">
+                {(["tactical", "strategic", "anomaly"] as const).map((lens) => (
+                  <button
+                    key={lens}
+                    type="button"
+                    onClick={() => setCognitiveLens(lens)}
+                    className={`rounded px-2 py-1 text-[9px] uppercase tracking-[0.14em] transition ${
+                      cognitiveLens === lens
+                        ? "bg-[#fabd2f]/20 border border-[#fabd2f] text-[#fabd2f]"
+                        : "bg-[#282828] border border-[#504945] text-[#a89984] hover:border-[#fabd2f]"
+                    }`}
+                  >
+                    {lens}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">
+              <div className="mb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-[#fabd2f]">ACTIVE HYPOTHESES</div>
+              <div className="space-y-2">
+                {hypotheses.map(hyp => (
+                  <div key={hyp.id} className="rounded border border-[#504945] bg-[#282828] p-2 flex flex-col gap-1">
+                    <div className="text-[#ebdbb2] leading-relaxed">{hyp.text}</div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#a89984] text-[8px] uppercase tracking-[0.1em]">Score: {hyp.score}</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => setHypotheses(hs => hs.map(h => h.id === hyp.id ? { ...h, score: h.score + 1 } : h))} className="hover:text-[#b8bb26] transition text-[#a89984]">▲</button>
+                        <button onClick={() => setHypotheses(hs => hs.map(h => h.id === hyp.id ? { ...h, score: h.score - 1 } : h))} className="hover:text-[#fb4934] transition text-[#a89984]">▼</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>

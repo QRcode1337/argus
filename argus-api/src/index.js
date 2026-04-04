@@ -7,6 +7,7 @@ const analyticsRoutes = require("./routes/analytics");
 const feedsRoutes = require("./routes/feeds");
 const recordRoutes = require("./routes/record");
 const playbackRoutes = require("./routes/playback");
+require("./cron/news");
 
 dotenv.config();
 
