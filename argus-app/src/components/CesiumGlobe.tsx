@@ -1,3 +1,6 @@
+import { AnalystControls } from "./AnalystControls";
+import { CrossingEvents } from "./CrossingEvents";
+import { TimelineScrubber } from "./TimelineScrubber";
 "use client";
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
@@ -1921,6 +1924,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       </div>
 
       <EpicFuryHud onFlyToCoordinates={flyToCoordinates} />
+      <AnalystControls />
+      <CrossingEvents />
+      <TimelineScrubber />
 
       <HudOverlay
         onFlyToPoi={flyToPoi}
