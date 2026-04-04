@@ -201,12 +201,16 @@ const suppressUnsupportedZoomErrors = (viewer: Viewer): (() => void) => {
     }
   };
 
+  const attachLayer = (layer?: ImageryLayerWithProvider) => {
+    attachProvider(layer?.imageryProvider);
+  };
+
   for (let index = 0; index < imageryLayers.length; index += 1) {
-    attachProvider(imageryLayers.get(index) as ImageryLayerWithProvider);
+    attachLayer(imageryLayers.get(index) as ImageryLayerWithProvider);
   }
 
   const removeLayerAddedListener = imageryLayers.layerAdded.addEventListener((layer) => {
-    attachProvider(layer as ImageryLayerWithProvider);
+    attachLayer(layer as ImageryLayerWithProvider);
   });
   if (typeof removeLayerAddedListener === "function") {
     cleanupFns.push(removeLayerAddedListener);
