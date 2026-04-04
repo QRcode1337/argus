@@ -2,12 +2,12 @@
 
 ## Overview
 
-Update EPIC FURY from a static mock-data demo into a hybrid ops mode that overlays real conflict-focused data on the globe. Global overview by default, with click-to-lock deep-dive into existing hotspot regions.
+Update EPIC FURY from a static mock-data demo into a hybrid ops mode that overlays real conflict-focused data on the globe. Iran/Israel/GCC theater overview by default, with click-to-lock deep-dive into existing hotspot regions inside that theater.
 
 ## Decisions
 
 - **Approach:** New `useEpicFuryStore` Zustand slice + rewritten components (Approach B)
-- **Focus:** Hybrid — global ops view with hotspot lock-on
+- **Focus:** Hybrid — Iran/Israel/GCC theater view with hotspot lock-on
 - **Feeds:** Conflict-focused — GDELT, military flights (ADSB), AIS vessels, USGS seismic
 - **Time filter:** Real buttons (1H / 6H / 24H / 7D / ALL) that filter the incident feed
 - **Region lock:** Click existing zoom-box hotspot regions to deep-dive
@@ -69,13 +69,14 @@ type RegionStats = {
 - `setActive(on: boolean)` — toggle EPIC FURY mode
 - `setTimeWindow(window: TimeWindow)` — change time filter
 - `lockRegion(region: ZoomRegion)` — deep-dive into a hotspot
-- `unlockRegion()` — return to global view
+- `unlockRegion()` — return to theater view
 - `pushIncidents(incidents: EpicFuryIncident[])` — deduplicate by id, append, evict oldest past 500 cap
 
 ### Derived
 
 - `filteredIncidents` — getter that filters `incidents` by:
   - `timestamp >= (Date.now() - windowMs)` (skipped for 'all')
+  - `lat/lon within EPIC FURY theater bounds`
   - `lat/lon within lockedRegion bounds` (skipped when null)
   - Sorted newest-first
 
@@ -96,7 +97,7 @@ type RegionStats = {
 
 **File:** `argus-app/src/components/EpicFuryHud.tsx`
 
-- Header: "EPIC FURY — GLOBAL OPS" or "EPIC FURY — [REGION LABEL]" when locked
+- Header: "EPIC FURY — IRAN / ISRAEL / GCC" or "EPIC FURY — [REGION LABEL]" when locked
 - Time window buttons: 1H / 6H / 24H / 7D / ALL — call `setTimeWindow()`, active button highlighted
 - Incident feed: reads `filteredIncidents` from store, sorted newest-first
 - Incident cards show: type icon, severity color-coded left border, title, detail, relative timestamp, source badge, lat/lon
@@ -110,7 +111,7 @@ type RegionStats = {
 - Global stats cards: vessels, military flights, satellites, seismic — from `useArgusStore.counts`
 - When region locked: additional row showing `regionStats` (military in region, vessels in region, incidents last hour, seismic in region)
 - Layer toggles: vessels, military, seismic, gdelt, flights — wired to `useArgusStore.toggleLayer()`
-- "UNLOCK REGION" button visible when `lockedRegion !== null`
+- "RESET TO THEATER" button visible when `lockedRegion !== null`
 
 ### CrossingEvents — delete
 

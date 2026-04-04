@@ -102,6 +102,7 @@ type AnalyticsLayer = {
   source: string;
   type: string;
   tileUrl: string;
+  maximumLevel?: number;
   available: boolean;
   // legacy fields from old argus-api format
   variable?: string;
@@ -183,6 +184,15 @@ const suppressUnsupportedZoomErrors = (viewer: Viewer): (() => void) => {
   const widget = viewer.cesiumWidget as unknown as {
     showErrorPanel?: (...args: unknown[]) => void;
   };
+  const removeUnsupportedErrorPanels = () => {
+    const panels = viewer.container.querySelectorAll(".cesium-widget-errorPanel");
+    for (const panel of panels) {
+      const text = panel.textContent ?? "";
+      if (UNSUPPORTED_ZOOM_ERROR.test(text)) {
+        panel.remove();
+      }
+    }
+  };
 
   const attachProvider = (provider?: ImageryProviderWithErrorEvent) => {
     if (!provider || typeof provider !== "object" || seenProviders.has(provider)) {
@@ -220,8 +230,7 @@ const suppressUnsupportedZoomErrors = (viewer: Viewer): (() => void) => {
   if (typeof originalShowErrorPanel === "function") {
     widget.showErrorPanel = (...args: unknown[]) => {
       if (args.some(isUnsupportedZoomError)) {
-        const errorPanel = viewer.container.querySelector(".cesium-widget-errorPanel");
-        errorPanel?.remove();
+        removeUnsupportedErrorPanels();
         return;
       }
 
@@ -232,6 +241,12 @@ const suppressUnsupportedZoomErrors = (viewer: Viewer): (() => void) => {
       widget.showErrorPanel = originalShowErrorPanel;
     });
   }
+
+  const observer = new MutationObserver(() => {
+    removeUnsupportedErrorPanels();
+  });
+  observer.observe(viewer.container, { childList: true, subtree: true });
+  cleanupFns.push(() => observer.disconnect());
 
   return () => {
     for (const cleanup of cleanupFns.reverse()) {
@@ -1833,7 +1848,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
   // Fetch analytics tile URLs once on mount, store in refs
   const gfsTileUrlRef = useRef<string | null>(null);
+  const gfsMaxLevelRef = useRef<number | undefined>(undefined);
   const sentinelTileUrlRef = useRef<string | null>(null);
+  const sentinelMaxLevelRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     void fetch("/api/analytics/layers", { cache: "no-store" })
@@ -1845,8 +1862,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         for (const layer of data.layers) {
           if (layer.id === "gfs_precip_radar" || layer.id === "gfs_satellite_ir") {
             gfsTileUrlRef.current = layer.tileUrl;
+            gfsMaxLevelRef.current = layer.maximumLevel;
           } else if (layer.id === "sentinel_imagery") {
             sentinelTileUrlRef.current = layer.tileUrl;
+            sentinelMaxLevelRef.current = layer.maximumLevel;
           }
         }
         setAnalyticsStatus(`${data.layers.filter((l) => l.available).length} raster layers available`);
@@ -1862,7 +1881,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     if (!rasterLayer) return;
 
     if (analyticsLayers.gfs_weather && gfsTileUrlRef.current) {
-      rasterLayer.load(gfsTileUrlRef.current);
+      rasterLayer.load(gfsTileUrlRef.current, { maximumLevel: gfsMaxLevelRef.current });
     } else {
       rasterLayer.unload();
     }
@@ -1874,7 +1893,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     if (!sentinel) return;
 
     if (analyticsLayers.sentinel_imagery && sentinelTileUrlRef.current) {
-      sentinel.load(sentinelTileUrlRef.current);
+      sentinel.load(sentinelTileUrlRef.current, { maximumLevel: sentinelMaxLevelRef.current });
     } else {
       sentinel.unload();
     }

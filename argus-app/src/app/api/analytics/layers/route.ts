@@ -35,6 +35,7 @@ export async function GET() {
       source: "RainViewer",
       type: "xyz",
       tileUrl: `https://tilecache.rainviewer.com${radarPath}/256/{z}/{x}/{y}/6/1_1.png`,
+      maximumLevel: 10,
       available: true,
     },
     {
@@ -44,6 +45,7 @@ export async function GET() {
       type: "xyz",
       tileUrl:
         "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes-vis-1km-900913/{z}/{x}/{y}.png",
+      maximumLevel: 12,
       available: true,
     },
     {
@@ -53,6 +55,7 @@ export async function GET() {
       type: "xyz",
       tileUrl:
         "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg",
+      maximumLevel: 19,
       available: true,
     },
   ];

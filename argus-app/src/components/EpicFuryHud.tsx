@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import {
+  EPIC_FURY_THEATER,
   filterEpicFuryIncidents,
   useEpicFuryStore,
   type TimeWindow,
@@ -50,7 +51,7 @@ export const EpicFuryHud: React.FC<{
         <div className="flex items-center gap-2">
           <span className="text-xl">👁️</span>
           <h2 className="text-lg font-bold tracking-widest text-cyan-500">
-            {lockedRegion ? `EPIC FURY — ${lockedRegion.label}` : "EPIC FURY — GLOBAL OPS"}
+            {lockedRegion ? `EPIC FURY — ${lockedRegion.label}` : `EPIC FURY — ${EPIC_FURY_THEATER.label}`}
           </h2>
         </div>
         <div className="flex items-center gap-2">
@@ -78,7 +79,7 @@ export const EpicFuryHud: React.FC<{
 
       {/* Incident Count */}
       <div className="text-[10px] text-cyan-600 mb-2">
-        {incidents.length} INCIDENT{incidents.length !== 1 ? "S" : ""} IN WINDOW
+        {incidents.length} INCIDENT{incidents.length !== 1 ? "S" : ""} IN THEATER WINDOW
       </div>
 
       {/* Incident Feed */}

@@ -33,6 +33,15 @@ export interface RegionStats {
   seismicInRegion: number;
 }
 
+export const EPIC_FURY_THEATER: ZoomRegion = {
+  id: "epic-fury-theater",
+  label: "IRAN / ISRAEL / GCC",
+  west: 32,
+  south: 10,
+  east: 64,
+  north: 38,
+};
+
 const TIME_WINDOW_MS: Record<TimeWindow, number> = {
   "1h": 3_600_000,
   "6h": 21_600_000,
@@ -47,6 +56,10 @@ function isInRegion(lat: number, lon: number, r: ZoomRegion): boolean {
   return lat >= r.south && lat <= r.north && lon >= r.west && lon <= r.east;
 }
 
+export function isInEpicFuryTheater(lat: number, lon: number): boolean {
+  return isInRegion(lat, lon, EPIC_FURY_THEATER);
+}
+
 export function filterEpicFuryIncidents(
   incidents: EpicFuryIncident[],
   timeWindow: TimeWindow,
@@ -56,6 +69,7 @@ export function filterEpicFuryIncidents(
   const cutoff = timeWindow === "all" ? 0 : now - TIME_WINDOW_MS[timeWindow];
   return incidents.filter((incident) => {
     if (incident.timestamp < cutoff) return false;
+    if (!isInEpicFuryTheater(incident.lat, incident.lon)) return false;
     if (lockedRegion && !isInRegion(incident.lat, incident.lon, lockedRegion)) return false;
     return true;
   });
@@ -66,11 +80,8 @@ export function computeEpicFuryRegionStats(
   lockedRegion: ZoomRegion | null,
   now = Date.now(),
 ): RegionStats {
-  if (!lockedRegion) {
-    return { militaryInRegion: 0, vesselsInRegion: 0, incidentsLastHour: 0, seismicInRegion: 0 };
-  }
-
-  const inRegion = incidents.filter((incident) => isInRegion(incident.lat, incident.lon, lockedRegion));
+  const region = lockedRegion ?? EPIC_FURY_THEATER;
+  const inRegion = incidents.filter((incident) => isInRegion(incident.lat, incident.lon, region));
   const oneHourAgo = now - 3_600_000;
   return {
     militaryInRegion: inRegion.filter((incident) => incident.type === "military").length,
