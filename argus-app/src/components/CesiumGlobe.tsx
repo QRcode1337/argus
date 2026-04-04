@@ -531,6 +531,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const [showFullIntel, setShowFullIntel] = useState(false);
   const [analyticsStatus, setAnalyticsStatus] = useState<string | null>(null);
   const [collisionEnabled, setCollisionEnabled] = useState(false);
+  const [isEpicFuryMode, setIsEpicFuryMode] = useState(false);
   const collisionEnabledRef = useRef(collisionEnabled);
   useEffect(() => {
     collisionEnabledRef.current = collisionEnabled;
@@ -1923,12 +1924,31 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         </div>
       </div>
 
-      <EpicFuryHud onFlyToCoordinates={flyToCoordinates} />
-      <AnalystControls />
-      <CrossingEvents />
-      <TimelineScrubber />
+      {isEpicFuryMode && (
+        <>
+          <EpicFuryHud onFlyToCoordinates={flyToCoordinates} />
+          <AnalystControls />
+          <CrossingEvents />
+          <TimelineScrubber />
+        </>
+      )}
 
-      <HudOverlay
+      {/* Top Bar Toggle */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex gap-4">
+        <button
+          onClick={() => setIsEpicFuryMode(!isEpicFuryMode)}
+          className={`px-6 py-2 rounded-lg font-mono text-sm font-bold tracking-widest border transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] backdrop-blur-md ${
+            isEpicFuryMode 
+              ? "bg-cyan-900/80 text-cyan-400 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)]" 
+              : "bg-black/60 text-gray-400 border-gray-600 hover:text-white hover:border-gray-400"
+          }`}
+        >
+          {isEpicFuryMode ? "MODE: EPIC FURY ACTIVE" : "ACTIVATE OP: EPIC FURY"}
+        </button>
+      </div>
+
+      {!isEpicFuryMode && (
+        <HudOverlay
         onFlyToPoi={flyToPoi}
         onResetCamera={resetCamera}
         onToggleCollision={toggleCollisionDetection}
