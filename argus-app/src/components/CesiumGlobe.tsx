@@ -80,6 +80,7 @@ import type {
 } from "@/types/intel";
 
 import { HudOverlay } from "./HudOverlay";
+import { EpicFuryHud } from "./EpicFuryHud";
 import { FlatMapView } from "./FlatMapView";
 
 type CesiumGlobeProps = {
@@ -1918,6 +1919,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           ) : null}
         </div>
       </div>
+
+      <EpicFuryHud onFlyToCoordinates={flyToCoordinates} />
 
       <HudOverlay
         onFlyToPoi={flyToPoi}

@@ -59,4 +59,5 @@ export const CAMERA_PRESETS = [
   { id: "banff-park", label: "Banff Nat. Park", lon: -115.5564, lat: 51.4968, height: 16000, heading: 0, pitch: -0.4, roll: 0 },
   { id: "shibuya", label: "Shibuya Crossing", lon: 139.7005, lat: 35.6595, height: 1500, heading: 0, pitch: -0.7, roll: 0 },
   { id: "venice", label: "Venice Canals", lon: 12.3155, lat: 45.4408, height: 4000, heading: 0.2, pitch: -0.6, roll: 0 },
+  { id: "strait-of-hormuz", label: "Strait of Hormuz", lon: 56.2500, lat: 26.5667, height: 250000, heading: 0, pitch: -0.8, roll: 0 },
 ] as const;
