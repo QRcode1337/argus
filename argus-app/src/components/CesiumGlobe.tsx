@@ -1,6 +1,5 @@
 "use client";
 import { AnalystControls } from "./AnalystControls";
-import { CrossingEvents } from "./CrossingEvents";
 import { TimelineScrubber } from "./TimelineScrubber";
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
@@ -84,6 +83,13 @@ import type {
 
 import { HudOverlay } from "./HudOverlay";
 import { EpicFuryHud } from "./EpicFuryHud";
+import { useEpicFuryStore } from "@/store/useEpicFuryStore";
+import {
+  mapGdeltIncidents,
+  mapMilitaryIncidents,
+  mapVesselIncidents,
+  mapSeismicIncidents,
+} from "@/lib/epicFuryMappers";
 import { FlatMapView } from "./FlatMapView";
 
 type CesiumGlobeProps = {
@@ -531,7 +537,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const [showFullIntel, setShowFullIntel] = useState(false);
   const [analyticsStatus, setAnalyticsStatus] = useState<string | null>(null);
   const [collisionEnabled, setCollisionEnabled] = useState(false);
-  const [isEpicFuryMode, setIsEpicFuryMode] = useState(false);
+  const pushIncidents = useEpicFuryStore((s) => s.pushIncidents);
+  const epicFuryActive = useEpicFuryStore((s) => s.active);
+  const setEpicFuryActive = useEpicFuryStore((s) => s.setActive);
   const collisionEnabledRef = useRef(collisionEnabled);
   useEffect(() => {
     collisionEnabledRef.current = collisionEnabled;
@@ -929,6 +937,20 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
             destination: Cartesian3.fromDegrees(cLon, cLat, zH),
             duration: 1.8,
           });
+          // Lock region in EPIC FURY mode
+          if (useEpicFuryStore.getState().active) {
+            const region = ZOOM_REGIONS.find((r) => r.id === clickedEntity.id);
+            if (region) {
+              useEpicFuryStore.getState().lockRegion({
+                id: region.id,
+                label: region.label,
+                west: region.west,
+                south: region.south,
+                east: region.east,
+                north: region.north,
+              });
+            }
+          }
         }
         return;
       }
@@ -1134,6 +1156,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           const count = militaryLayer.upsertFlights(bounded);
           setCount("military", count);
           setFeedHealthy("adsb");
+          pushIncidents(mapMilitaryIncidents(bounded));
           militaryAlertsRef.current = analyzeMilitary(bounded);
           recordMilitary(bounded);
         } catch (error) {
@@ -1189,6 +1212,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           const count = seismicLayer.upsertEarthquakes(quakes);
           setCount("seismic", count);
           setFeedHealthy("usgs");
+          pushIncidents(mapSeismicIncidents(quakes));
           seismicAlertsRef.current = analyzeSeismic(count);
           recordQuakes(quakes);
 
@@ -1286,6 +1310,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           const count = vesselLayer.upsertVessels(vessels);
           setCount("vessels", count);
           setFeedHealthy("ais");
+          pushIncidents(mapVesselIncidents(vessels));
         } catch (error) {
           setFeedError("ais", error instanceof Error ? error.message : "Failed to fetch AISStream");
         }
@@ -1301,6 +1326,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           const count = gdeltLayer.update(events);
           setCount("gdelt", count);
           setFeedHealthy("gdelt");
+          pushIncidents(mapGdeltIncidents(events));
         } catch (error) {
           setFeedError("gdelt", error instanceof Error ? error.message : "Failed to fetch GDELT");
         }
@@ -1924,11 +1950,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         </div>
       </div>
 
-      {isEpicFuryMode && (
+      {epicFuryActive && (
         <>
           <EpicFuryHud onFlyToCoordinates={flyToCoordinates} />
           <AnalystControls />
-          <CrossingEvents />
           <TimelineScrubber />
         </>
       )}
@@ -1936,18 +1961,18 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       {/* Top Bar Toggle */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex gap-4">
         <button
-          onClick={() => setIsEpicFuryMode(!isEpicFuryMode)}
+          onClick={() => setEpicFuryActive(!epicFuryActive)}
           className={`px-6 py-2 rounded-lg font-mono text-sm font-bold tracking-widest border transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] backdrop-blur-md ${
-            isEpicFuryMode 
-              ? "bg-cyan-900/80 text-cyan-400 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)]" 
+            epicFuryActive
+              ? "bg-cyan-900/80 text-cyan-400 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)]"
               : "bg-black/60 text-gray-400 border-gray-600 hover:text-white hover:border-gray-400"
           }`}
         >
-          {isEpicFuryMode ? "MODE: EPIC FURY ACTIVE" : "ACTIVATE OP: EPIC FURY"}
+          {epicFuryActive ? "MODE: EPIC FURY ACTIVE" : "ACTIVATE OP: EPIC FURY"}
         </button>
       </div>
 
-      {!isEpicFuryMode && (
+      {!epicFuryActive && (
         <HudOverlay
         onFlyToPoi={flyToPoi}
         onResetCamera={resetCamera}
