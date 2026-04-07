@@ -11,6 +11,12 @@ import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
 import { AnalystControls } from "./AnalystControls";
 import { VideoOverlay } from "./VideoOverlay";
 import PneumaHud from "./PneumaHud";
+import {
+  EPIC_FURY_THEATER,
+  filterEpicFuryIncidents,
+  useEpicFuryStore,
+  type TimeWindow,
+} from "@/store/useEpicFuryStore";
 
 type HudOverlayProps = {
   onFlyToPoi: (poiId: string) => void;
@@ -118,6 +124,7 @@ const workspaceDefs = [
   { id: "intel", label: "Intel" },
   { id: "news", label: "News" },
   { id: "feeds", label: "Feeds" },
+  { id: "epic", label: "Epic" },
   { id: "signal", label: "Signal" },
   { id: "status", label: "Status" },
   { id: "settings", label: "Settings" },
@@ -296,6 +303,14 @@ export function HudOverlay({
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [showPneumaPanel, setShowPneumaPanel] = useState(false);
   const [rightPanelMode, setRightPanelMode] = useState<"target" | "epicFury">("target");
+  const efTimeWindow = useEpicFuryStore((s) => s.timeWindow);
+  const efSetTimeWindow = useEpicFuryStore((s) => s.setTimeWindow);
+  const efLockedRegion = useEpicFuryStore((s) => s.lockedRegion);
+  const efAllIncidents = useEpicFuryStore((s) => s.incidents);
+  const efFilteredIncidents = useMemo(
+    () => filterEpicFuryIncidents(efAllIncidents, efTimeWindow, efLockedRegion),
+    [efAllIncidents, efTimeWindow, efLockedRegion],
+  );
   const [gdeltDigestLoading, setGdeltDigestLoading] = useState(false);
   const [gdeltDigestDocument, setGdeltDigestDocument] = useState<{
     title: string;
@@ -311,10 +326,14 @@ export function HudOverlay({
   const [cognitiveLens, setCognitiveLens] = useState<"tactical" | "strategic" | "anomaly">("tactical");
 
   useEffect(() => {
-    if (!epicFuryActive && rightPanelMode === "epicFury") {
-      setRightPanelMode("target");
+    if (epicFuryActive) {
+      setWorkspace("epic");
+      setRightPanelMode("epicFury");
+    } else {
+      if (rightPanelMode === "epicFury") setRightPanelMode("target");
+      if (workspace === "epic") setWorkspace("intel");
     }
-  }, [epicFuryActive, rightPanelMode]);
+  }, [epicFuryActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const syncClock = () => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC"));
@@ -871,7 +890,37 @@ export function HudOverlay({
           </div>
 
           {rightPanelMode === "epicFury" && epicFuryActive ? (
-            <div className="mt-3">
+            <div className="mt-3 space-y-3">
+              {/* Timeline Stats */}
+              <div className="rounded-xl border border-cyan-900/40 bg-[#0d1520]/60 p-3 font-mono">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[9px] uppercase tracking-[0.18em] text-cyan-600">Theater Timeline</span>
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
+                    <span className="text-[8px] uppercase tracking-wider text-cyan-400">Live</span>
+                  </span>
+                </div>
+                <div className="flex gap-1 mb-2">
+                  {(["1h", "6h", "24h", "7d", "all"] as TimeWindow[]).map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => efSetTimeWindow(w)}
+                      className={`rounded px-2 py-1 text-[8px] font-bold uppercase transition ${
+                        efTimeWindow === w
+                          ? "bg-cyan-900/60 text-cyan-400 border border-cyan-500/50"
+                          : "text-[#7298a8] hover:text-cyan-400 border border-transparent"
+                      }`}
+                    >
+                      {w}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[9px]">
+                  <div className="text-[#a89984]">Window: <span className="text-[#ebdbb2] font-bold">{efTimeWindow === "all" ? "ALL TIME" : `LAST ${efTimeWindow.toUpperCase()}`}</span></div>
+                  <div className="text-[#a89984]">Incidents: <span className="text-[#ebdbb2] font-bold">{efFilteredIncidents.length}</span></div>
+                </div>
+              </div>
               <AnalystControls embedded />
             </div>
           ) : selectedIntel ? (
@@ -1693,6 +1742,100 @@ export function HudOverlay({
               </div>
             </div>
           </CollapsibleSection>
+          )}
+
+          {/* EPIC FURY section */}
+          {workspace === "epic" && (
+            <section className="space-y-2 border-b border-[#3c3836] px-3 py-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-cyan-400">
+                    {efLockedRegion ? `Epic Fury \u2014 ${efLockedRegion.label}` : `Epic Fury \u2014 ${EPIC_FURY_THEATER.label}`}
+                  </span>
+                  {epicFuryActive && (
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
+                      <span className="font-mono text-[8px] uppercase tracking-wider text-cyan-400">Live</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Time Window Buttons */}
+              <div className="flex gap-1">
+                {(["1h", "6h", "24h", "7d", "all"] as TimeWindow[]).map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => efSetTimeWindow(w)}
+                    className={`rounded-md px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
+                      efTimeWindow === w
+                        ? "border border-cyan-500/50 bg-cyan-900/60 text-cyan-400"
+                        : "border border-transparent text-[#7298a8] hover:text-cyan-400"
+                    }`}
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
+
+              {/* Stats bar */}
+              <div className="flex items-center justify-between rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#a89984]">
+                  Incidents: <span className="text-[#ebdbb2] font-bold">{efFilteredIncidents.length}</span>
+                </span>
+                {efFilteredIncidents.length > 0 && (
+                  <span className="font-mono text-[8px] text-cyan-600">
+                    Latest: {new Date(efFilteredIncidents[0].timestamp).toISOString().replace("T", " ").slice(11, 19)} UTC
+                  </span>
+                )}
+              </div>
+
+              {!epicFuryActive && (
+                <div className="rounded-md border border-[#504945] bg-[#282828] px-2 py-2 font-mono text-[9px] text-[#928374] text-center">
+                  Epic Fury mode is not active. Activate via the top bar button.
+                </div>
+              )}
+
+              {/* Incident Feed */}
+              {epicFuryActive && (
+                <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5">
+                  {efFilteredIncidents.length === 0 ? (
+                    <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-4 text-center font-mono text-[9px] text-[#928374]">
+                      No incidents in current window
+                    </div>
+                  ) : (
+                    efFilteredIncidents.map((incident) => {
+                      const typeIcons: Record<string, string> = { gdelt: "\u{1F310}", military: "\u2708\uFE0F", vessel: "\u{1F6A2}", seismic: "\u{1F534}" };
+                      const sevBorder: Record<string, string> = { critical: "border-l-red-500", high: "border-l-orange-400", medium: "border-l-cyan-500", low: "border-l-cyan-900" };
+                      return (
+                        <button
+                          key={incident.id}
+                          type="button"
+                          onClick={() => onFlyToCoordinates(incident.lat, incident.lon)}
+                          className={`w-full rounded-md border border-[#3c3836] border-l-2 ${sevBorder[incident.severity]} bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]`}
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-[10px]">{typeIcons[incident.type]}</span>
+                              <span className="truncate font-mono text-[10px] font-bold text-[#ebdbb2]">{incident.title}</span>
+                            </div>
+                            <span className="shrink-0 font-mono text-[8px] text-[#928374]">
+                              {(() => { const d = Date.now() - incident.timestamp; if (d < 60000) return "now"; if (d < 3600000) return `${Math.floor(d/60000)}m`; if (d < 86400000) return `${Math.floor(d/3600000)}h`; return `${Math.floor(d/86400000)}d`; })()}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 font-mono text-[9px] leading-relaxed text-[#a89984] line-clamp-2">{incident.detail}</div>
+                          <div className="mt-1 flex items-center justify-between">
+                            <span className="rounded border border-[#504945] bg-[#282828] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] text-[#83a598]">{incident.source}</span>
+                            <span className="font-mono text-[8px] text-[#4e6a7a]">{incident.lat.toFixed(2)}, {incident.lon.toFixed(2)}</span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </section>
           )}
 
           {workspace === "settings" && (

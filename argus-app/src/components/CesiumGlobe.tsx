@@ -1,5 +1,4 @@
 "use client";
-import { TimelineScrubber } from "./TimelineScrubber";
 
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
@@ -81,7 +80,6 @@ import type {
 } from "@/types/intel";
 
 import { HudOverlay } from "./HudOverlay";
-import { EpicFuryHud } from "./EpicFuryHud";
 import { useEpicFuryStore } from "@/store/useEpicFuryStore";
 import {
   mapGdeltIncidents,
@@ -200,11 +198,11 @@ const suppressUnsupportedZoomErrors = (viewer: Viewer): (() => void) => {
     }
 
     seenProviders.add(provider);
-    const removeListener = provider.errorEvent?.addEventListener?.((tileError) => {
-       
+    const removeListener = provider.errorEvent?.addEventListener?.(
+      (tileError: TileErrorLike) => {
         tileError.retry = false;
-      }
-    });
+      },
+    );
 
     if (typeof removeListener === "function") {
       cleanupFns.push(removeListener);
@@ -398,9 +396,15 @@ const buildAnalysisSummary = (kind: string, props: Record<string, unknown>, name
     case "vessel":
       return [
         `${name} is an AIS-tracked vessel (MMSI: ${props.mmsi ?? "unknown"}).`,
+        props.country ? `Flag: ${props.country}.` : null,
+        props.isMilitary ? "CLASSIFICATION: POTENTIAL MILITARY VESSEL." : null,
+        props.knownVessel ? `Identified as known naval vessel: ${props.knownVessel}.` : null,
         typeof props.sog === "number" ? `Speed over ground: ${Number(props.sog).toFixed(1)} knots.` : null,
         typeof props.cog === "number" ? `Course: ${Number(props.cog).toFixed(0)}°.` : null,
         props.callsign ? `Callsign: ${props.callsign}.` : null,
+        props.nearChokepoint ? `Currently near strategic chokepoint: ${props.nearChokepoint}.` : null,
+        props.nearBase ? `Proximity to naval base: ${props.nearBase}.` : null,
+        props.isDark ? "WARNING: AIS dark — signal gap exceeds 60 minutes." : null,
       ]
         .filter(Boolean)
         .join(" ");
@@ -547,6 +551,12 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("Course", props.cog);
       pushQuick("Heading", props.heading);
       pushQuick("Nav Status", props.navStatus);
+      pushQuick("Country", props.country);
+      if (props.isMilitary) pushQuick("Classification", "MILITARY");
+      if (props.knownVessel) pushQuick("Known Vessel", props.knownVessel);
+      if (props.nearChokepoint) pushQuick("Near Chokepoint", props.nearChokepoint);
+      if (props.nearBase) pushQuick("Near Base", props.nearBase);
+      if (props.isDark) pushQuick("AIS Status", "DARK (gap > 60 min)");
       break;
     default:
       break;
@@ -666,6 +676,18 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   useEffect(() => {
     collisionEnabledRef.current = collisionEnabled;
   }, [collisionEnabled]);
+
+  // Fly to Strait of Hormuz / Middle East when Epic Fury activates
+  useEffect(() => {
+    if (!epicFuryActive) return;
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    // Center on Strait of Hormuz area (26.5N, 56.5E)
+    viewer.camera.flyTo({
+      destination: Cartesian3.fromDegrees(52.0, 26.5, 2_500_000),
+      duration: 2.0,
+    });
+  }, [epicFuryActive]);
 
   const layers = useArgusStore((s) => s.layers);
   const platformMode = useArgusStore((s) => s.platformMode);
@@ -2078,12 +2100,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         </div>
       </div>
 
-      {epicFuryActive && (
-        <>
-          <EpicFuryHud onFlyToCoordinates={flyToCoordinates} />
-          <TimelineScrubber />
-        </>
-      )}
+      {/* Epic Fury data is now shown in the sidebar panels */}
 
       {/* Top Bar Toggle */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex gap-4">

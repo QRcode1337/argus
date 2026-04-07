@@ -48,9 +48,9 @@ export class WeatherLayer {
       }
 
       const provider = new UrlTemplateImageryProvider({
-        url: `https://tilecache.rainviewer.com/v2/radar/${timestamp}/{z}/{x}/{y}/2/1_1.png`,
+        url: `https://tilecache.rainviewer.com${latest.path}/256/{z}/{x}/{y}/2/1_1.png`,
         credit: "RainViewer",
-        maximumLevel: 10,
+        
       });
 
       this.layer = this.viewer.imageryLayers.addImageryProvider(provider);

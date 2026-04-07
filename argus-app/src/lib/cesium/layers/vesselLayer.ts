@@ -1,16 +1,20 @@
 import {
+  Cartesian2,
   Cartesian3,
   Color,
   ConstantProperty,
   ConstantPositionProperty,
   Entity,
+  HorizontalOrigin,
+  LabelStyle,
   NearFarScalar,
   PolylineGlowMaterialProperty,
   VerticalOrigin,
   type Viewer,
 } from "cesium";
 
-import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
+import { createBoatSvg } from "@/lib/cesium/tacticalMarker";
+import { analyzeVessel } from "@/lib/maritime/vesselIntel";
 import type { AisVessel } from "@/types/vessel";
 
 const MAX_TRAIL_POSITIONS = 30;
@@ -23,9 +27,15 @@ export class VesselLayer {
   private trailEntity: Entity | null = null;
   private activeTrailVesselId: string | null = null;
 
-  private readonly marker = createTacticalMarkerSvg({
+  private readonly marker = createBoatSvg({
     fill: "#458588",
     glow: "#83a598",
+    stroke: "#1d2021",
+  });
+
+  private readonly militaryMarker = createBoatSvg({
+    fill: "#fabd2f",
+    glow: "#fe8019",
     stroke: "#1d2021",
   });
 
@@ -81,15 +91,40 @@ export class VesselLayer {
         continue;
       }
 
+      const intel = analyzeVessel(
+        vessel.mmsi,
+        vessel.vesselName ?? "",
+        vessel.lat,
+        vessel.lon,
+        vessel.timestamp ? new Date(vessel.timestamp).getTime() : undefined,
+      );
+
+      const displayName = vessel.vesselName?.trim() || vessel.callsign?.trim() || vessel.mmsi;
+      const isMilitary = intel.isPotentialMilitary;
+      const labelColor = isMilitary ? "#fabd2f" : "#83a598";
+
       const entity = this.viewer.entities.add({
         id: `vessel-${vessel.mmsi}`,
         position,
         billboard: {
-          image: new ConstantProperty(this.marker),
-          scale: 0.7,
+          image: new ConstantProperty(isMilitary ? this.militaryMarker : this.marker),
+          scale: isMilitary ? 0.85 : 0.7,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(500_000, 1.5, 10_000_000, 0.3),
-          disableDepthTestDistance: 0,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        label: {
+          text: new ConstantProperty(displayName),
+          font: new ConstantProperty(isMilitary ? "bold 11px monospace" : "11px monospace"),
+          fillColor: new ConstantProperty(Color.fromCssColorString(labelColor)),
+          outlineColor: new ConstantProperty(Color.BLACK),
+          outlineWidth: new ConstantProperty(2),
+          style: new ConstantProperty(LabelStyle.FILL_AND_OUTLINE),
+          verticalOrigin: new ConstantProperty(VerticalOrigin.TOP),
+          horizontalOrigin: new ConstantProperty(HorizontalOrigin.CENTER),
+          pixelOffset: new ConstantProperty(new Cartesian2(0, 14)),
+          scaleByDistance: new NearFarScalar(500_000, 1.0, 5_000_000, 0.0),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
         properties: {
           kind: "vessel",
@@ -100,6 +135,12 @@ export class VesselLayer {
           cog: vessel.cog,
           heading: vessel.heading,
           navStatus: vessel.navStatus,
+          country: intel.country,
+          isMilitary: intel.isPotentialMilitary,
+          knownVessel: intel.knownVessel?.name,
+          nearChokepoint: intel.nearChokepoint,
+          nearBase: intel.nearBase,
+          isDark: intel.isDark,
         },
       });
 

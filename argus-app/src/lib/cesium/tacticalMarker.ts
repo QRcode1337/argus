@@ -104,3 +104,30 @@ export function createIssMarkerSvg(palette: TacticalMarkerPalette): string {
   iconCache.set(key, encoded);
   return encoded;
 }
+
+export function createBoatSvg(palette: TacticalMarkerPalette): string {
+  const key = `boat:${palette.fill}|${palette.glow}|${palette.stroke}`;
+  const cached = iconCache.get(key);
+  if (cached) return cached;
+
+  const fill = sanitize(palette.fill);
+  const glow = sanitize(palette.glow);
+  const stroke = sanitize(palette.stroke);
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+    <defs>
+      <filter id="g" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="0.9" result="blur"/>
+      </filter>
+    </defs>
+    <path d="M4 14.5c0 0 1.5-2 10-2h4c2 0 3 1 3 2.5s-1 2.5-3 2.5h-4c-8.5 0-10-2-10-2" fill="${fill}" fill-opacity="0.3" stroke="${stroke}" stroke-width="0.8"/>
+    <path d="M6 14c1 0 13 0 14 0l-2 3c-1 1-10 1-11 0l-1-3Z" fill="${fill}" stroke="${stroke}" stroke-width="0.8"/>
+    <path d="M12 10v4" stroke="${stroke}" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M9 10l3-2 3 2" fill="${glow}" fill-opacity="0.7"/>
+    <circle cx="12" cy="14" r="1.5" fill="${glow}" filter="url(#g)"/>
+  </svg>`;
+
+  const encoded = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  iconCache.set(key, encoded);
+  return encoded;
+}

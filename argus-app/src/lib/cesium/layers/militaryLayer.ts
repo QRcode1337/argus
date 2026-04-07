@@ -10,7 +10,7 @@ import {
   type Viewer,
 } from "cesium";
 
-import { createTacticalMarkerSvg } from "@/lib/cesium/tacticalMarker";
+import { createTacticalMarkerSvg, createAirplaneSvg } from "@/lib/cesium/tacticalMarker";
 import { lookupAircraftType } from "@/lib/data/aircraftTypes";
 import type { MilitaryFlight } from "@/types/intel";
 
@@ -24,7 +24,7 @@ export class MilitaryLayer {
   private trailEntity: Entity | null = null;
   private activeTrailFlightId: string | null = null;
 
-  private readonly marker = createTacticalMarkerSvg({
+  private readonly marker = createAirplaneSvg({
     fill: "#cc241d",
     glow: "#fb4934",
     stroke: "#3c3836",
