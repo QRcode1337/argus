@@ -7,9 +7,14 @@ type GdeltResponse = {
 };
 
 export async function fetchGdeltEvents(endpoint: string): Promise<GdeltEvent[]> {
-  const url = endpoint.startsWith('/') && typeof window === 'undefined'
-    ? `http://127.0.0.1:${process.env.PORT || 3000}${endpoint}`
-    : endpoint;
+  let url: string;
+  if (endpoint.startsWith('/') && typeof window === 'undefined') {
+    const host = require('os').hostname();
+    const port = process.env.PORT || 3000;
+    url = `http://${host}:${port}${endpoint}`;
+  } else {
+    url = endpoint;
+  }
 
   const response = await fetch(url, { cache: "no-store" });
 
