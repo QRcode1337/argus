@@ -52,7 +52,7 @@ export async function queryLlm(prompt: string, systemPrompt?: string): Promise<L
   const { llm } = await readSettings();
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
+  const timeout = setTimeout(() => controller.abort(), 60_000);
 
   try {
     if (llm.provider === "ollama") {
@@ -137,7 +137,7 @@ export async function queryLlm(prompt: string, systemPrompt?: string): Promise<L
     const res = await fetch(`${llm.endpoint}/v1/chat/completions`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ model: llm.model, messages, max_tokens: 512 }),
+      body: JSON.stringify({ model: llm.model, messages, max_tokens: 2048 }),
       signal: controller.signal,
     });
     if (!res.ok) return { text: "", error: `LLM error: ${res.status}` };

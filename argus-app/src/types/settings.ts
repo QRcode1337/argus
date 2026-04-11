@@ -16,9 +16,11 @@ function defaultLlmSettings(): LlmSettings {
   const gradientBase = process.env.GRADIENT_BASE_URL;
   const gradientKey = process.env.GRADIENT_ENDPOINT_ACCESS_KEY;
   if (gradientBase && gradientKey) {
+    // Strip trailing /v1 if present — llmClient appends /v1/chat/completions
+    const endpoint = gradientBase.replace(/\/v1\/?$/, "");
     return {
       provider: "openai_compatible",
-      endpoint: gradientBase,
+      endpoint,
       model: "llama-3.3-70b-instruct",
       apiKey: gradientKey,
     };
