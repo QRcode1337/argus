@@ -8,7 +8,7 @@ import { fetchNewsFeed, type NewsItem, type RegionDigest } from "@/lib/ingest/ne
 import { useArgusStore } from "@/store/useArgusStore";
 import type { ClickedCoordinates, LayerKey, PlatformMode, PlaybackSpeed, SceneMode, SelectedIntel, VisualMode } from "@/types/intel";
 import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
-import { AnalystControls } from "./AnalystControls";
+
 import { VideoOverlay } from "./VideoOverlay";
 import PneumaHud from "./PneumaHud";
 import {
@@ -17,6 +17,13 @@ import {
   useEpicFuryStore,
   type TimeWindow,
 } from "@/store/useEpicFuryStore";
+import {
+  ANOMALY_SITES,
+  CATEGORY_COLORS,
+  CATEGORY_LABELS,
+  STATUS_ICONS,
+  type AnomalyCategory,
+} from "@/data/anomalyAtlas";
 
 type HudOverlayProps = {
   onFlyToPoi: (poiId: string) => void;
@@ -45,7 +52,6 @@ type HudOverlayProps = {
   onPlaybackSpeedChange?: (speed: number) => void;
   clickedCoordinates: ClickedCoordinates | null;
   onSelectIntel: (intel: SelectedIntel | null) => void;
-  epicFuryActive?: boolean;
 };
 
 type SliderDef = {
@@ -124,7 +130,7 @@ const workspaceDefs = [
   { id: "intel", label: "Intel" },
   { id: "news", label: "News" },
   { id: "feeds", label: "Feeds" },
-  { id: "epic", label: "Epic" },
+
   { id: "signal", label: "Signal" },
   { id: "status", label: "Status" },
   { id: "settings", label: "Settings" },
@@ -243,7 +249,6 @@ export function HudOverlay({
   onPlaybackSpeedChange,
   clickedCoordinates,
   onSelectIntel,
-  epicFuryActive = false,
 }: HudOverlayProps) {
   const {
     layers,
@@ -268,6 +273,7 @@ export function HudOverlay({
     dayNight,
     toggleDayNight,
   } = useArgusStore();
+  const epicFuryActive = platformMode === "epic-fury";
 
   const searchQuery = useArgusStore((s) => s.searchQuery);
   const setSearchQuery = useArgusStore((s) => s.setSearchQuery);
@@ -302,7 +308,6 @@ export function HudOverlay({
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [showPneumaPanel, setShowPneumaPanel] = useState(false);
-  const [rightPanelMode, setRightPanelMode] = useState<"target" | "epicFury">("target");
   const efTimeWindow = useEpicFuryStore((s) => s.timeWindow);
   const efSetTimeWindow = useEpicFuryStore((s) => s.setTimeWindow);
   const efLockedRegion = useEpicFuryStore((s) => s.lockedRegion);
@@ -312,6 +317,8 @@ export function HudOverlay({
     [efAllIncidents, efTimeWindow, efLockedRegion],
   );
   const [gdeltDigestLoading, setGdeltDigestLoading] = useState(false);
+  const [gdeltDigestError, setGdeltDigestError] = useState<string | null>(null);
+  const [anomalyCategoryFilter, setAnomalyCategoryFilter] = useState<AnomalyCategory | null>(null);
   const [gdeltDigestDocument, setGdeltDigestDocument] = useState<{
     title: string;
     content: string;
@@ -326,14 +333,10 @@ export function HudOverlay({
   const [cognitiveLens, setCognitiveLens] = useState<"tactical" | "strategic" | "anomaly">("tactical");
 
   useEffect(() => {
-    if (epicFuryActive) {
-      setWorkspace("epic");
-      setRightPanelMode("epicFury");
-    } else {
-      if (rightPanelMode === "epicFury") setRightPanelMode("target");
-      if (workspace === "epic") setWorkspace("intel");
+    if (epicFuryActive || platformMode === "anomaly-atlas") {
+      setWorkspace("intel");
     }
-  }, [epicFuryActive]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [epicFuryActive, platformMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const syncClock = () => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC"));
@@ -666,6 +669,7 @@ export function HudOverlay({
   const requestGdeltDigest = async () => {
     if (gdeltDigestLoading) return;
     setGdeltDigestLoading(true);
+    setGdeltDigestError(null);
     try {
       const res = await fetch("/api/ai/gdelt-digest");
       const data = await res.json();
@@ -678,8 +682,12 @@ export function HudOverlay({
           eventCount: data.eventCount,
           generatedAt: new Date().toUTCString(),
         });
+      } else {
+        setGdeltDigestError(data.error ?? "No summary returned — check LLM configuration in Settings");
       }
-    } catch {} finally {
+    } catch (e) {
+      setGdeltDigestError(e instanceof Error ? e.message : "Network error");
+    } finally {
       setGdeltDigestLoading(false);
     }
   };
@@ -846,37 +854,11 @@ export function HudOverlay({
       </section>
 
       {/* Selected intel panel (right side) — desktop only */}
-      {selectedIntel || epicFuryActive ? (
+      {selectedIntel ? (
         <section className="pointer-events-auto absolute right-8 top-[5.5rem] hidden w-[348px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] p-4 shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md md:block">
           <div className="flex items-center justify-between">
             <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#fabd2f]">Target Data Intel</div>
             <div className="flex items-center gap-2">
-              <div className="flex rounded-md border border-[#504945] bg-[#282828] p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setRightPanelMode("target")}
-                  className={`rounded px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] transition ${
-                    rightPanelMode === "target"
-                      ? "bg-[#504945] text-[#ebdbb2]"
-                      : "text-[#a89984] hover:text-[#d5c4a1]"
-                  }`}
-                >
-                  Target
-                </button>
-                {epicFuryActive ? (
-                  <button
-                    type="button"
-                    onClick={() => setRightPanelMode("epicFury")}
-                    className={`rounded px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] transition ${
-                      rightPanelMode === "epicFury"
-                        ? "bg-[#14526b] text-cyan-300"
-                        : "text-[#7298a8] hover:text-cyan-300"
-                    }`}
-                  >
-                    Epic Fury
-                  </button>
-                ) : null}
-              </div>
               {selectedIntel ? (
                 <button
                   type="button"
@@ -889,41 +871,7 @@ export function HudOverlay({
             </div>
           </div>
 
-          {rightPanelMode === "epicFury" && epicFuryActive ? (
-            <div className="mt-3 space-y-3">
-              {/* Timeline Stats */}
-              <div className="rounded-xl border border-cyan-900/40 bg-[#0d1520]/60 p-3 font-mono">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[9px] uppercase tracking-[0.18em] text-cyan-600">Theater Timeline</span>
-                  <span className="flex items-center gap-1">
-                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
-                    <span className="text-[8px] uppercase tracking-wider text-cyan-400">Live</span>
-                  </span>
-                </div>
-                <div className="flex gap-1 mb-2">
-                  {(["1h", "6h", "24h", "7d", "all"] as TimeWindow[]).map((w) => (
-                    <button
-                      key={w}
-                      type="button"
-                      onClick={() => efSetTimeWindow(w)}
-                      className={`rounded px-2 py-1 text-[8px] font-bold uppercase transition ${
-                        efTimeWindow === w
-                          ? "bg-cyan-900/60 text-cyan-400 border border-cyan-500/50"
-                          : "text-[#7298a8] hover:text-cyan-400 border border-transparent"
-                      }`}
-                    >
-                      {w}
-                    </button>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-[9px]">
-                  <div className="text-[#a89984]">Window: <span className="text-[#ebdbb2] font-bold">{efTimeWindow === "all" ? "ALL TIME" : `LAST ${efTimeWindow.toUpperCase()}`}</span></div>
-                  <div className="text-[#a89984]">Incidents: <span className="text-[#ebdbb2] font-bold">{efFilteredIncidents.length}</span></div>
-                </div>
-              </div>
-              <AnalystControls embedded />
-            </div>
-          ) : selectedIntel ? (
+          {selectedIntel ? (
             <>
               <div className="mt-2 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono">
                 <div className="text-[15px] text-[#ebdbb2]">{selectedIntel.name}</div>
@@ -1075,7 +1023,7 @@ export function HudOverlay({
           {/* Sidebar header with hide button */}
           <div className="flex items-center justify-between border-b border-[#3c3836] px-3 py-2">
             <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#a89984]">
-              {platformMode === "analytics" ? "Analytics" : platformMode === "playback" ? "Playback" : "Live"} Panels
+              {platformMode === "analytics" ? "Analytics" : platformMode === "playback" ? "Playback" : platformMode === "epic-fury" ? "Op Epic Fury" : platformMode === "anomaly-atlas" ? "Anomaly Atlas" : "Live"} Panels
             </span>
             <button
               type="button"
@@ -1222,7 +1170,7 @@ export function HudOverlay({
           )}
 
           {/* INTEL BRIEF section */}
-          {workspace === "intel" && (platformMode === "live" || platformMode === "analytics") && (
+          {workspace === "intel" && (platformMode !== "playback") && (
             <CollapsibleSection
               title="Intel Brief"
               badge={
@@ -1298,6 +1246,11 @@ export function HudOverlay({
                           ? `Refresh GDELT Digest (${compact(counts.gdelt)} events)`
                           : `Generate GDELT Digest (${compact(counts.gdelt)} events)`}
                     </button>
+                  )}
+                  {gdeltDigestError && (
+                    <div className="rounded-md border border-red-900/50 bg-red-900/10 px-2 py-1.5 font-mono text-[9px] text-red-400">
+                      Digest failed: {gdeltDigestError}
+                    </div>
                   )}
 
                   {/* Alerts list — clickable, filterable, scrollable */}
@@ -1399,7 +1352,7 @@ export function HudOverlay({
           )}
 
           {/* SEARCH section */}
-          {workspace === "intel" && (platformMode === "live" || platformMode === "analytics") && (
+          {workspace === "intel" && (platformMode !== "playback") && (
             <CollapsibleSection title="Search" badge={searchResults.length > 0 ? `${searchResults.length}` : null}>
               <div className="space-y-1.5">
                 <input
@@ -1744,70 +1697,40 @@ export function HudOverlay({
           </CollapsibleSection>
           )}
 
-          {/* EPIC FURY section */}
-          {workspace === "epic" && (
-            <section className="space-y-2 border-b border-[#3c3836] px-3 py-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-cyan-400">
-                    {efLockedRegion ? `Epic Fury \u2014 ${efLockedRegion.label}` : `Epic Fury \u2014 ${EPIC_FURY_THEATER.label}`}
-                  </span>
-                  {epicFuryActive && (
-                    <span className="flex items-center gap-1">
-                      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
-                      <span className="font-mono text-[8px] uppercase tracking-wider text-cyan-400">Live</span>
-                    </span>
-                  )}
+          {/* Epic Fury regional feed — shown in intel workspace when active */}
+          {workspace === "intel" && epicFuryActive && (
+            <CollapsibleSection
+              title={efLockedRegion ? `Op Epic Fury — ${efLockedRegion.label}` : `Op Epic Fury — ${EPIC_FURY_THEATER.label}`}
+              badge={`${efFilteredIncidents.length}`}
+              defaultOpen
+            >
+              <div className="space-y-2">
+                <div className="flex gap-1">
+                  {(["1h", "6h", "24h", "7d", "all"] as TimeWindow[]).map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => efSetTimeWindow(w)}
+                      className={`rounded-md px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
+                        efTimeWindow === w
+                          ? "border border-[#83a598] bg-[#504945] text-[#ebdbb2]"
+                          : "border border-transparent text-[#a89984] hover:text-[#d5c4a1]"
+                      }`}
+                    >
+                      {w}
+                    </button>
+                  ))}
                 </div>
-              </div>
 
-              {/* Time Window Buttons */}
-              <div className="flex gap-1">
-                {(["1h", "6h", "24h", "7d", "all"] as TimeWindow[]).map((w) => (
-                  <button
-                    key={w}
-                    type="button"
-                    onClick={() => efSetTimeWindow(w)}
-                    className={`rounded-md px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
-                      efTimeWindow === w
-                        ? "border border-cyan-500/50 bg-cyan-900/60 text-cyan-400"
-                        : "border border-transparent text-[#7298a8] hover:text-cyan-400"
-                    }`}
-                  >
-                    {w}
-                  </button>
-                ))}
-              </div>
-
-              {/* Stats bar */}
-              <div className="flex items-center justify-between rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
-                <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#a89984]">
-                  Incidents: <span className="text-[#ebdbb2] font-bold">{efFilteredIncidents.length}</span>
-                </span>
-                {efFilteredIncidents.length > 0 && (
-                  <span className="font-mono text-[8px] text-cyan-600">
-                    Latest: {new Date(efFilteredIncidents[0].timestamp).toISOString().replace("T", " ").slice(11, 19)} UTC
-                  </span>
-                )}
-              </div>
-
-              {!epicFuryActive && (
-                <div className="rounded-md border border-[#504945] bg-[#282828] px-2 py-2 font-mono text-[9px] text-[#928374] text-center">
-                  Epic Fury mode is not active. Activate via the top bar button.
-                </div>
-              )}
-
-              {/* Incident Feed */}
-              {epicFuryActive && (
-                <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5">
+                <div className="max-h-[350px] space-y-1 overflow-y-auto pr-0.5">
                   {efFilteredIncidents.length === 0 ? (
-                    <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-4 text-center font-mono text-[9px] text-[#928374]">
+                    <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-3 text-center font-mono text-[9px] text-[#928374]">
                       No incidents in current window
                     </div>
                   ) : (
                     efFilteredIncidents.map((incident) => {
                       const typeIcons: Record<string, string> = { gdelt: "\u{1F310}", military: "\u2708\uFE0F", vessel: "\u{1F6A2}", seismic: "\u{1F534}" };
-                      const sevBorder: Record<string, string> = { critical: "border-l-red-500", high: "border-l-orange-400", medium: "border-l-cyan-500", low: "border-l-cyan-900" };
+                      const sevBorder: Record<string, string> = { critical: "border-l-red-500", high: "border-l-orange-400", medium: "border-l-[#83a598]", low: "border-l-[#504945]" };
                       return (
                         <button
                           key={incident.id}
@@ -1834,8 +1757,92 @@ export function HudOverlay({
                     })
                   )}
                 </div>
-              )}
-            </section>
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* Anomaly Atlas — shown in intel workspace when platform mode is anomaly-atlas */}
+          {workspace === "intel" && platformMode === "anomaly-atlas" && (
+            <CollapsibleSection
+              title="Anomaly Atlas"
+              badge={`${ANOMALY_SITES.length} sites`}
+              defaultOpen
+            >
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setAnomalyCategoryFilter(null)}
+                    className={`rounded-md border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] transition ${
+                      anomalyCategoryFilter === null
+                        ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                        : "border-[#504945] bg-[#282828] text-[#a89984] hover:text-[#d5c4a1]"
+                    }`}
+                  >
+                    All
+                  </button>
+                  {(Object.keys(CATEGORY_LABELS) as AnomalyCategory[]).map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setAnomalyCategoryFilter(anomalyCategoryFilter === cat ? null : cat)}
+                      className={`rounded-md border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] transition ${
+                        anomalyCategoryFilter === cat
+                          ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                          : "border-[#504945] bg-[#282828] text-[#a89984] hover:text-[#d5c4a1]"
+                      }`}
+                    >
+                      {CATEGORY_LABELS[cat]}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5">
+                  {ANOMALY_SITES
+                    .filter((site) => !anomalyCategoryFilter || site.category === anomalyCategoryFilter)
+                    .map((site) => (
+                      <button
+                        key={site.id}
+                        type="button"
+                        onClick={() => {
+                          onFlyToCoordinates(site.lat, site.lon);
+                          onSelectIntel({
+                            id: site.id,
+                            name: site.name,
+                            kind: "anomaly",
+                            importance: site.status === "ambiguous" || site.status === "unexplained" ? "important" : "normal",
+                            quickFacts: [
+                              { label: "Category", value: CATEGORY_LABELS[site.category] },
+                              { label: "Status", value: `${STATUS_ICONS[site.status]} ${site.status}` },
+                              { label: "Coordinates", value: `${site.lat.toFixed(4)}, ${site.lon.toFixed(4)}` },
+                            ],
+                            fullFacts: [],
+                            analysisSummary: site.description,
+                            coordinates: { lat: site.lat, lon: site.lon },
+                          });
+                        }}
+                        className="w-full rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-[10px]">{STATUS_ICONS[site.status]}</span>
+                            <span className="truncate font-mono text-[10px] font-bold text-[#ebdbb2]">{site.name}</span>
+                          </div>
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-1.5">
+                          <span
+                            className="rounded border border-[#504945] bg-[#282828] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em]"
+                            style={{ color: CATEGORY_COLORS[site.category] }}
+                          >
+                            {CATEGORY_LABELS[site.category]}
+                          </span>
+                          <span className="font-mono text-[8px] text-[#4e6a7a]">{site.lat.toFixed(2)}, {site.lon.toFixed(2)}</span>
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </CollapsibleSection>
           )}
 
           {workspace === "settings" && (
@@ -1950,6 +1957,8 @@ export function HudOverlay({
               <option value="live">Live</option>
               <option value="playback">Playback</option>
               <option value="analytics">Analytics</option>
+              <option value="epic-fury">Op Epic Fury</option>
+              <option value="anomaly-atlas">Anomaly Atlas</option>
             </select>
           </label>
 

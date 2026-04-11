@@ -129,7 +129,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     gdelt: true,
     anomalies: true,
     weather: false,
-    vessels: false,
+    vessels: true,
   },
   counts: {
     flights: 0,

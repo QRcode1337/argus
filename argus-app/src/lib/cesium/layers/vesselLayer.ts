@@ -7,6 +7,7 @@ import {
   Entity,
   HorizontalOrigin,
   LabelStyle,
+  Math as CesiumMath,
   NearFarScalar,
   PolylineGlowMaterialProperty,
   VerticalOrigin,
@@ -71,6 +72,12 @@ export class VesselLayer {
         }
       }
 
+      // Prefer true heading; fall back to course over ground
+      const hdg = Number.isFinite(vessel.heading) && vessel.heading !== 511
+        ? vessel.heading
+        : (Number.isFinite(vessel.cog) ? vessel.cog : 0);
+      const rotation = -CesiumMath.toRadians(hdg);
+
       const existing = this.entities.get(vessel.mmsi);
       if (existing) {
         const positionProperty = existing.position as ConstantPositionProperty | undefined;
@@ -78,6 +85,9 @@ export class VesselLayer {
           positionProperty.setValue(position);
         } else {
           existing.position = new ConstantPositionProperty(position);
+        }
+        if (existing.billboard) {
+          existing.billboard.rotation = new ConstantProperty(rotation) as any;
         }
 
         // Update trail if this vessel is being tracked
@@ -109,6 +119,8 @@ export class VesselLayer {
         billboard: {
           image: new ConstantProperty(isMilitary ? this.militaryMarker : this.marker),
           scale: isMilitary ? 0.85 : 0.7,
+          rotation: new ConstantProperty(rotation) as any,
+          alignedAxis: new ConstantProperty(Cartesian3.ZERO) as any,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(500_000, 1.5, 10_000_000, 0.3),
           disableDepthTestDistance: Number.POSITIVE_INFINITY,

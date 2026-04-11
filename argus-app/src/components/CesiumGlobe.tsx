@@ -57,6 +57,7 @@ import { fetchFredObservations } from "@/lib/ingest/fred";
 import { fetchAisVessels } from "@/lib/ingest/aisstream";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
 import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
+import { ANOMALY_SITES, CATEGORY_COLORS, CATEGORY_LABELS, STATUS_ICONS } from "@/data/anomalyAtlas";
 import { fetchIssIntel } from "@/lib/ingest/iss";
 import { recordFlights, recordMilitary, recordSatellites, recordQuakes, recordOutages, recordThreats } from "@/lib/ingest/recorder";
 import {
@@ -518,6 +519,27 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("Perigee (km)", props.perigeeKm);
       break;
     case "anomaly":
+      if (props.anomalyId) {
+        // Google Earth Anomaly Atlas entry
+        pushQuick("Category", props.category);
+        pushQuick("Status", props.status);
+        const site = ANOMALY_SITES.find((s) => s.id === props.anomalyId);
+        if (site) {
+          return {
+            id: entity.id,
+            name: site.name,
+            kind: "anomaly",
+            importance: site.status === "ambiguous" || site.status === "unexplained" ? "important" : "normal",
+            quickFacts,
+            fullFacts: [],
+            analysisSummary: site.description,
+            coordinates: cartographic ? {
+              lat: CesiumMath.toDegrees(cartographic.latitude),
+              lon: CesiumMath.toDegrees(cartographic.longitude),
+            } : undefined,
+          };
+        }
+      }
       pushQuick("Type", props.anomaly_type);
       pushQuick("Severity", props.severity);
       pushQuick("Chaos Score", props.chaos_score);
@@ -670,27 +692,90 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const [analyticsStatus, setAnalyticsStatus] = useState<string | null>(null);
   const [collisionEnabled, setCollisionEnabled] = useState(false);
   const pushIncidents = useEpicFuryStore((s) => s.pushIncidents);
-  const epicFuryActive = useEpicFuryStore((s) => s.active);
   const setEpicFuryActive = useEpicFuryStore((s) => s.setActive);
   const collisionEnabledRef = useRef(collisionEnabled);
   useEffect(() => {
     collisionEnabledRef.current = collisionEnabled;
   }, [collisionEnabled]);
 
-  // Fly to Strait of Hormuz / Middle East when Epic Fury activates
+  const layers = useArgusStore((s) => s.layers);
+  const platformMode = useArgusStore((s) => s.platformMode);
+  const epicFuryActive = platformMode === "epic-fury";
+
+  // Sync Epic Fury store with platform mode
+  useEffect(() => {
+    setEpicFuryActive(epicFuryActive);
+  }, [epicFuryActive, setEpicFuryActive]);
+
+  // Fly to Strait of Hormuz when Epic Fury activates
   useEffect(() => {
     if (!epicFuryActive) return;
     const viewer = viewerRef.current;
     if (!viewer) return;
-    // Center on Strait of Hormuz area (26.5N, 56.5E)
     viewer.camera.flyTo({
-      destination: Cartesian3.fromDegrees(52.0, 26.5, 2_500_000),
+      destination: Cartesian3.fromDegrees(56.25, 26.5667, 250_000),
       duration: 2.0,
     });
   }, [epicFuryActive]);
 
-  const layers = useArgusStore((s) => s.layers);
-  const platformMode = useArgusStore((s) => s.platformMode);
+  // Anomaly Atlas — add/remove markers and fly to global view
+  const anomalyEntitiesRef = useRef<Entity[]>([]);
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    const isAtlas = platformMode === "anomaly-atlas";
+
+    // Remove existing anomaly markers
+    for (const entity of anomalyEntitiesRef.current) {
+      viewer.entities.remove(entity);
+    }
+    anomalyEntitiesRef.current = [];
+
+    if (!isAtlas) return;
+
+    // Add anomaly markers
+    for (const site of ANOMALY_SITES) {
+      const color = Color.fromCssColorString(CATEGORY_COLORS[site.category]);
+      const entity = viewer.entities.add({
+        id: `anomaly-${site.id}`,
+        position: Cartesian3.fromDegrees(site.lon, site.lat, 0),
+        point: {
+          pixelSize: 8,
+          color,
+          outlineColor: Color.BLACK,
+          outlineWidth: 1,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          scaleByDistance: new NearFarScalar(1_000_000, 1.5, 20_000_000, 0.6),
+        },
+        label: {
+          text: site.name.length > 30 ? site.name.slice(0, 28) + "\u2026" : site.name,
+          font: "10px monospace",
+          fillColor: color,
+          outlineColor: Color.BLACK,
+          outlineWidth: 2,
+          style: LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: VerticalOrigin.BOTTOM,
+          pixelOffset: new Cartesian2(0, -10),
+          scaleByDistance: new NearFarScalar(500_000, 1.0, 5_000_000, 0.0),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        properties: {
+          kind: "anomaly",
+          anomalyId: site.id,
+          category: site.category,
+          status: site.status,
+        },
+      });
+      anomalyEntitiesRef.current.push(entity);
+    }
+
+    // Fly to global overview
+    viewer.camera.flyTo({
+      destination: Cartesian3.fromDegrees(20, 20, 15_000_000),
+      duration: 2.0,
+    });
+  }, [platformMode]);
+
   const analyticsLayers = useArgusStore((s) => s.analyticsLayers);
   const visualMode = useArgusStore((s) => s.visualMode);
   const visualIntensity = useArgusStore((s) => s.visualIntensity);
@@ -2100,21 +2185,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         </div>
       </div>
 
-      {/* Epic Fury data is now shown in the sidebar panels */}
-
-      {/* Top Bar Toggle */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex gap-4">
-        <button
-          onClick={() => setEpicFuryActive(!epicFuryActive)}
-          className={`px-6 py-2 rounded-lg font-mono text-sm font-bold tracking-widest border transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] backdrop-blur-md ${
-            epicFuryActive
-              ? "bg-cyan-900/80 text-cyan-400 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)]"
-              : "bg-black/60 text-gray-400 border-gray-600 hover:text-white hover:border-gray-400"
-          }`}
-        >
-          {epicFuryActive ? "MODE: EPIC FURY ACTIVE" : "ACTIVATE OP: EPIC FURY"}
-        </button>
-      </div>
+      {/* Epic Fury data is shown in sidebar panels when platform mode is epic-fury */}
 
       <HudOverlay
         onFlyToPoi={flyToPoi}
@@ -2148,7 +2219,6 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         onSeek={handleSeek}
         clickedCoordinates={clickedCoordinates}
         onSelectIntel={setSelectedIntel}
-        epicFuryActive={epicFuryActive}
       />
     </div>
   );

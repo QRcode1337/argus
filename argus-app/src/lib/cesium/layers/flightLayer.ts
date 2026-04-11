@@ -4,6 +4,7 @@ import {
   ConstantProperty,
   ConstantPositionProperty,
   Entity,
+  Math as CesiumMath,
   NearFarScalar,
   PolylineGlowMaterialProperty,
   VerticalOrigin,
@@ -61,6 +62,9 @@ export class FlightLayer {
         }
       }
 
+      const heading = flight.trueTrack ?? 0;
+      const rotation = -CesiumMath.toRadians(heading);
+
       const existing = this.entities.get(flight.id);
       if (existing) {
         const positionProperty = existing.position as ConstantPositionProperty | undefined;
@@ -68,6 +72,9 @@ export class FlightLayer {
           positionProperty.setValue(position);
         } else {
           existing.position = new ConstantPositionProperty(position);
+        }
+        if (existing.billboard) {
+          existing.billboard.rotation = new ConstantProperty(rotation) as any;
         }
 
         // Update trail if this flight is being tracked
@@ -87,6 +94,8 @@ export class FlightLayer {
         billboard: {
           image: new ConstantProperty(this.marker),
           scale: 0.85,
+          rotation: new ConstantProperty(rotation) as any,
+          alignedAxis: new ConstantProperty(Cartesian3.ZERO) as any,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.3, 20_000_000, 0.4),
           disableDepthTestDistance: 0,

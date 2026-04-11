@@ -1,0 +1,605 @@
+[
+  {
+    "id": "gea-001",
+    "name": "Richat Structure \u2014 \"Eye of the Sahara\"",
+    "lat": 21.1168,
+    "lon": -11.4052,
+    "category": "geometric",
+    "status": "confirmed",
+    "description": "Coordinates: 21.1168\u00b0N, 11.4052\u00b0W \u00b7 Mauritania Size: 40 km diameter Status: \u2705 Confirmed explained Concentric rings of eroded quartzite forming a bull's-eye visible from orbit. Visible since Gemini space missions. Geologists confirm it as a deeply eroded igneous dome \u2014 subsurface intrusion ~100 million years ago, differential erosion exposed the rings. No shock metamorphism found (disproves meteorite impact). Fringe theorists link it to Atlantis. UNESCO geological heritage site. Mainstream: Deeply eroded geological dome. Confidence: HIGH."
+  },
+  {
+    "id": "gea-002",
+    "name": "Badlands Guardian \u2014 \"Indian Head\"",
+    "lat": 50.0064,
+    "lon": -110.1081,
+    "category": "geometric",
+    "status": "confirmed",
+    "description": "Coordinates: 50.0064\u00b0N, 110.1081\u00b0W \u00b7 Medicine Hat, Alberta, Canada Discovered: 2005 by Lynn Hickox Status: \u2705 Confirmed explained Geomorphological feature resembling a human face in full Indigenous headdress, facing west. A road and oil well create the illusion of earbuds. Feature is actually concave (a valley) \u2014 an example of the hollow-face illusion + pareidolia. Formed by glacial meltwater erosion of clay-rich badlands. Ranked #7 on TIME's Top 10 Google Earth Finds. Mainstream: Natural erosion + pareidolia. Confidence: HIGH."
+  },
+  {
+    "id": "gea-003",
+    "name": "Oregon Sri Yantra \u2014 Alvord Desert",
+    "lat": 42.7381,
+    "lon": -118.314,
+    "category": "geometric",
+    "status": "ambiguous",
+    "description": "Coordinates: 42.7381\u00b0N, 118.3140\u00b0W \u00b7 Mickey Basin, Oregon Discovered: August 10, 1990 (Idaho Air National Guard pilot) Status: \u26a0\ufe0f Ambiguous \u2014 creator claim disputed A quarter-mile-wide Hindu sacred geometry pattern (nine interlocking triangles) scored 3 inches deep into a dry lakebed. 13.3 miles of lines, 10 inches wide. Artist Bill Witherspoon claimed credit (10-day job with a garden cultivator). Critics note architects estimated surveying alone would cost $75,000+; Air National Guard never noticed construction in progress. Pattern has since disappeared. Likely human-made, but method debated."
+  },
+  {
+    "id": "gea-004",
+    "name": "Marree Man \u2014 World's Largest Geoglyph",
+    "lat": -29.5324,
+    "lon": 137.4694,
+    "category": "geometric",
+    "status": "ambiguous",
+    "description": "Coordinates: 29.5324\u00b0S, 137.4694\u00b0E \u00b7 Finniss Springs, South Australia Discovered: June 26, 1998 (charter pilot) Status: \u26a0\ufe0f Creator identity unknown The world's largest geoglyph \u2014 2.7\u20134.2 km tall figure of an Indigenous hunter; lines up to 35 meters wide. Definitively human-made via earthmoving equipment and likely GPS. Prime suspect: Bardius Goldberg (died 2002). Anonymous faxes with American spelling, a US flag, and Branch Davidian references were found near the site. Despite a reward offer, the official creator remains unknown. Restored 2016 via GPS and a grader. Confirmed human-made; creato"
+  },
+  {
+    "id": "gea-005",
+    "name": "Namibian Fairy Circles \u2014 NamibRand",
+    "lat": -25.0,
+    "lon": 15.9,
+    "category": "geometric",
+    "status": "ambiguous",
+    "description": "Coordinates: ~25.0\u00b0S, 15.9\u00b0E \u00b7 NamibRand Nature Reserve (2,400 km belt, Angola to South Africa) Status: \u26a0\ufe0f Natural phenomenon, causation debated Hundreds of thousands of nearly circular barren patches (2\u201312 m diameter) in evenly spaced polka-dot patterns across desert grasslands. Individual circles persist 30\u201360+ years. Similar patterns found in Australia's Pilbara (2014). Two competing hypotheses: self-organizing vegetation driven by water competition; sand termite activity. A 2017 Princeton study proposed both mechanisms work together. Despite 30+ peer-reviewed papers, full consensus elusive"
+  },
+  {
+    "id": "gea-006",
+    "name": "Desert Breath \u2014 Hurghada Land Art",
+    "lat": 27.38,
+    "lon": 33.63,
+    "category": "geometric",
+    "status": "confirmed",
+    "description": "Coordinates: 27.38\u00b0N, 33.63\u00b0E \u00b7 Near Hurghada, Egypt Created: March 7, 1997 by D.A.ST. Arteam (Greek art collective) Status: \u2705 Confirmed \u2014 documented art A 1-million-square-foot land art installation: two interwoven spirals of 89 raised sand cones and 89 depressions, with a formerly water-filled 30m pool at center. Routinely appears on \"mysterious Google Earth finds\" lists because uninformed viewers find the spirals baffling. The central pool has dried; the piece is gradually eroding. Documented art installation. Confirmed. No mystery."
+  },
+  {
+    "id": "gea-007",
+    "name": "Patomskiy Crater \u2014 \"Fire Eagle's Nest\"",
+    "lat": 59.2847,
+    "lon": 116.5894,
+    "category": "crater",
+    "status": "ambiguous",
+    "description": "Coordinates: 59.2847\u00b0N, 116.5894\u00b0E \u00b7 Irkutsk Oblast, Siberia Size: ~150 m base, ~40 m high, ~1 million tons Status: \u26a0\ufe0f Ambiguous \u2014 unique on Earth A cone-shaped mound of shattered limestone in dense taiga. Discovered 1949; first expedition 2005 (lead researcher died en route of heart attack). 2010 conference rejected meteorite hypothesis unanimously. Leading explanation: phreatic (steam-driven) explosion from deep CO\u2082/H\u2082O fluid release. Age ~300\u2013500 years (tree ring data). Anomalies: trees show growth patterns similar to Chernobyl forests; low-level radioactive strontium and uranium detected. "
+  },
+  {
+    "id": "gea-008",
+    "name": "Darvaza Gas Crater \u2014 \"Door to Hell\"",
+    "lat": 40.2526,
+    "lon": 58.4394,
+    "category": "crater",
+    "status": "ambiguous",
+    "description": "Coordinates: 40.2526\u00b0N, 58.4394\u00b0E \u00b7 Karakum Desert, Turkmenistan Size: 60\u201370 m diameter, ~30 m deep Status: \u26a0\ufe0f Origin story unverified Continuously burning crater visible from 40 km at night. Reportedly ~1971: Soviet engineers drilled into a gas cavern, ground collapsed, gas ignited to prevent methane release. However, no government documents confirm this; no witnesses on record; exact year uncertain. George Kourounis descended to the bottom in 2013 \u2014 found extremophile microbes. As of 2025, Turkmen authorities claim the fire has been reduced three-fold. Burns continuously for 50+ years regard"
+  },
+  {
+    "id": "gea-009",
+    "name": "Batagaika Crater \u2014 \"Doorway to the Underworld\"",
+    "lat": 67.58,
+    "lon": 134.77,
+    "category": "crater",
+    "status": "confirmed",
+    "description": "Coordinates: 67.58\u00b0N, 134.77\u00b0E \u00b7 Sakha Republic, Russia Size: 1 km long, up to 100 m deep \u2014 growing Status: \u2705 Confirmed \u2014 thermokarst The world's largest permafrost crater. Headwall retreats 10\u201330 m per year. Started subsiding in the 1960s after surrounding forest was cleared. Mechanism: deforestation exposed permafrost to warming in a self-reinforcing feedback loop. Contains 200,000-year-old paleontological fossils. A major climate change indicator. Well understood. Thermokarst from permafrost thaw."
+  },
+  {
+    "id": "gea-010",
+    "name": "Yamal Gas Emission Craters \u2014 C1 / Bovanenko",
+    "lat": 69.58,
+    "lon": 68.22,
+    "category": "crater",
+    "status": "ambiguous",
+    "description": "Coordinates: ~69.58\u00b0N, 68.22\u00b0E \u00b7 Yamal Peninsula, Russia (20+ craters since 2014) Status: \u26a0\ufe0f Mechanism debated Cylindrical craters 50+ m deep, appearing suddenly where mounds (pingos) existed. Radial ramparts of ejected blocks scattered hundreds of meters. First worldwide news July 2014. 2024 Cambridge study proposed osmotic pressure changes in saline cryopegs drive explosive methane release. Initial theories: meteorite, UFO, weapons test (all disproven). Why only in Yamal/Gydan region despite similar warming elsewhere remains unexplained. Clearly gas-driven permafrost explosions; exact format"
+  },
+  {
+    "id": "gea-011",
+    "name": "Kebira Crater \u2014 Sahara's Disputed Mega-Impact",
+    "lat": 24.4,
+    "lon": 24.58,
+    "category": "crater",
+    "status": "unresolved",
+    "description": "Coordinates: 24.40\u00b0N, 24.58\u00b0E \u00b7 Egypt-Libya border Size: ~31 km diameter Status: \u2753 Genuinely contested Double-ringed circular feature identified 2007 by Farouk El-Baz (Boston University) via Landsat/radar. Proposed as the largest Saharan impact structure and possible source of Libyan desert glass. Field expeditions found NO evidence of shock metamorphism \u2014 the \"central uplift\" retains horizontal bedding typical of undisturbed rock. Not listed in the Earth Impact Database. Satellite evidence and ground truth diverge significantly. Active scientific debate. Impact hypothesis contradicted by fiel"
+  },
+  {
+    "id": "gea-012",
+    "name": "Dead Sea Sinkholes \u2014 Accelerating Collapse",
+    "lat": 31.5,
+    "lon": 35.4,
+    "category": "crater",
+    "status": "confirmed",
+    "description": "Coordinates: ~31.5\u00b0N, 35.4\u00b0E \u00b7 Dead Sea shoreline, Israel/Jordan Status: \u2705 Confirmed \u2014 salt dissolution Over 6,000 sinkholes appearing along the receding shoreline, some tens of meters across. The Dead Sea drops ~1 meter/year (35 m since the 1960s): freshwater dissolves underground salt layers, creating cavities that collapse suddenly. Dramatically visible on Google Earth time-lapse. Accelerating since 2000s. Well understood. Salt dissolution from lake recession."
+  },
+  {
+    "id": "gea-013",
+    "name": "Manicouagan Crater \u2014 \"Eye of Quebec\"",
+    "lat": 51.38,
+    "lon": -68.7,
+    "category": "crater",
+    "status": "confirmed",
+    "description": "Coordinates: 51.38\u00b0N, 68.70\u00b0W \u00b7 Quebec, Canada Size: 100 km diameter Status: \u2705 Confirmed \u2014 asteroid impact One of Earth's largest confirmed impact craters. Formed by a ~5 km asteroid ~214 million years ago (Late Triassic). The distinctive annular ring lake was enhanced by a hydroelectric dam in the 1960s. One of the \"Big Five\" impact structures on Earth. Strikingly visible from orbit. Confirmed ancient asteroid impact. Well-studied."
+  },
+  {
+    "id": "gea-014",
+    "name": "Volkel Air Base \u2014 Dutch Nuclear Storage",
+    "lat": 51.6546,
+    "lon": 5.6865,
+    "category": "censored",
+    "status": "confirmed",
+    "description": "Coordinates: 51.6546\u00b0N, 5.6865\u00b0E \u00b7 Netherlands Status: \u2705 Confirmed \u2014 now unblurred (2016) Dutch law required blurring; WikiLeaks confirmed 22 US B61 nuclear bombs stored here (one of NATO's nuclear sharing sites). Unblurred September 2016 after Dutch law changed. Now fully visible \u2014 arguably making the pre-2016 blurring counterproductive. Reason for censorship confirmed. Site now visible."
+  },
+  {
+    "id": "gea-015",
+    "name": "Dimona Nuclear Facility \u2014 Israel",
+    "lat": 31.0013,
+    "lon": 35.1445,
+    "category": "censored",
+    "status": "confirmed",
+    "description": "Coordinates: 31.0013\u00b0N, 35.1445\u00b0E \u00b7 Negev Desert, Israel Status: \u2705 Confirmed \u2014 US law mandates low resolution Capped to maximum 2m resolution by the Kyl-Bingaman Amendment (1997 US law) which bars US satellite companies from providing high-resolution imagery of Israel. Completely blurred on Yandex. Israel maintains deliberate ambiguity about its nuclear program (\"nuclear opacity\"). Suspected to house the Shimon Peres Negev Nuclear Research Center. Legal mandate confirmed. US congressional act caps all satellite imagery of Israel."
+  },
+  {
+    "id": "gea-016",
+    "name": "Ramstein Air Base \u2014 USAFE HQ, Germany",
+    "lat": 49.4364,
+    "lon": 7.6003,
+    "category": "censored",
+    "status": "confirmed",
+    "description": "Coordinates: 49.4364\u00b0N, 7.6003\u00b0E \u00b7 Rhineland-Palatinate, Germany Status: \u2705 Confirmed \u2014 NATO OPSEC request Headquarters of US Air Forces in Europe and NATO Allied Air Command. Hosts ~54,000 US service members \u2014 largest US military community outside the US. Partial blur applied to specific facilities. Also hosts USAF drone operations control infrastructure. Standard NATO military operational security request."
+  },
+  {
+    "id": "gea-017",
+    "name": "Marcoule Nuclear Site \u2014 France",
+    "lat": 44.1445,
+    "lon": 4.7063,
+    "category": "censored",
+    "status": "confirmed",
+    "description": "Coordinates: 44.1445\u00b0N, 4.7063\u00b0E \u00b7 Gard, France Status: \u2705 Confirmed \u2014 French nuclear security Complete blur applied to the nuclear complex under French security protocols. Site of a fatal industrial accident in September 2011 (blast furnace explosion, 1 killed, 4 injured). CEA (Commissariat \u00e0 l'\u00e9nergie atomique) nuclear research and reprocessing site. French nuclear security protocols confirmed."
+  },
+  {
+    "id": "gea-018",
+    "name": "Severnaya Zemlya \u2014 Russian Arctic Archipelago",
+    "lat": 79.945,
+    "lon": 95.0142,
+    "category": "censored",
+    "status": "ambiguous",
+    "description": "Coordinates: 79.9450\u00b0N, 95.0142\u00b0E \u00b7 Russian Arctic Status: \u26a0\ufe0f Ambiguous \u2014 censorship disproportionate A large swath of the Russian Arctic archipelago rendered as a giant gray bar on Google Earth \u2014 described as looking \"drawn freehand in MSPaint.\" Remote area with WWII-era military remains and Cold War infrastructure. The censorship is far more aggressive than the location or known contents would seem to require. Reason for aggressive censorship unexplained. Beyond standard military OPSEC."
+  },
+  {
+    "id": "gea-019",
+    "name": "Babylon \u2014 Ancient City, Iraq",
+    "lat": 32.5422,
+    "lon": 44.4211,
+    "category": "censored",
+    "status": "ambiguous",
+    "description": "Coordinates: 32.5422\u00b0N, 44.4211\u00b0E \u00b7 Al Hillah, Babil Province, Iraq Status: \u26a0\ufe0f Reason unconfirmed The entire ancient city of Babylon is blurred on Google Earth. Possible explanations: post-Iraq War military sensitivity (US base was located inside the ancient ruins, causing documented damage); archaeological protection; or Iraqi government request. Exact reason has not been officially confirmed. Reason for blurring not officially confirmed. Multiple plausible explanations."
+  },
+  {
+    "id": "gea-020",
+    "name": "Mazda Raceway Laguna Seca \u2014 Unexplained Blur",
+    "lat": 36.5841,
+    "lon": -121.7533,
+    "category": "censored",
+    "status": "unresolved",
+    "description": "Coordinates: 36.5841\u00b0N, 121.7533\u00b0W \u00b7 Monterey County, California Status: \u2753 Genuinely unexplained A commercial racetrack heavily whited out on Google Maps \u2014 no obvious security rationale. Possible explanation: proximity to former Fort Ord military land (closed 1994), which still contains unexploded ordnance. Or proximity to other classified facilities in the area. No official explanation has been provided for censoring a public motorsports venue. No confirmed rationale. One of the most puzzling commercial censorship cases."
+  },
+  {
+    "id": "gea-021",
+    "name": "Minami Torishima \u2014 Japan's Easternmost Island",
+    "lat": 24.2897,
+    "lon": 153.979,
+    "category": "censored",
+    "status": "confirmed",
+    "description": "Coordinates: 24.2897\u00b0N, 153.9790\u00b0E \u00b7 Pacific Ocean Status: \u2705 Confirmed \u2014 JMSDF base Japan's easternmost territory \u2014 a tiny atoll with airport completely whited out on satellite imagery. Houses a Japan Maritime Self-Defense Force (JMSDF) weather station and maritime patrol base. Recently significant as Japan's exclusive economic zone anchor in the western Pacific. JMSDF facility. Standard military censorship."
+  },
+  {
+    "id": "gea-022",
+    "name": "Incirlik Air Base \u2014 Turkey (Nuclear Storage)",
+    "lat": 37.0021,
+    "lon": 35.4259,
+    "category": "censored",
+    "status": "confirmed",
+    "description": "Coordinates: 37.0021\u00b0N, 35.4259\u00b0E \u00b7 Adana, Turkey Status: \u2705 Confirmed \u2014 NATO nuclear sharing site Entirely blurred on Yandex Maps; reduced resolution on Google. Hosts the largest contingent of US B61 nuclear gravity bombs at any single NATO base (~50 warheads). Used during US operations in Iraq, Syria, and Afghanistan. In 2016 coup attempt, Turkish authorities cut power to the base. A 2018 FAS analysis found that Yandex's mass blurring of Incirlik inadvertently confirmed its perimeter precisely. NATO nuclear sharing site. Confirmed via WikiLeaks, FAS, and official US government acknowledgment."
+  },
+  {
+    "id": "gea-023",
+    "name": "Sycamore Knoll \u2014 Blurred Malibu Seafloor Feature",
+    "lat": 34.0231,
+    "lon": -118.996,
+    "category": "censored",
+    "status": "ambiguous",
+    "description": "Coordinates: 34.0231\u00b0N, 118.9960\u00b0W \u00b7 ~6.6 miles off Malibu, California Status: \u26a0\ufe0f Blur applied Jan\u2013Apr 2025 \u2014 reason unconfirmed Flat-topped seafloor knoll ~2,000 ft deep, 2.5\u20133 miles wide. Previously clearly visible on Google Earth. Blurred sometime between late 2024 and April 2025. USGS identified it as a tectonic pop-up structure (Anacapa-Dume Fault system). High NUFORC USO report density. Near NAS Point Mugu. The blur coincides with increased public attention following Jeremy Corbell's 2023 USS Jackson footage revelations. Geological feature confirmed; reason for blurring not officially ex"
+  },
+  {
+    "id": "gea-024",
+    "name": "China Gobi Desert Grids \u2014 Satellite Calibration",
+    "lat": 40.4521,
+    "lon": 93.7421,
+    "category": "desert",
+    "status": "confirmed",
+    "description": "Coordinates: 40.4521\u00b0N, 93.7421\u00b0E \u00b7 Near Dunhuang, Gansu Province, China Went viral: 2011 Status: \u2705 Confirmed \u2014 military calibration targets Multiple massive structures: zigzagging white-line grids, a Stonehenge-like radial formation with fighter jets at center, and grids with destroyed vehicles. Confirmed as spy satellite calibration targets by Jonathon Hill (Arizona State University Mars Space Flight Facility). The zigzag grids orient satellite cameras; radial formations calibrate radar. The US has equivalent targets (Corona target, Casa Grande, AZ at 32.8069\u00b0N, 111.7226\u00b0W). Additional China"
+  },
+  {
+    "id": "gea-025",
+    "name": "Turgai Steppe Geoglyphs \u2014 \"Kazakhstan's Nazca Lines\"",
+    "lat": 50.8329,
+    "lon": 65.3263,
+    "category": "desert",
+    "status": "ambiguous",
+    "description": "Coordinates: 50.8329\u00b0N, 65.3263\u00b0E \u00b7 Kostanay Region, Kazakhstan Discovered: 2007 by Dmitriy Dey (via Google Earth); NASA images released 2015 Status: \u26a0\ufe0f Age and purpose debated ~260 massive earthwork geoglyphs \u2014 squares, circles, crosses, and a three-armed swastika \u2014 90 to 400+ meters across. Potentially 2,000\u20138,000+ years old, possibly built by the Mahandzhar nomadic culture (7000\u20135000 BCE). If the older dating holds, these predate the Nazca Lines by millennia and challenge assumptions about nomadic cultures. No human remains or significant artifacts found at most sites. Confirmed human-made."
+  },
+  {
+    "id": "gea-026",
+    "name": "Jordan Desert Wheels \u2014 \"Big Circles\"",
+    "lat": 31.8,
+    "lon": 36.8,
+    "category": "desert",
+    "status": "ambiguous",
+    "description": "Coordinates: ~31.8\u00b0N, 36.8\u00b0E \u00b7 Azraq Oasis area, eastern Jordan Status: \u26a0\ufe0f Purpose unknown Stone wheel-shaped structures with spokes, 25\u201370 m across. Some \"Big Circles\" reach ~400 m diameter. First reported by RAF pilots in the 1920s. Systematically studied via Google Earth by APAAME (Prof. David Kennedy, University of Western Australia). At least 12 circles in Jordan; more in Syria and Turkey. OSL dating: ~8,500 years old. Some spokes align with winter solstice sunrise. Walls too low for animal pens; purpose remains officially unknown. Confirmed ancient (8,500 BP). Purpose unknown \u2014 oldest de"
+  },
+  {
+    "id": "gea-027",
+    "name": "Nazca Lines \u2014 Peru",
+    "lat": -14.7167,
+    "lon": -75.1333,
+    "category": "desert",
+    "status": "confirmed",
+    "description": "Coordinates: 14.7167\u00b0S, 75.1333\u00b0W \u00b7 Nazca Desert, Peru Status: \u2705 Confirmed \u2014 Nazca culture Over 1,500 geoglyphs across 450 km\u00b2 \u2014 geometric shapes, lines extending for kilometers, biomorphic figures (hummingbird, spider, monkey, condor, humming bird). Created 200 BCE\u2013600 CE. UNESCO World Heritage Site since 1994. Made by removing reddish pebbles to expose lighter ground. Served ritual/religious purposes related to water and fertility. AI-assisted surveys continue discovering new figures. Von D\u00e4niken's \"alien runway\" hypothesis has no scientific support. Confirmed: Nazca culture ritual/astronomi"
+  },
+  {
+    "id": "gea-028",
+    "name": "Saudi Arabian Mustatils \u2014 Neolithic \"Gates\"",
+    "lat": 26.62,
+    "lon": 37.92,
+    "category": "desert",
+    "status": "ambiguous",
+    "description": "Coordinates: ~26.62\u00b0N, 37.92\u00b0E \u00b7 Al-Ula cluster, NW Saudi Arabia Also: ~25.7\u00b0N, 39.9\u00b0E \u00b7 Harrat Khaybar cluster Status: \u26a0\ufe0f Purpose partially understood Over 1,600 massive rectangular stone structures (mustatils = \"rectangles\" in Arabic): two platforms linked by parallel walls up to 600 m long, only ~0.5 m high. First ID'd 1970s; rediscovered via Google Earth 2008. Radiocarbon dated to ~5000 BCE \u2014 predating Giza and Stonehenge by millennia. Excavations reveal animal bone offerings (goat, gazelle, cattle skulls) around upright stone slabs \u2014 suggesting a Neolithic cattle cult during the \"Green Ar"
+  },
+  {
+    "id": "gea-029",
+    "name": "Blythe Intaglios \u2014 California's Nazca Figures",
+    "lat": 33.8004,
+    "lon": -114.5382,
+    "category": "desert",
+    "status": "confirmed",
+    "description": "Coordinates: 33.8004\u00b0N, 114.5382\u00b0W \u00b7 Colorado Desert, California Discovered: 1932 (pilot George Palmer) Status: \u2705 Confirmed \u2014 Native American ceremonial Six giant figures including three human forms and two quadrupeds. Largest human figure: 171 feet (52 m) long. Created by Mohave and Quechan peoples. Depicts Mastamho, the Creator of all life. Radiocarbon dates: 900 BCE\u20131200 CE. National Register of Historic Places since 1982. Fenced to protect from off-road vehicles. Confirmed: Native American ceremonial geoglyphs. Documented origin."
+  },
+  {
+    "id": "gea-030",
+    "name": "Atacama Giant \u2014 World's Largest Anthropomorphic Geoglyph",
+    "lat": -19.949,
+    "lon": -69.633,
+    "category": "desert",
+    "status": "confirmed",
+    "description": "Coordinates: 19.9490\u00b0S, 69.6330\u00b0W \u00b7 Cerro Unita, Tarapac\u00e1 Region, Chile Status: \u2705 Confirmed \u2014 pre-Columbian An 86-meter-tall anthropomorphic figure \u2014 the largest ancient human-like geoglyph in the world. Created ~1000\u20131400 CE by pre-Incan peoples. Represents a shaman or deity; used as an astronomical marker for agricultural calendar. Surrounded by ~5,000 additional geoglyphs across the Atacama Desert region. Confirmed: Pre-Columbian geoglyph. Well-documented."
+  },
+  {
+    "id": "gea-031",
+    "name": "Baltic Sea Anomaly",
+    "lat": 65.075,
+    "lon": 19.8,
+    "category": "underwater",
+    "status": "confirmed",
+    "description": "Coordinates: ~65.075\u00b0N, 19.8\u00b0E \u00b7 Gulf of Bothnia, Sweden/Finland Discovered: June 2011, OceanX team sonar Depth: ~90 m Size: ~60 m circular formation Status: \u2705 Confirmed \u2014 glacial deposit A formation resembling the Millennium Falcon with apparent straight edges and a 300-meter \"runway\" trail. Rock samples from Stockholm University showed ordinary granites, gneisses, and sandstones consistent with glacial transport. Finnish geomorphologist Jarmo Korteniemi identified the \"runway\" as typical NNW-SSE glacial mounds. Sonar expert Hanumant Singh (Woods Hole) called the equipment \"virtually useless "
+  },
+  {
+    "id": "gea-032",
+    "name": "\"Atlantis\" Grid \u2014 Off Canary Islands",
+    "lat": 31.667,
+    "lon": -24.325,
+    "category": "underwater",
+    "status": "confirmed",
+    "description": "Coordinates: ~31.667\u00b0N, 24.325\u00b0W \u00b7 ~600 miles west of Canary Islands Discovered: February 2009 by Bernie Bamford Status: \u2705 Google confirmed \u2014 sonar artifact A Wales-sized rectangular grid on the ocean floor. Media immediately suggested Atlantis. Google confirmed it was a sonar trackline artifact \u2014 ships collecting bathymetric data sail in parallel lines, creating grid patterns in the data when stitched. Google updated imagery to remove such artifacts. Water depth far too great for any ancient civilization. Google officially acknowledged as sonar data collection artifact. Confirmed."
+  },
+  {
+    "id": "gea-033",
+    "name": "Cuba Underwater City Claims",
+    "lat": 21.57,
+    "lon": -85.13,
+    "category": "underwater",
+    "status": "ambiguous",
+    "description": "Coordinates: ~21.57\u00b0N, 85.13\u00b0W \u00b7 Off Guanahacabibes Peninsula, western Cuba Discovered: 2001 (ADC sonar survey) Depth: 600\u2013700 m Status: \u26a0\ufe0f Ambiguous \u2014 impossible depth for human construction Sonar images interpreted as geometric stone structures at 600\u2013700 m depth, 2 sq km area. Filmed by ROV on second expedition. At that depth, area was above sea level ~50,000 years ago \u2014 long before any known civilization capable of such construction. National Geographic partially funded follow-up but never broadcast results. No peer-reviewed publication. Geologist Iturralde-Vinent suggested natural volcani"
+  },
+  {
+    "id": "gea-034",
+    "name": "Sandy Island \u2014 Phantom Island (Now Removed)",
+    "lat": -19.22,
+    "lon": 159.93,
+    "category": "underwater",
+    "status": "confirmed",
+    "description": "Coordinates: ~19.22\u00b0S, 159.93\u00b0E \u00b7 Coral Sea, near New Caledonia Status: \u2705 Confirmed \u2014 cartographic error A Manhattan-sized island appearing on maps and Google Earth (as a black polygon) for 130 years. In November 2012, RV Southern Surveyor found only open ocean at 4,620+ feet depth. A whaling ship's 1876 sighting of a pumice raft almost certainly created the original error. The French Hydrographic Service removed it from charts in 1974/1979 but the error persisted in digital databases inherited by Google. Now removed from Google Earth. Confirmed cartographic error propagation. Visible on histo"
+  },
+  {
+    "id": "gea-035",
+    "name": "Bimini Road",
+    "lat": 25.7677,
+    "lon": -79.2779,
+    "category": "underwater",
+    "status": "ambiguous",
+    "description": "Coordinates: 25.7677\u00b0N, 79.2779\u00b0W \u00b7 Off North Bimini, Bahamas Depth: ~5.5 m Status: \u26a0\ufe0f Natural origin argued; debate persists A 0.5-mile J-shaped line of rectangular limestone blocks at ~5.5 m depth. Discovered 1968 \u2014 the same year psychic Edgar Cayce predicted Atlantis remains would be found near Bimini (his 1938 prophecy). USGS geologist Eugene Shinn demonstrated in 1978 that blocks are naturally formed beachrock fractured by tectonic/erosional forces. Radiocarbon dates: 2,000\u20133,000 years ago. 2006\u20132007 sonar: additional rectangular features at 30 m depth, all aligned in parallel straight li"
+  },
+  {
+    "id": "gea-036",
+    "name": "Yonaguni Monument",
+    "lat": 24.4358,
+    "lon": 123.0114,
+    "category": "underwater",
+    "status": "ambiguous",
+    "description": "Coordinates: 24.4358\u00b0N, 123.0114\u00b0E \u00b7 Off Yonaguni Island, Japan Depth: 5\u201325 m Size: ~150 m long, 40 m wide, 27 m tall Status: \u26a0\ufe0f Scholarly debate ongoing A submerged formation with terraced platforms, flat surfaces, and right angles. Discovered 1986 by diver Kihachiro Aratake. Geologists Schoch (Boston) and Nunn conclude it's natural sandstone/mudstone with parallel bedding and vertical joints that fracture into rectangular shapes (similar formations exist above water on Yonaguni's coast). Marine geologist Masaaki Kimura (15+ years diving) argues man-made: identifies stepped pyramid, castle, a"
+  },
+  {
+    "id": "gea-037",
+    "name": "Nazca Seafloor Circle \u2014 Off Peru Coast",
+    "lat": -14.5,
+    "lon": -76.1,
+    "category": "underwater",
+    "status": "ambiguous",
+    "description": "Coordinates: ~14.5\u00b0S, 76.1\u00b0W \u00b7 ~352 miles off Lima, Peru Size: ~4.2 miles (6.8 km) diameter Status: \u26a0\ufe0f Likely data artifact Large circular rise on seafloor near Peru's Nazca Lines region. Discovered via Google Earth gravity model data. Mainstream explanation: artifact from stitched Scripps/NOAA bathymetry \u2014 gravity satellite data has ~1.5 km resolution and produces circular artifacts at data seam boundaries. Only ~5% of the seafloor has been mapped by modern high-res sonar. No confirmation survey performed at this specific location. Likely sonar/gravity-model artifact; no high-res sonar survey"
+  },
+  {
+    "id": "gea-038",
+    "name": "Cuban Underwater Formation (exact coords)",
+    "lat": 21.7725,
+    "lon": -84.8367,
+    "category": "underwater",
+    "status": "ambiguous",
+    "description": "Coordinates: 21.772547\u00b0N, 84.836736\u00b0W Depth: 600\u2013750 m Area: ~2 sq km Status: \u26a0\ufe0f Ambiguous These are the precise coordinates from the Cuban government survey documents. Sonar interpreted as pyramids, circular structures, and smooth hewn granite-like blocks across 200 hectares. ROV footage filmed but not fully published. Maya/Yucatec legends reference a sunken ancestral island in this region. No physical sampling or excavation publicly confirmed. If structures are genuine and at this depth, standard geological knowledge cannot explain them. Precise survey coordinates. No public verification exp"
+  },
+  {
+    "id": "gea-039",
+    "name": "Area 51 / Groom Lake \u2014 Nevada",
+    "lat": 37.2431,
+    "lon": -115.793,
+    "category": "military",
+    "status": "confirmed",
+    "description": "Coordinates: 37.2431\u00b0N, 115.7930\u00b0W \u00b7 Lincoln County, Nevada Status: \u2705 CIA acknowledged 2013 Multiple runways (one ~23,000 ft \u2014 longest in the world), hangars, support buildings on dry lakebed at 4,400 ft elevation. CIA confirmed existence via 2013 FOIA release. Test site for U-2 (1955), SR-71 Blackbird, F-117 Nighthawk, B-2 Spirit. Ongoing classified programs. Visible on Google Earth; key facilities still reportedly degraded to lower resolution. Surrounded by formidable ground-based and electronic security perimeter. Confirmed as classified US Air Force test facility. Current programs classifi"
+  },
+  {
+    "id": "gea-040",
+    "name": "Pine Gap \u2014 Australia's \"Area 51\"",
+    "lat": -23.799,
+    "lon": 133.737,
+    "category": "military",
+    "status": "confirmed",
+    "description": "Coordinates: 23.7990\u00b0S, 133.7370\u00b0E \u00b7 19 km SW of Alice Springs, Australia Status: \u2705 Confirmed (scope partially classified) Joint US-Australian intelligence facility (CIA/NSA). Cluster of white radomes on 5.24 sq mi compound. Signals intelligence, missile early warning, drone strike support. Snowden documents revealed surveillance scope including targeting assistance for US drone strikes in Afghanistan and Pakistan. Officially: Joint Defence Facility Pine Gap (JDFPG). Staffed by ~1,000 personnel. Confirmed intelligence facility. Full operational scope remains classified."
+  },
+  {
+    "id": "gea-041",
+    "name": "Kapustin Yar \u2014 \"Russia's Area 51\"",
+    "lat": 48.5818,
+    "lon": 45.7448,
+    "category": "military",
+    "status": "confirmed",
+    "description": "Coordinates: 48.5818\u00b0N, 45.7448\u00b0E \u00b7 Astrakhan Oblast, Russia Status: \u2705 Confirmed (as missile range) Russia's oldest missile test range (est. 1946 by captured German V-2 scientists). Multiple launch pads, support buildings, closed adjacent town. The 1948 Kapustin Yar UFO incident is a staple of Russian UFO research (reportedly a \"torpedo-shaped craft\" engaged by Soviet aircraft). Known as the location of early Soviet nuclear missile tests. Still actively used. Confirmed as active missile/aerospace test range since 1946."
+  },
+  {
+    "id": "gea-042",
+    "name": "Mezhgorye / Mt. Yamantau \u2014 Russia's Mystery Mountain",
+    "lat": 54.2553,
+    "lon": 58.1031,
+    "category": "military",
+    "status": "ambiguous",
+    "description": "Coordinates: 54.2553\u00b0N, 58.1031\u00b0E \u00b7 Southern Ural Mountains, Russia Status: \u26a0\ufe0f Existence confirmed; scale unknown Reported massive underground complex under 3,000 ft of quartz rock beneath Russia's highest peak in the Urals. Russia has given contradictory explanations: mining, food storage, emergency government bunker. Reportedly up to 30,000 workers at one point. Putin disclosed a \"new nuclear command bunker\" in 2020 \u2014 possibly this facility. US Congressional concern documented in 1990s. Heavily forested mountain with significant railroad infrastructure visible on satellite. Existence of clas"
+  },
+  {
+    "id": "gea-043",
+    "name": "Diego Garcia \u2014 Remote Indian Ocean Base",
+    "lat": -7.3195,
+    "lon": 72.4229,
+    "category": "military",
+    "status": "ambiguous",
+    "description": "Coordinates: 7.3195\u00b0S, 72.4229\u00b0E \u00b7 British Indian Ocean Territory Status: \u26a0\ufe0f Ambiguous (several unconfirmed allegations) Joint US-UK base with long runway, deepwater port, and key areas censored. Allegations include: CIA \"black site\" detention (officially denied but supported by Council of Europe report citing flight records); role in 2003 Iraq War extraordinary renditions; links to MH370 disappearance theories (flight path terminus). Officially: naval support facility and strategic bomber base. Base existence confirmed. Alleged black site detention and rendition links partially supported but "
+  },
+  {
+    "id": "gea-044",
+    "name": "Jiuquan Satellite Launch Center \u2014 China",
+    "lat": 40.9583,
+    "lon": 100.2917,
+    "category": "military",
+    "status": "confirmed",
+    "description": "Coordinates: 40.9583\u00b0N, 100.2917\u00b0E \u00b7 Gobi Desert, Inner Mongolia/Gansu Status: \u2705 Confirmed \u2014 China's oldest spaceport China's oldest and primary crewed spaceflight facility, est. 1958. Spaceport spans 2,800 km\u00b2. All Chinese crewed missions (Shenzhou) launch here. Dual-use: civilian space program + PLA strategic missile testing. Named after the nearest city (270 km away) as misdirection. Fully visible on Google Earth \u2014 China no longer needs to hide this facility. Confirmed. Operational spaceport and military missile test site."
+  },
+  {
+    "id": "gea-045",
+    "name": "Porton Down \u2014 UK's CBRN Research Facility",
+    "lat": 51.1322,
+    "lon": -1.7107,
+    "category": "military",
+    "status": "confirmed",
+    "description": "Coordinates: 51.1322\u00b0N, 1.7107\u00b0W \u00b7 Salisbury Plain, Wiltshire, UK Status: \u2705 Confirmed \u2014 DSTL research facility UK's Defence Science and Technology Laboratory (DSTL). CBRN (chemical, biological, radiological, nuclear) research since 1916. History of controversial human experimentation (1950s nerve agent tests \u2014 some deaths). Identified the Novichok nerve agent used in 2018 Salisbury poisoning of Sergei Skripal. Large, clearly visible compound on Salisbury Plain with extensive testing infrastructure. Confirmed CBRN research facility. History of classified human experiments acknowledged by UK gov"
+  },
+  {
+    "id": "gea-046",
+    "name": "North Korea \u2014 Punggye-ri Nuclear Test Site",
+    "lat": 41.28,
+    "lon": 129.08,
+    "category": "military",
+    "status": "confirmed",
+    "description": "Coordinates: 41.28\u00b0N, 129.08\u00b0E \u00b7 North Hamgyong Province, North Korea Status: \u2705 Confirmed \u2014 all 6 DPRK nuclear tests conducted here All six of North Korea's nuclear tests (2006\u20132017) were conducted at this underground site. Seismic monitoring allows real-time detection of new tests. Satellite imagery shows tunnel entrances, administrative buildings, and residual subsidence. North Korea announced the site \"permanently closed\" in May 2018 (apparently collapsed portions of the tunnel network following the 2017 test). Mapped in detail by 38 North analysts using Google Earth time-lapse. Confirmed. "
+  },
+  {
+    "id": "gea-047",
+    "name": "Woomera Test Range \u2014 Australia",
+    "lat": -31.16,
+    "lon": 136.834,
+    "category": "military",
+    "status": "confirmed",
+    "description": "Coordinates: 31.1600\u00b0S, 136.8340\u00b0E \u00b7 South Australia Status: \u2705 Confirmed \u2014 active defense range Australia's premier defense testing range since 1947. Vast desert area \u2014 122,000 km\u00b2 (larger than England). Site of British nuclear tests in 1950s\u201360s with lasting contamination of indigenous lands. Tests long-range missiles, hypersonic vehicles, and classified aerospace systems. Remains one of the world's largest overland restricted areas. Fully visible on satellite \u2014 too large to effectively censor. Confirmed active defense range. Nuclear contamination legacy documented."
+  },
+  {
+    "id": "gea-048",
+    "name": "Bosnian \"Pyramid of the Sun\" \u2014 Viso\u010dica Hill",
+    "lat": 43.9888,
+    "lon": 18.1702,
+    "category": "natural",
+    "status": "confirmed",
+    "description": "Coordinates: 43.9888\u00b0N, 18.1702\u00b0E \u00b7 Visoko, Bosnia & Herzegovina Status: \u2705 Confirmed debunked \u2014 natural flatirons A ~213 m tall hill with a roughly triangular profile. Claims began 2005 by Semir Osmanagi\u0107 that these are the largest/oldest pyramids on Earth. Geologists have thoroughly demonstrated these are flatirons \u2014 natural formations common worldwide. The European Association of Archaeologists condemned the claims as a \"cruel hoax.\" Real medieval and Roman archaeology at the site has reportedly been damaged by unscientific excavations. Attracts ~200,000 tourists/year regardless. Fully debun"
+  },
+  {
+    "id": "gea-049",
+    "name": "Gunung Padang \u2014 Southeast Asia's Largest Megalithic Site",
+    "lat": -6.9942,
+    "lon": 107.0564,
+    "category": "natural",
+    "status": "ambiguous",
+    "description": "Coordinates: 6.9942\u00b0S, 107.0564\u00b0E \u00b7 Cianjur, West Java, Indonesia Status: \u26a0\ufe0f Surface confirmed; extreme antiquity claims highly contested Southeast Asia's largest megalithic site \u2014 terraced platforms of columnar basalt blocks. Surface megaliths confirmed 2,500\u20134,500 years old. A controversial 2023 paper in Earth and Planetary Science Letters claimed subsurface structures date to 27,000 years ago \u2014 making it the oldest pyramid by tens of thousands of years. Peer reviewers contested the methodology; some co-authors distanced themselves. Columnar basalt occurs naturally from volcanic cooling. Maj"
+  },
+  {
+    "id": "gea-050",
+    "name": "Antarctic \"Pyramid\" Mountain \u2014 Ellsworth Mountains",
+    "lat": -79.9776,
+    "lon": -81.9589,
+    "category": "natural",
+    "status": "confirmed",
+    "description": "Coordinates: 79.9776\u00b0S, 81.9589\u00b0W \u00b7 Heritage Range, Ellsworth Mountains, Antarctica Went viral: Late 2016 Status: \u2705 Confirmed \u2014 glacial horn A strikingly symmetrical pyramidal peak (~1,265 m tall) with four steep converging snow-covered faces. Geologists Dr. Mitch Darcy (GFZ Potsdam) and Eric Rignot (UC-Irvine) confirmed it's a classic glacial horn \u2014 shaped by erosion from multiple glaciers carving concave cirques on different faces. The Matterhorn is the same type of formation. Rocks contain Cambrian-period fossils (~500+ million years old). Unanimous scientific consensus: glacial horn. No ar"
+  },
+  {
+    "id": "gea-051",
+    "name": "Giant Pink Rabbit \u2014 Colletto Fava, Italy",
+    "lat": 44.2445,
+    "lon": 7.7695,
+    "category": "vanished",
+    "status": "confirmed",
+    "description": "Coordinates: 44.2445\u00b0N, 7.7695\u00b0E \u00b7 Colletto Fava mountain, Cuneo, Italy Status: \u2705 Confirmed \u2014 ephemeral art, now decomposed A 55-meter knitted pink rabbit placed in 2005 by Viennese collective Gelitin, designed to look crash-landed with stuffing spilling out. Intended lifespan: 2025. By 2016, completely decomposed from weather. Current imagery shows nothing \u2014 only historical Google Earth views (~2012) capture it. Best viewed in Google Earth's historical imagery slider. Documented art. Now gone. Use historical imagery slider to see it."
+  },
+  {
+    "id": "gea-052",
+    "name": "KFC Colonel Sanders \u2014 Rachel, Nevada Desert",
+    "lat": 37.65,
+    "lon": -115.74,
+    "category": "vanished",
+    "status": "confirmed",
+    "description": "Coordinates: ~37.65\u00b0N, 115.74\u00b0W \u00b7 Rachel, Nevada (near Area 51) Status: \u2705 Confirmed \u2014 temporary marketing stunt In November 2006, KFC created a 65,000-square-foot Colonel Sanders logo from colored tiles in the Nevada desert \u2014 billed as the first brand designed to be visible from space. Located near Area 51 for PR reasons. Removed in 2007 after the marketing campaign ended. Visible in historical satellite imagery from the period. Confirmed promotional stunt. Now removed. Historical imagery only."
+  },
+  {
+    "id": "gea-053",
+    "name": "Firefox Crop Circle \u2014 Amity, Oregon",
+    "lat": 45.1238,
+    "lon": -123.1137,
+    "category": "vanished",
+    "status": "confirmed",
+    "description": "Coordinates: 45.1238\u00b0N, 123.1137\u00b0W \u00b7 Amity, Oregon Created: August 12, 2006 Status: \u2705 Confirmed \u2014 promotional project A 220-foot-diameter Firefox browser logo stamped into an oat field by 12 Oregon State University students in under 24 hours \u2014 celebrating Firefox's 50 millionth download. One of TIME's \"Top 10 Google Earth Finds.\" The oat field was harvested shortly after; the feature no longer exists in current imagery. Fully documented promotional project. Historical imagery only."
+  },
+  {
+    "id": "gea-054",
+    "name": "Wilkes Land Gravity Anomaly \u2014 Possible Mega-Impact",
+    "lat": -70.0,
+    "lon": 120.0,
+    "category": "antarctica",
+    "status": "unresolved",
+    "description": "Coordinates: ~70.0\u00b0S, 120.0\u00b0E \u00b7 East Antarctica (beneath ~1.5 km of ice) Status: \u2753 Active scientific debate A 500-km-diameter gravity anomaly detected by NASA's GRACE satellite \u2014 a mascon structure consistent with impact basins on the Moon and Mars. First proposed 1962; mascon reported by von Frese & Potts (Ohio State, 2006). If confirmed as an impact crater, it would be 2\u20133\u00d7 the size of Chicxulub and possibly linked to the Permian-Triassic extinction (~250 Ma \u2014 the largest extinction event in Earth history). Alternative: tectonic rift basin. Direct observation is impossible under 1.5 km of ic"
+  },
+  {
+    "id": "gea-055",
+    "name": "Blood Falls \u2014 McMurdo Dry Valleys",
+    "lat": -77.7167,
+    "lon": 162.2667,
+    "category": "antarctica",
+    "status": "confirmed",
+    "description": "Coordinates: 77.7167\u00b0S, 162.2667\u00b0E \u00b7 Taylor Glacier, Antarctica Status: \u2705 Confirmed \u2014 iron oxidation of ancient brine A vivid crimson outflow from Taylor Glacier's snout. Color comes from iron-rich hypersaline brine trapped beneath the glacier for ~1.5\u20132 million years. When it seeps to the surface, dissolved ferrous iron oxidizes (rusts) on contact with air. A 2017 study confirmed a subsurface brine channel network. First observed during Scott's 1911 Antarctic expedition. Visible in Google Earth satellite imagery. Fully explained. One of the most visually striking confirmed natural phenomena o"
+  },
+  {
+    "id": "gea-056",
+    "name": "Weddell Sea Polynya \u2014 Maud Rise",
+    "lat": -65.0,
+    "lon": 3.0,
+    "category": "antarctica",
+    "status": "ambiguous",
+    "description": "Coordinates: ~65.0\u00b0S, 3.0\u00b0E \u00b7 Over Maud Rise seamount, Weddell Sea Status: \u26a0\ufe0f Explained but intermittency still studied A massive hole in sea ice (~80,000 km\u00b2, larger than Ireland) in 2017. First observed via satellite in 1974; appeared 1974\u20131976, then vanished for ~40 years before reappearing 2016\u20132017. A 2019 Nature study attributed it to deep ocean convection \u2014 warm, salty deep water rises over the underwater Maud Rise seamount, melting ice from below. Dramatic and clearly visible on satellite. Why it's intermittent and confined to this location remains under study. Mechanism largely unders"
+  },
+  {
+    "id": "gea-057",
+    "name": "Lake Vostok \u2014 Subglacial Lake Under 4 km of Ice",
+    "lat": -77.0,
+    "lon": 105.0,
+    "category": "antarctica",
+    "status": "ambiguous",
+    "description": "Coordinates: ~77.0\u00b0S, 105.0\u00b0E \u00b7 East Antarctica (beneath ~4 km of ice) Status: \u26a0\ufe0f Real lake; magnetic anomaly has geological explanation One of Earth's largest subglacial lakes \u2014 250 km long, 50 km wide, sealed for ~15\u201325 million years. A magnetic anomaly at the southeastern end (identified by Columbia's Lamont-Doherty Observatory) is likely caused by thinned crust or sediment. Russian drilling reached the lake in 2012, finding ancient frozen water and extremophile microbes \u2014 no structures. Richard Hoagland claimed the anomaly was an alien artifact \u2014 rejected by geophysicists. However, with ~1"
+  },
+  {
+    "id": "gea-058",
+    "name": "Antarctic \"Ice Ship\" \u2014 Natural Iceberg",
+    "lat": -66.9046,
+    "lon": 163.2275,
+    "category": "antarctica",
+    "status": "confirmed",
+    "description": "Coordinates: 66.9046\u00b0S, 163.2275\u00b0E Went viral: 2020 Status: \u2705 Confirmed \u2014 natural iceberg An elongated ice formation ~120 m long resembling a ship with apparent hull, deck, and superstructure. Publicized 2020 by YouTuber MrMBB333. An unusually shaped tabular iceberg \u2014 wind and wave erosion routinely creates seemingly artificial profiles. Spawned theories including Noah's Ark and Nazi Antarctic bases (Neuschwabenland). Has since changed shape or melted entirely. Natural iceberg. Pareidolia + erosion-shaped ice."
+  },
+  {
+    "id": "gea-059",
+    "name": "Antarctic \"Pyramid\" Mountain #2 \u2014 Ellsworth",
+    "lat": -79.58,
+    "lon": -83.36,
+    "category": "antarctica",
+    "status": "confirmed",
+    "description": "Coordinates: ~79.58\u00b0S, 83.36\u00b0W \u00b7 Sentinel Range, Ellsworth Mountains Status: \u2705 Confirmed \u2014 glacial horn A second frequently circulated \"pyramid mountain\" in the Ellsworth Mountains, sometimes cited alongside the Heritage Range peak. Same geological explanation: glacial horn formed by multiple glaciers eroding concave cirques on different faces. The Sentinel Range contains Antarctica's highest peaks (Vinson Massif, 4,892 m). Glacial horn. Same formation type as the Matterhorn."
+  },
+  {
+    "id": "gea-060",
+    "name": "William Moldt's Car \u2014 Cold Case Solved by Google Earth",
+    "lat": 26.6617,
+    "lon": -80.1831,
+    "category": "other",
+    "status": "confirmed",
+    "description": "Coordinates: 26.6617\u00b0N, 80.1831\u00b0W \u00b7 Wellington, Florida Status: \u2705 Confirmed \u2014 solved cold case In August 2019, a former resident browsing Google Earth spotted a white shape in a retention pond near Moon Bay Circle. Police recovered a 1994 Saturn SL containing skeletal remains of William Moldt, a 40-year-old mortgage broker missing since November 7, 1997. The car had been plainly visible on Google Earth since at least 2007 \u2014 12 years unnoticed by investigators. He likely lost control after drinking and drove into the pond in a then-under-construction subdivision. A 22-year cold case solved by s"
+  },
+  {
+    "id": "gea-061",
+    "name": "Guitar-Shaped Forest \u2014 Argentina",
+    "lat": -33.8679,
+    "lon": -63.987,
+    "category": "other",
+    "status": "confirmed",
+    "description": "Coordinates: 33.8679\u00b0S, 63.9870\u00b0W \u00b7 Near General Levalle, C\u00f3rdoba Province, Argentina Status: \u2705 Confirmed \u2014 human memorial A guitar made of 7,000+ trees (~1 km long). Cypress trees form the outline and body; blue eucalyptus trees form the strings. Planting began 1979 by farmer Pedro Mart\u00edn Ureta in memory of his wife Graciela, who died of a brain aneurysm at 25 and had suggested the design. Ureta himself has never seen it from the air \u2014 he is afraid of flying. Documented and deeply personal human creation. Still growing."
+  },
+  {
+    "id": "gea-062",
+    "name": "Coca-Cola Logo \u2014 Visible from Space, Chile",
+    "lat": -18.5293,
+    "lon": -70.2498,
+    "category": "other",
+    "status": "confirmed",
+    "description": "Coordinates: 18.5293\u00b0S, 70.2498\u00b0W \u00b7 Near Arica, Tarapac\u00e1 Region, Chile Status: \u2705 Confirmed \u2014 corporate installation 70,000 empty Coke bottles arranged on a desert hillside (~50 m \u00d7 120 m). Created 1986 for Coca-Cola's centennial. Refurbished 2011. Holds a Guinness World Record. Predates Google Earth by two decades but became famous as a \"visible from space\" landmark. Located in the driest desert on Earth \u2014 bottles preserved by extreme aridity. Documented corporate commemorative installation. Still exists."
+  },
+  {
+    "id": "gea-063",
+    "name": "\"Blood Lake\" \u2014 Baghdad, Iraq",
+    "lat": 33.3959,
+    "lon": 44.4322,
+    "category": "other",
+    "status": "ambiguous",
+    "description": "Coordinates: ~33.3959\u00b0N, 44.4322\u00b0E \u00b7 Near Sadr City, Baghdad, Iraq Status: \u26a0\ufe0f Cause never officially confirmed In 2007, a lake appeared blood-red on Google Earth. The Baghdad location and Iraq War context fueled intense speculation. Most likely caused by industrial pollution, sewage, and/or halophilic algal blooms (Dunaliella salina or halobacteria). The lake later returned to normal coloring on subsequent satellite imagery passes. The exact cause was never publicly confirmed by Iraqi authorities. Likely industrial pollution or algal bloom. Never officially confirmed."
+  },
+  {
+    "id": "gea-064",
+    "name": "Davis-Monthan Airplane Boneyard \u2014 AMARG",
+    "lat": 32.1523,
+    "lon": -110.8376,
+    "category": "other",
+    "status": "confirmed",
+    "description": "Coordinates: 32.1523\u00b0N, 110.8376\u00b0W \u00b7 Tucson, Arizona Status: \u2705 Confirmed \u2014 active USAF facility Over 4,000 military aircraft in precise rows across 2,600 acres \u2014 the 309th Aerospace Maintenance and Regeneration Group (AMARG). Stores, maintains, reclaims parts, and disposes of aircraft from all US military branches and NASA. Tucson's dry climate (10\u201320% humidity) prevents corrosion. Operating since 1945. Visually spectacular on Google Earth \u2014 rows of B-52s, F-14s, C-130s, F-117s spanning every era of US military aviation. Fully documented active USAF facility. One of the most visually striking "
+  },
+  {
+    "id": "gea-065",
+    "name": "Airmail Navigation Arrows \u2014 American West",
+    "lat": 40.8058,
+    "lon": -117.8671,
+    "category": "other",
+    "status": "confirmed",
+    "description": "Coordinates (example): 40.8058\u00b0N, 117.8671\u00b0W \u00b7 Near Lovelock, Nevada Status: \u2705 Confirmed \u2014 1920s\u20131930s aviation infrastructure Giant concrete arrows ~70 feet long with crumbling beacon tower bases, scattered across remote American landscapes at ~10-mile intervals. Built as part of the US Transcontinental Airway System \u2014 lit rotating beacons guided early airmail pilots. The system stretched from New York to San Francisco. Decommissioned in the 1940s when radio navigation made them obsolete. Rediscovered and cataloged by Google Earth enthusiasts. Dozens survive across Nevada, Utah, Wyoming, Colo"
+  },
+  {
+    "id": "gea-066",
+    "name": "Yongbyon Nuclear Research Center \u2014 North Korea",
+    "lat": 39.8,
+    "lon": 125.75,
+    "category": "other",
+    "status": "confirmed",
+    "description": "Coordinates: 39.80\u00b0N, 125.75\u00b0E \u00b7 North Pyongan Province, North Korea Status: \u2705 Confirmed via satellite OSINT North Korea's primary nuclear research and plutonium production facility. First identified via satellite imagery; continuously monitored by 38 North (Johns Hopkins SAIS). Produces weapons-grade plutonium. New uranium enrichment facility expanded significantly 2020\u20132023 (visible on satellite). Activity levels serve as key indicator of DPRK nuclear program status. Never officially acknowledged by North Korea. Satellite OSINT has characterized this facility in considerable detail. Key prol"
+  },
+  {
+    "id": "gea-067",
+    "name": "US Airmail Calibration Target \u2014 Casa Grande, Arizona",
+    "lat": 32.8069,
+    "lon": -111.7226,
+    "category": "other",
+    "status": "confirmed",
+    "description": "Coordinates: 32.8069\u00b0N, 111.7226\u00b0W \u00b7 Casa Grande, Arizona Status: \u2705 Confirmed \u2014 US satellite calibration target The US equivalent of China's Gobi Desert calibration grids. A large ground-based target used for calibrating spy satellite cameras. Once secret, now publicly known. Visible on Google Earth as a geometric pattern. Mentioned in context of explaining China's Gobi calibration grids \u2014 same purpose, different geometry. Confirmed US spy satellite calibration target. Declassified/acknowledged."
+  }
+]
