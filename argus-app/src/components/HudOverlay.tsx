@@ -324,6 +324,8 @@ export function HudOverlay({
   const [anomalyCategoryFilter, setAnomalyCategoryFilter] = useState<AnomalyCategory | null>(null);
   const [gdeltEvents, setGdeltEvents] = useState<GdeltEvent[]>([]);
   const [gdeltQuadFilter, setGdeltQuadFilter] = useState<GdeltQuadClass | null>(null);
+  const [efNews, setEfNews] = useState<{ id: string; title: string; link: string; source: string; pubDate: string; snippet: string }[]>([]);
+  const [efSocial, setEfSocial] = useState<{ id: string; text: string; author: string; link: string; pubDate: string }[]>([]);
   const [gdeltDigestDocument, setGdeltDigestDocument] = useState<{
     title: string;
     content: string;
@@ -342,6 +344,28 @@ export function HudOverlay({
       setWorkspace("intel");
     }
   }, [epicFuryActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch Epic Fury regional data
+  useEffect(() => {
+    if (!epicFuryActive) return;
+    let cancelled = false;
+    void fetch("/api/feeds/epic-fury-news").then(r => r.json()).then(d => {
+      if (!cancelled && d.items) setEfNews(d.items);
+    }).catch(() => {});
+    void fetch("/api/feeds/epic-fury-social").then(r => r.json()).then(d => {
+      if (!cancelled && d.posts) setEfSocial(d.posts);
+    }).catch(() => {});
+    // Refresh every 5 minutes
+    const interval = setInterval(() => {
+      void fetch("/api/feeds/epic-fury-news").then(r => r.json()).then(d => {
+        if (!cancelled && d.items) setEfNews(d.items);
+      }).catch(() => {});
+      void fetch("/api/feeds/epic-fury-social").then(r => r.json()).then(d => {
+        if (!cancelled && d.posts) setEfSocial(d.posts);
+      }).catch(() => {});
+    }, 300_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [epicFuryActive]);
 
   // Fetch GDELT events when workspace is "gdelt"
   useEffect(() => {
@@ -1712,68 +1736,91 @@ export function HudOverlay({
           </CollapsibleSection>
           )}
 
-          {/* Epic Fury regional feed — shown in intel workspace when active */}
+          {/* OP EPIC FURY — comprehensive regional intelligence */}
           {workspace === "intel" && epicFuryActive && (
-            <CollapsibleSection
-              title={efLockedRegion ? `Op Epic Fury — ${efLockedRegion.label}` : `Op Epic Fury — ${EPIC_FURY_THEATER.label}`}
-              badge={`${efFilteredIncidents.length}`}
-              defaultOpen
-            >
-              <div className="space-y-2">
-                <div className="flex gap-1">
-                  {(["1h", "6h", "24h", "7d", "all"] as TimeWindow[]).map((w) => (
-                    <button
-                      key={w}
-                      type="button"
-                      onClick={() => efSetTimeWindow(w)}
-                      className={`rounded-md px-2 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
-                        efTimeWindow === w
-                          ? "border border-[#83a598] bg-[#504945] text-[#ebdbb2]"
-                          : "border border-transparent text-[#a89984] hover:text-[#d5c4a1]"
-                      }`}
-                    >
-                      {w}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="max-h-[350px] space-y-1 overflow-y-auto pr-0.5">
-                  {efFilteredIncidents.length === 0 ? (
-                    <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-3 text-center font-mono text-[9px] text-[#928374]">
-                      No incidents in current window
-                    </div>
-                  ) : (
-                    efFilteredIncidents.map((incident) => {
+            <>
+              {/* Theater Status */}
+              <CollapsibleSection
+                title={efLockedRegion ? `Op Epic Fury — ${efLockedRegion.label}` : "Op Epic Fury — CENTCOM AOR"}
+                badge={`${efFilteredIncidents.length} incidents`}
+                defaultOpen
+              >
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { label: "MIL", count: efFilteredIncidents.filter(i => i.type === "military").length, color: "#fb4934" },
+                      { label: "VES", count: efFilteredIncidents.filter(i => i.type === "vessel").length, color: "#83a598" },
+                      { label: "GEO", count: efFilteredIncidents.filter(i => i.type === "gdelt").length, color: "#fabd2f" },
+                      { label: "SEI", count: efFilteredIncidents.filter(i => i.type === "seismic").length, color: "#fe8019" },
+                    ].map(({ label, count, color }) => (
+                      <div key={label} className="rounded border border-[#3c3836] bg-[#1d2021] px-1 py-1 text-center">
+                        <div className="font-mono text-[12px] font-bold" style={{ color }}>{count}</div>
+                        <div className="font-mono text-[7px] uppercase tracking-[0.14em] text-[#928374]">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="max-h-[200px] space-y-1 overflow-y-auto pr-0.5">
+                    {efFilteredIncidents.slice(0, 20).map((incident) => {
                       const typeIcons: Record<string, string> = { gdelt: "\u{1F310}", military: "\u2708\uFE0F", vessel: "\u{1F6A2}", seismic: "\u{1F534}" };
                       const sevBorder: Record<string, string> = { critical: "border-l-red-500", high: "border-l-orange-400", medium: "border-l-[#83a598]", low: "border-l-[#504945]" };
                       return (
-                        <button
-                          key={incident.id}
-                          type="button"
-                          onClick={() => onFlyToCoordinates(incident.lat, incident.lon)}
-                          className={`w-full rounded-md border border-[#3c3836] border-l-2 ${sevBorder[incident.severity]} bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]`}
-                        >
+                        <button key={incident.id} type="button" onClick={() => onFlyToCoordinates(incident.lat, incident.lon)}
+                          className={`w-full rounded-md border border-[#3c3836] border-l-2 ${sevBorder[incident.severity]} bg-[#1d2021] px-2 py-1 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]`}>
                           <div className="flex items-start justify-between gap-1">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="text-[10px]">{typeIcons[incident.type]}</span>
-                              <span className="truncate font-mono text-[10px] font-bold text-[#ebdbb2]">{incident.title}</span>
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="text-[9px]">{typeIcons[incident.type]}</span>
+                              <span className="truncate font-mono text-[9px] font-bold text-[#ebdbb2]">{incident.title}</span>
                             </div>
-                            <span className="shrink-0 font-mono text-[8px] text-[#928374]">
-                              {(() => { const d = Date.now() - incident.timestamp; if (d < 60000) return "now"; if (d < 3600000) return `${Math.floor(d/60000)}m`; if (d < 86400000) return `${Math.floor(d/3600000)}h`; return `${Math.floor(d/86400000)}d`; })()}
+                            <span className="shrink-0 font-mono text-[7px] text-[#928374]">
+                              {(() => { const d = Date.now() - incident.timestamp; if (d < 60000) return "now"; if (d < 3600000) return `${Math.floor(d/60000)}m`; return `${Math.floor(d/3600000)}h`; })()}
                             </span>
                           </div>
-                          <div className="mt-0.5 font-mono text-[9px] leading-relaxed text-[#a89984] line-clamp-2">{incident.detail}</div>
-                          <div className="mt-1 flex items-center justify-between">
-                            <span className="rounded border border-[#504945] bg-[#282828] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] text-[#83a598]">{incident.source}</span>
-                            <span className="font-mono text-[8px] text-[#4e6a7a]">{incident.lat.toFixed(2)}, {incident.lon.toFixed(2)}</span>
-                          </div>
+                          <div className="mt-0.5 font-mono text-[8px] text-[#a89984] truncate">{incident.detail}</div>
                         </button>
                       );
-                    })
-                  )}
+                    })}
+                  </div>
                 </div>
-              </div>
-            </CollapsibleSection>
+              </CollapsibleSection>
+
+              {/* Regional News */}
+              <CollapsibleSection title="Regional OSINT" badge={efNews.length > 0 ? `${efNews.length}` : null} defaultOpen>
+                <div className="max-h-[250px] space-y-1 overflow-y-auto pr-0.5">
+                  {efNews.length === 0 ? (
+                    <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-2 text-center font-mono text-[9px] text-[#928374]">Loading regional feeds...</div>
+                  ) : efNews.map((item) => (
+                    <a key={item.id} href={item.link} target="_blank" rel="noopener noreferrer"
+                      className="block w-full rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]">
+                      <div className="flex items-start justify-between gap-1">
+                        <span className="font-mono text-[9px] font-bold text-[#ebdbb2] line-clamp-2">{item.title}</span>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        <span className="rounded border border-[#504945] bg-[#282828] px-1 py-0.5 font-mono text-[7px] uppercase tracking-[0.1em] text-[#fabd2f]">{item.source}</span>
+                        <span className="font-mono text-[7px] text-[#928374]">{new Date(item.pubDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </CollapsibleSection>
+
+              {/* Social Intelligence */}
+              <CollapsibleSection title="Social SIGINT" badge={efSocial.length > 0 ? `${efSocial.length}` : null}>
+                <div className="max-h-[200px] space-y-1 overflow-y-auto pr-0.5">
+                  {efSocial.length === 0 ? (
+                    <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-2 text-center font-mono text-[9px] text-[#928374]">Monitoring social channels...</div>
+                  ) : efSocial.map((post) => (
+                    <a key={post.id} href={post.link} target="_blank" rel="noopener noreferrer"
+                      className="block w-full rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]">
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <span className="font-mono text-[8px] font-bold text-[#83a598]">@{post.author}</span>
+                        <span className="font-mono text-[7px] text-[#928374]">{new Date(post.pubDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                      <div className="font-mono text-[9px] text-[#d5c4a1] line-clamp-3">{post.text}</div>
+                    </a>
+                  ))}
+                </div>
+              </CollapsibleSection>
+            </>
           )}
 
           {/* GDELT workspace */}

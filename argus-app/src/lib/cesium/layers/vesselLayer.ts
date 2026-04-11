@@ -120,7 +120,6 @@ export class VesselLayer {
           image: new ConstantProperty(isMilitary ? this.militaryMarker : this.marker),
           scale: isMilitary ? 0.85 : 0.7,
           rotation: new ConstantProperty(rotation) as any,
-          alignedAxis: new ConstantProperty(Cartesian3.ZERO) as any,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(500_000, 1.5, 10_000_000, 0.3),
           disableDepthTestDistance: 500_000,

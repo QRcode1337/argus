@@ -95,7 +95,6 @@ export class FlightLayer {
           image: new ConstantProperty(this.marker),
           scale: 0.85,
           rotation: new ConstantProperty(rotation) as any,
-          alignedAxis: new ConstantProperty(Cartesian3.ZERO) as any,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.3, 20_000_000, 0.4),
           disableDepthTestDistance: 0,
