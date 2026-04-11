@@ -11,6 +11,7 @@ import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
 
 import { VideoOverlay } from "./VideoOverlay";
 import PneumaHud from "./PneumaHud";
+import { SettingsModal } from "./SettingsModal";
 import {
   EPIC_FURY_THEATER,
   filterEpicFuryIncidents,
@@ -308,6 +309,7 @@ export function HudOverlay({
   const [llmModel, setLlmModel] = useState("llama3");
   const [llmApiKey, setLlmApiKey] = useState("");
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [showPneumaPanel, setShowPneumaPanel] = useState(false);
@@ -1998,65 +2000,18 @@ export function HudOverlay({
           )}
 
           {workspace === "settings" && (
-          <CollapsibleSection title="LLM Configuration" defaultOpen={true}>
-            <div className="space-y-2">
-              <label className="block">
-                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Provider</span>
-                <select
-                  className={`${controlInputClass} mt-1`}
-                  value={llmProvider}
-                  onChange={(e) => setLlmProvider(e.target.value as "ollama" | "openai_compatible")}
-                >
-                  <option value="ollama">Ollama</option>
-                  <option value="openai_compatible">OpenAI-Compatible</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Endpoint URL</span>
-                <input
-                  type="text"
-                  className={`${controlInputClass} mt-1`}
-                  value={llmEndpoint}
-                  onChange={(e) => setLlmEndpoint(e.target.value)}
-                  placeholder="http://localhost:11434"
-                />
-              </label>
-              <label className="block">
-                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Model</span>
-                <input
-                  type="text"
-                  className={`${controlInputClass} mt-1`}
-                  value={llmModel}
-                  onChange={(e) => setLlmModel(e.target.value)}
-                  placeholder="llama3"
-                />
-              </label>
-              {llmProvider === "openai_compatible" && (
-                <label className="block">
-                  <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">API Key (optional)</span>
-                  <input
-                    type="password"
-                    className={`${controlInputClass} mt-1`}
-                    value={llmApiKey}
-                    onChange={(e) => setLlmApiKey(e.target.value)}
-                    placeholder="sk-..."
-                  />
-                </label>
-              )}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={saveSettings}
-                  className={actionButtonClass}
-                >
-                  {settingsSaved ? "Saved!" : "Save Settings"}
-                </button>
+            <section className="space-y-2 px-3 py-2.5">
+              <button
+                type="button"
+                onClick={() => setSettingsModalOpen(true)}
+                className="w-full rounded-lg border border-[#83a598] bg-[#504945] px-3 py-3 font-mono text-[11px] uppercase tracking-[0.18em] text-[#ebdbb2] transition hover:bg-[#665c54]"
+              >
+                Open Configuration Panel
+              </button>
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-2 font-mono text-[9px] text-[#928374] leading-relaxed">
+                Configure LLM providers, view data feed status, manage API keys, and learn about Argus subsystems including PNEUMA and Phantom.
               </div>
-              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">
-                Configure a local LLM (Ollama, LM Studio, etc.) to enable AI-powered intel summaries. Your keys stay on your server.
-              </div>
-            </div>
-          </CollapsibleSection>
+            </section>
           )}
         </nav>
       ) : (
@@ -2763,6 +2718,21 @@ export function HudOverlay({
           </div>
         </div>
       ) : null}
+
+      <SettingsModal
+        open={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+        llmProvider={llmProvider}
+        setLlmProvider={setLlmProvider}
+        llmEndpoint={llmEndpoint}
+        setLlmEndpoint={setLlmEndpoint}
+        llmModel={llmModel}
+        setLlmModel={setLlmModel}
+        llmApiKey={llmApiKey}
+        setLlmApiKey={setLlmApiKey}
+        saveSettings={saveSettings}
+        settingsSaved={settingsSaved}
+      />
 
       {/* Playback Timeline Bar */}
       {platformMode === "playback" && playbackTimeRange && (
