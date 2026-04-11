@@ -3,7 +3,17 @@ import { reportFeedHealth } from "@/lib/feedHealth";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_BOUNDS = [[[-90, -180], [90, 180]]];
+// Multiple bounding boxes ensure coverage of strategic areas
+// AISStream sends messages matching ANY box, so critical regions get guaranteed coverage
+const DEFAULT_BOUNDS = [
+  [[-90, -180], [90, 180]],           // Global
+  [[23, 48], [30, 60]],               // Persian Gulf & Strait of Hormuz
+  [[10, 40], [16, 46]],               // Bab el-Mandeb & Gulf of Aden
+  [[28, 30], [32, 35]],               // Suez Canal & Red Sea north
+  [[32, 32], [37, 36]],               // Eastern Mediterranean
+  [[-5, 98], [8, 106]],               // Strait of Malacca
+  [[20, 118], [28, 123]],             // Taiwan Strait & South China Sea
+];
 
 type AisVessel = {
   mmsi: number;
@@ -59,9 +69,10 @@ type WsConstructor = new (
 ) => WsLike;
 
 let cache: AisCache | null = null;
+const CACHE_TTL_MS = 45_000; // Serve cached data for 45s to avoid hammering the WebSocket
 
-const REQUEST_TIMEOUT_MS = Number(process.env.AISSTREAM_TIMEOUT_MS ?? 12000);
-const MAX_MESSAGES = Number(process.env.AISSTREAM_MAX_MESSAGES ?? 200);
+const REQUEST_TIMEOUT_MS = Number(process.env.AISSTREAM_TIMEOUT_MS ?? 25000);
+const MAX_MESSAGES = Number(process.env.AISSTREAM_MAX_MESSAGES ?? 1500);
 
 function rawDataToString(data: unknown): string {
   if (typeof data === "string") return data;
@@ -180,6 +191,11 @@ export async function GET() {
   const apiKey = process.env.AISSTREAM_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "AISSTREAM_API_KEY not configured" }, { status: 500 });
+  }
+
+  // Return cached data if still fresh
+  if (cache && Date.now() - new Date(cache.cachedAt).getTime() < CACHE_TTL_MS) {
+    return NextResponse.json({ ...cache.data, _cached: true });
   }
 
   try {
