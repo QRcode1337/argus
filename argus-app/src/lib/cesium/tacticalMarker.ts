@@ -131,3 +131,45 @@ export function createBoatSvg(palette: TacticalMarkerPalette): string {
   iconCache.set(key, encoded);
   return encoded;
 }
+
+// ---- Anomaly Atlas category markers ----
+
+type AnomalyCat = "geometric" | "crater" | "censored" | "desert" | "underwater" | "military" | "natural" | "vanished" | "antarctica" | "other";
+
+const anomalySvgs: Record<AnomalyCat, (fill: string, stroke: string) => string> = {
+  geometric: (f, s) => `<polygon points="14,2 17.5,10.5 26,11 19.5,17 21.5,26 14,21.5 6.5,26 8.5,17 2,11 10.5,10.5" fill="${f}" stroke="${s}" stroke-width="0.8"/>`,
+  crater: (f, s) => `<circle cx="14" cy="14" r="9" fill="${f}" fill-opacity="0.35" stroke="${s}" stroke-width="1"/><circle cx="14" cy="14" r="4" fill="${f}" stroke="${s}" stroke-width="0.6"/><line x1="14" y1="3" x2="14" y2="25" stroke="${s}" stroke-width="0.5" opacity="0.6"/><line x1="3" y1="14" x2="25" y2="14" stroke="${s}" stroke-width="0.5" opacity="0.6"/>`,
+  censored: (f, s) => `<rect x="4" y="4" width="20" height="20" rx="2" fill="${f}" fill-opacity="0.3" stroke="${s}" stroke-width="1"/><line x1="7" y1="7" x2="21" y2="21" stroke="${s}" stroke-width="2" stroke-linecap="round"/><line x1="21" y1="7" x2="7" y2="21" stroke="${s}" stroke-width="2" stroke-linecap="round"/>`,
+  desert: (f, s) => `<polygon points="14,3 25,24 3,24" fill="${f}" fill-opacity="0.35" stroke="${s}" stroke-width="1"/><polygon points="14,10 20,21 8,21" fill="${f}" fill-opacity="0.5"/>`,
+  underwater: (f, s) => `<circle cx="14" cy="14" r="10" fill="${f}" fill-opacity="0.2" stroke="${s}" stroke-width="0.8"/><path d="M5 14 Q8 10 11 14 Q14 18 17 14 Q20 10 23 14" fill="none" stroke="${s}" stroke-width="1.5" stroke-linecap="round"/><path d="M5 18 Q8 14 11 18 Q14 22 17 18 Q20 14 23 18" fill="none" stroke="${s}" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/>`,
+  military: (f, s) => `<path d="M14 3 L23 8 L23 15 C23 20 14 25 14 25 C14 25 5 20 5 15 L5 8 Z" fill="${f}" fill-opacity="0.35" stroke="${s}" stroke-width="1"/><path d="M14 8 L18 10.5 L18 14.5 C18 17 14 20 14 20 C14 20 10 17 10 14.5 L10 10.5 Z" fill="${f}"/>`,
+  natural: (f, s) => `<path d="M14 3 C8 3 3 10 3 16 C3 22 8 25 14 25 C14 25 14 14 14 14 C14 14 25 14 25 14 C25 8 20 3 14 3Z" fill="${f}" fill-opacity="0.4" stroke="${s}" stroke-width="0.8"/><path d="M14 25 C14 14 14 14 25 14" fill="none" stroke="${s}" stroke-width="0.6"/>`,
+  vanished: (f, s) => `<circle cx="14" cy="14" r="9" fill="${f}" fill-opacity="0.15" stroke="${s}" stroke-width="0.8" stroke-dasharray="3 2"/><circle cx="14" cy="14" r="4" fill="${f}" fill-opacity="0.4" stroke="${s}" stroke-width="0.5"/>`,
+  antarctica: (f, s) => `<line x1="14" y1="3" x2="14" y2="25" stroke="${s}" stroke-width="1.2"/><line x1="4.5" y1="8.5" x2="23.5" y2="19.5" stroke="${s}" stroke-width="1.2"/><line x1="4.5" y1="19.5" x2="23.5" y2="8.5" stroke="${s}" stroke-width="1.2"/><circle cx="14" cy="14" r="3" fill="${f}"/><line x1="14" y1="3" x2="11" y2="5.5" stroke="${s}" stroke-width="0.8"/><line x1="14" y1="3" x2="17" y2="5.5" stroke="${s}" stroke-width="0.8"/><line x1="14" y1="25" x2="11" y2="22.5" stroke="${s}" stroke-width="0.8"/><line x1="14" y1="25" x2="17" y2="22.5" stroke="${s}" stroke-width="0.8"/>`,
+  other: (f, s) => `<polygon points="14,3 25,14 14,25 3,14" fill="${f}" fill-opacity="0.35" stroke="${s}" stroke-width="1"/><circle cx="14" cy="14" r="3" fill="${f}"/>`,
+};
+
+export function createAnomalyMarkerSvg(category: string, fill: string): string {
+  const key = `anomaly:${category}:${fill}`;
+  const cached = iconCache.get(key);
+  if (cached) return cached;
+
+  const f = sanitize(fill);
+  const s = sanitize("#1d2021");
+  const cat = (category in anomalySvgs ? category : "other") as AnomalyCat;
+  const inner = anomalySvgs[cat](f, s);
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+    <defs>
+      <filter id="g" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="1.2" result="blur"/>
+      </filter>
+    </defs>
+    <circle cx="14" cy="14" r="12" fill="${f}" fill-opacity="0.08" filter="url(#g)"/>
+    ${inner}
+  </svg>`;
+
+  const encoded = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  iconCache.set(key, encoded);
+  return encoded;
+}

@@ -58,6 +58,7 @@ import { fetchAisVessels } from "@/lib/ingest/aisstream";
 import { fetchUsgsQuakes } from "@/lib/ingest/usgs";
 import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import { ANOMALY_SITES, CATEGORY_COLORS, CATEGORY_LABELS, STATUS_ICONS } from "@/data/anomalyAtlas";
+import { createAnomalyMarkerSvg } from "@/lib/cesium/tacticalMarker";
 import { fetchIssIntel } from "@/lib/ingest/iss";
 import { recordFlights, recordMilitary, recordSatellites, recordQuakes, recordOutages, recordThreats } from "@/lib/ingest/recorder";
 import {
@@ -718,34 +719,25 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     });
   }, [epicFuryActive]);
 
-  // Anomaly Atlas — add/remove markers and fly to global view
-  const anomalyEntitiesRef = useRef<Entity[]>([]);
+  // Anomaly Atlas — load static markers once on viewer init
+  const anomalyAtlasLoadedRef = useRef(false);
   useEffect(() => {
     const viewer = viewerRef.current;
-    if (!viewer) return;
-    const isAtlas = platformMode === "anomaly-atlas";
+    if (!viewer || anomalyAtlasLoadedRef.current) return;
+    anomalyAtlasLoadedRef.current = true;
 
-    // Remove existing anomaly markers
-    for (const entity of anomalyEntitiesRef.current) {
-      viewer.entities.remove(entity);
-    }
-    anomalyEntitiesRef.current = [];
-
-    if (!isAtlas) return;
-
-    // Add anomaly markers
     for (const site of ANOMALY_SITES) {
       const color = Color.fromCssColorString(CATEGORY_COLORS[site.category]);
-      const entity = viewer.entities.add({
+      const markerSvg = createAnomalyMarkerSvg(site.category, CATEGORY_COLORS[site.category]);
+      viewer.entities.add({
         id: `anomaly-${site.id}`,
         position: Cartesian3.fromDegrees(site.lon, site.lat, 0),
-        point: {
-          pixelSize: 8,
-          color,
-          outlineColor: Color.BLACK,
-          outlineWidth: 1,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          scaleByDistance: new NearFarScalar(1_000_000, 1.5, 20_000_000, 0.6),
+        billboard: {
+          image: markerSvg,
+          scale: 0.7,
+          verticalOrigin: VerticalOrigin.CENTER,
+          scaleByDistance: new NearFarScalar(500_000, 1.2, 15_000_000, 0.35),
+          disableDepthTestDistance: 500_000,
         },
         label: {
           text: site.name.length > 30 ? site.name.slice(0, 28) + "\u2026" : site.name,
@@ -755,9 +747,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           outlineWidth: 2,
           style: LabelStyle.FILL_AND_OUTLINE,
           verticalOrigin: VerticalOrigin.BOTTOM,
-          pixelOffset: new Cartesian2(0, -10),
-          scaleByDistance: new NearFarScalar(500_000, 1.0, 5_000_000, 0.0),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          pixelOffset: new Cartesian2(0, -14),
+          scaleByDistance: new NearFarScalar(300_000, 1.0, 2_000_000, 0.0),
+          disableDepthTestDistance: 300_000,
         },
         properties: {
           kind: "anomaly",
@@ -766,15 +758,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           status: site.status,
         },
       });
-      anomalyEntitiesRef.current.push(entity);
     }
-
-    // Fly to global overview
-    viewer.camera.flyTo({
-      destination: Cartesian3.fromDegrees(20, 20, 15_000_000),
-      duration: 2.0,
-    });
-  }, [platformMode]);
+  }, []);
 
   const analyticsLayers = useArgusStore((s) => s.analyticsLayers);
   const visualMode = useArgusStore((s) => s.visualMode);

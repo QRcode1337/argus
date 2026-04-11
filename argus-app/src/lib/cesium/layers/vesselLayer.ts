@@ -123,7 +123,7 @@ export class VesselLayer {
           alignedAxis: new ConstantProperty(Cartesian3.ZERO) as any,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(500_000, 1.5, 10_000_000, 0.3),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          disableDepthTestDistance: 500_000,
         },
         label: {
           text: new ConstantProperty(displayName),
@@ -136,7 +136,7 @@ export class VesselLayer {
           horizontalOrigin: new ConstantProperty(HorizontalOrigin.CENTER),
           pixelOffset: new ConstantProperty(new Cartesian2(0, 14)),
           scaleByDistance: new NearFarScalar(500_000, 1.0, 5_000_000, 0.0),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          disableDepthTestDistance: 500_000,
         },
         properties: {
           kind: "vessel",

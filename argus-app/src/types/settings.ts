@@ -12,10 +12,24 @@ export interface AppSettings {
   llm: LlmSettings;
 }
 
-export const DEFAULT_SETTINGS: AppSettings = {
-  llm: {
+function defaultLlmSettings(): LlmSettings {
+  const gradientBase = process.env.GRADIENT_BASE_URL;
+  const gradientKey = process.env.GRADIENT_ENDPOINT_ACCESS_KEY;
+  if (gradientBase && gradientKey) {
+    return {
+      provider: "openai_compatible",
+      endpoint: gradientBase,
+      model: "llama-3.3-70b-instruct",
+      apiKey: gradientKey,
+    };
+  }
+  return {
     provider: "ollama",
     endpoint: "http://localhost:11434",
     model: "llama3",
-  },
+  };
+}
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  llm: defaultLlmSettings(),
 };

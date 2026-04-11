@@ -24,6 +24,8 @@ import {
   STATUS_ICONS,
   type AnomalyCategory,
 } from "@/data/anomalyAtlas";
+import { QUAD_CLASS_LABELS, QUAD_CLASS_COLORS, type GdeltEvent, type GdeltQuadClass } from "@/types/gdelt";
+import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 
 type HudOverlayProps = {
   onFlyToPoi: (poiId: string) => void;
@@ -130,7 +132,8 @@ const workspaceDefs = [
   { id: "intel", label: "Intel" },
   { id: "news", label: "News" },
   { id: "feeds", label: "Feeds" },
-
+  { id: "gdelt", label: "GDELT" },
+  { id: "anomalies", label: "Anomalies" },
   { id: "signal", label: "Signal" },
   { id: "status", label: "Status" },
   { id: "settings", label: "Settings" },
@@ -319,6 +322,8 @@ export function HudOverlay({
   const [gdeltDigestLoading, setGdeltDigestLoading] = useState(false);
   const [gdeltDigestError, setGdeltDigestError] = useState<string | null>(null);
   const [anomalyCategoryFilter, setAnomalyCategoryFilter] = useState<AnomalyCategory | null>(null);
+  const [gdeltEvents, setGdeltEvents] = useState<GdeltEvent[]>([]);
+  const [gdeltQuadFilter, setGdeltQuadFilter] = useState<GdeltQuadClass | null>(null);
   const [gdeltDigestDocument, setGdeltDigestDocument] = useState<{
     title: string;
     content: string;
@@ -333,10 +338,20 @@ export function HudOverlay({
   const [cognitiveLens, setCognitiveLens] = useState<"tactical" | "strategic" | "anomaly">("tactical");
 
   useEffect(() => {
-    if (epicFuryActive || platformMode === "anomaly-atlas") {
+    if (epicFuryActive) {
       setWorkspace("intel");
     }
-  }, [epicFuryActive, platformMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [epicFuryActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch GDELT events when workspace is "gdelt"
+  useEffect(() => {
+    if (workspace !== "gdelt") return;
+    let cancelled = false;
+    void fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt).then((events) => {
+      if (!cancelled) setGdeltEvents(events);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [workspace]);
 
   useEffect(() => {
     const syncClock = () => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC"));
@@ -1023,7 +1038,7 @@ export function HudOverlay({
           {/* Sidebar header with hide button */}
           <div className="flex items-center justify-between border-b border-[#3c3836] px-3 py-2">
             <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#a89984]">
-              {platformMode === "analytics" ? "Analytics" : platformMode === "playback" ? "Playback" : platformMode === "epic-fury" ? "Op Epic Fury" : platformMode === "anomaly-atlas" ? "Anomaly Atlas" : "Live"} Panels
+              {platformMode === "analytics" ? "Analytics" : platformMode === "playback" ? "Playback" : platformMode === "epic-fury" ? "Op Epic Fury" : "Live"} Panels
             </span>
             <button
               type="button"
@@ -1761,8 +1776,98 @@ export function HudOverlay({
             </CollapsibleSection>
           )}
 
-          {/* Anomaly Atlas — shown in intel workspace when platform mode is anomaly-atlas */}
-          {workspace === "intel" && platformMode === "anomaly-atlas" && (
+          {/* GDELT workspace */}
+          {workspace === "gdelt" && (
+            <CollapsibleSection
+              title="GDELT Events"
+              badge={`${gdeltEvents.length}`}
+              defaultOpen
+            >
+              <div className="space-y-2">
+                <div className="flex gap-1 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setGdeltQuadFilter(null)}
+                    className={`rounded-md border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] transition ${
+                      gdeltQuadFilter === null ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]" : "border-[#504945] bg-[#282828] text-[#a89984]"
+                    }`}
+                  >All</button>
+                  {([1, 2, 3, 4] as GdeltQuadClass[]).map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => setGdeltQuadFilter(gdeltQuadFilter === q ? null : q)}
+                      className={`rounded-md border px-1.5 py-0.5 font-mono text-[8px] tracking-[0.1em] transition ${
+                        gdeltQuadFilter === q ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]" : "border-[#504945] bg-[#282828]"
+                      }`}
+                      style={{ color: gdeltQuadFilter === q ? undefined : QUAD_CLASS_COLORS[q] }}
+                    >{QUAD_CLASS_LABELS[q]}</button>
+                  ))}
+                </div>
+
+                {/* Digest button */}
+                <button
+                  type="button"
+                  onClick={requestGdeltDigest}
+                  disabled={gdeltDigestLoading}
+                  className="w-full rounded-lg border border-[#fabd2f]/30 bg-[#fabd2f]/10 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#fabd2f] transition hover:border-[#fabd2f] hover:bg-[#fabd2f]/20 disabled:opacity-50"
+                >
+                  {gdeltDigestLoading ? "Generating Strategic Digest..." : gdeltDigestDocument ? "Refresh Strategic Digest" : `Generate Strategic Digest (${gdeltEvents.length} events)`}
+                </button>
+                {gdeltDigestError && (
+                  <div className="rounded-md border border-red-900/50 bg-red-900/10 px-2 py-1.5 font-mono text-[9px] text-red-400">
+                    {gdeltDigestError}
+                  </div>
+                )}
+
+                <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5">
+                  {gdeltEvents
+                    .filter((e) => !gdeltQuadFilter || e.quadClass === gdeltQuadFilter)
+                    .sort((a, b) => Math.abs(b.goldsteinScale) - Math.abs(a.goldsteinScale))
+                    .map((event) => (
+                      <button
+                        key={event.id}
+                        type="button"
+                        onClick={() => {
+                          onFlyToCoordinates(event.latitude, event.longitude);
+                          onSelectIntel({
+                            id: `gdelt-${event.id}`,
+                            name: `${event.actor1Name || "Unknown"} → ${event.actor2Name || "Unknown"}`,
+                            kind: "gdelt",
+                            importance: Math.abs(event.goldsteinScale) >= 5 ? "important" : "normal",
+                            quickFacts: [
+                              { label: "Type", value: QUAD_CLASS_LABELS[event.quadClass as GdeltQuadClass] ?? "Unknown" },
+                              { label: "Goldstein", value: String(event.goldsteinScale) },
+                              { label: "Actor 1", value: `${event.actor1Name || "?"} (${event.actor1Country || "?"})` },
+                              { label: "Actor 2", value: `${event.actor2Name || "?"} (${event.actor2Country || "?"})` },
+                              { label: "Location", value: event.actionGeoName },
+                              { label: "Mentions", value: String(event.numMentions) },
+                              { label: "Tone", value: event.avgTone.toFixed(1) },
+                            ],
+                            fullFacts: [],
+                            coordinates: { lat: event.latitude, lon: event.longitude },
+                          });
+                        }}
+                        className="w-full rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <span className="truncate font-mono text-[10px] font-bold text-[#ebdbb2]">
+                            {event.actor1Name || "?"} → {event.actor2Name || "?"}
+                          </span>
+                          <span className="shrink-0 rounded border border-[#504945] bg-[#282828] px-1 py-0.5 font-mono text-[8px]" style={{ color: QUAD_CLASS_COLORS[event.quadClass as GdeltQuadClass] }}>
+                            {event.goldsteinScale > 0 ? "+" : ""}{event.goldsteinScale}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 font-mono text-[9px] text-[#a89984] truncate">{event.actionGeoName}</div>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* Anomaly Atlas workspace */}
+          {workspace === "anomalies" && (
             <CollapsibleSection
               title="Anomaly Atlas"
               badge={`${ANOMALY_SITES.length} sites`}
@@ -1958,7 +2063,6 @@ export function HudOverlay({
               <option value="playback">Playback</option>
               <option value="analytics">Analytics</option>
               <option value="epic-fury">Op Epic Fury</option>
-              <option value="anomaly-atlas">Anomaly Atlas</option>
             </select>
           </label>
 
