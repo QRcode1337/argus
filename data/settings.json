@@ -1,7 +1,7 @@
 {
   "llm": {
-    "provider": "pneuma",
-    "endpoint": "http://localhost:11434",
-    "model": "llama3"
+    "provider": "openai_compatible",
+    "endpoint": "",
+    "model": "llama-3.3-70b-instruct"
   }
 }

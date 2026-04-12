@@ -12,8 +12,12 @@ export async function readSettings(): Promise<AppSettings> {
     const raw = await fs.readFile(SETTINGS_PATH, "utf-8");
     const saved = JSON.parse(raw) as Partial<AppSettings>;
 
-    // Deep-merge llm settings so individual keys survive
-    const llm = { ...DEFAULT_SETTINGS.llm, ...saved.llm };
+    // Deep-merge llm settings so individual keys survive.
+    // Drop empty strings so env-var defaults aren't overridden by blank values.
+    const savedLlm = Object.fromEntries(
+      Object.entries(saved.llm ?? {}).filter(([, v]) => v !== "" && v != null),
+    );
+    const llm = { ...DEFAULT_SETTINGS.llm, ...savedLlm } as AppSettings["llm"];
 
     // Migrate unknown/stale providers to the default before they 502
     if (!VALID_PROVIDERS.has(llm.provider)) {
