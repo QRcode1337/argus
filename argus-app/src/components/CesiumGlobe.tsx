@@ -209,7 +209,9 @@ const suppressCesiumErrorPanels = (viewer: Viewer): (() => void) => {
   // Replace showErrorPanel with a no-op — all Cesium error panels are suppressed
   const originalShowErrorPanel = widget.showErrorPanel;
   if (typeof originalShowErrorPanel === "function") {
-    widget.showErrorPanel = () => {};
+    widget.showErrorPanel = (...args: unknown[]) => {
+      console.debug("[cesium] suppressed error panel:", ...args);
+    };
 
     cleanupFns.push(() => {
       widget.showErrorPanel = originalShowErrorPanel;
