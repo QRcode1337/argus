@@ -149,51 +149,31 @@ const ZOOM_REGIONS = [
   { id: "zr-horn-africa", label: "HORN / RED SEA", west: 36, south: 2, east: 55, north: 18, color: "#fe8019", height: 800_000 },
 ] as const;
 
-const UNSUPPORTED_ZOOM_ERROR =
-  /zoom level not supported|unsupported zoom|outside.*zoom|not available.*zoom|invalid.*zoom/i;
-
-const isUnsupportedZoomError = (value: unknown): boolean => {
-  if (!value) {
-    return false;
-  }
-
-  if (typeof value === "string") {
-    return UNSUPPORTED_ZOOM_ERROR.test(value);
-  }
-
-  if (value instanceof Error) {
-    return UNSUPPORTED_ZOOM_ERROR.test(value.message);
-  }
-
-  if (typeof value === "object") {
-    const candidate = value as Record<string, unknown>;
-    return (
-      isUnsupportedZoomError(candidate.message) ||
-      isUnsupportedZoomError(candidate.error) ||
-      isUnsupportedZoomError(candidate.title)
-    );
-  }
-
-  return false;
-};
-
-const suppressUnsupportedZoomErrors = (viewer: Viewer): (() => void) => {
+/**
+ * Nuke ALL Cesium error panels unconditionally.
+ *
+ * Previous attempts tried to regex-match "zoom level not supported" but the
+ * actual error text from imagery providers varies wildly (generic titles like
+ * "An error occurred while rendering" with zoom details buried in nested
+ * error objects or stack traces). Argus has its own error handling — Cesium
+ * error panels are never useful here, so suppress them all.
+ */
+const suppressCesiumErrorPanels = (viewer: Viewer): (() => void) => {
   const cleanupFns: Array<() => void> = [];
   const seenProviders = new WeakSet<object>();
   const imageryLayers = viewer.imageryLayers;
   const widget = viewer.cesiumWidget as unknown as {
     showErrorPanel?: (...args: unknown[]) => void;
   };
-  const removeUnsupportedErrorPanels = () => {
+
+  const removeAllErrorPanels = () => {
     const panels = viewer.container.querySelectorAll(".cesium-widget-errorPanel");
     for (const panel of panels) {
-      const text = panel.textContent ?? "";
-      if (UNSUPPORTED_ZOOM_ERROR.test(text)) {
-        panel.remove();
-      }
+      panel.remove();
     }
   };
 
+  // Swallow tile-provider errors so they never trigger retry loops or panels
   const attachProvider = (provider?: ImageryProviderWithErrorEvent) => {
     if (!provider || typeof provider !== "object" || seenProviders.has(provider)) {
       return;
@@ -226,27 +206,25 @@ const suppressUnsupportedZoomErrors = (viewer: Viewer): (() => void) => {
     cleanupFns.push(removeLayerAddedListener);
   }
 
+  // Replace showErrorPanel with a no-op — all Cesium error panels are suppressed
   const originalShowErrorPanel = widget.showErrorPanel;
   if (typeof originalShowErrorPanel === "function") {
-    widget.showErrorPanel = (...args: unknown[]) => {
-      if (args.some(isUnsupportedZoomError)) {
-        removeUnsupportedErrorPanels();
-        return;
-      }
-
-      originalShowErrorPanel.apply(widget, args);
-    };
+    widget.showErrorPanel = () => {};
 
     cleanupFns.push(() => {
       widget.showErrorPanel = originalShowErrorPanel;
     });
   }
 
+  // Belt-and-suspenders: MutationObserver catches any panels that slip through
   const observer = new MutationObserver(() => {
-    removeUnsupportedErrorPanels();
+    removeAllErrorPanels();
   });
   observer.observe(viewer.container, { childList: true, subtree: true });
   cleanupFns.push(() => observer.disconnect());
+
+  // Remove any panels that already exist
+  removeAllErrorPanels();
 
   return () => {
     for (const cleanup of cleanupFns.reverse()) {
@@ -998,7 +976,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       timeline: false,
       shouldAnimate: true,
     });
-    const restoreUnsupportedZoomHandling = suppressUnsupportedZoomErrors(viewer);
+    const restoreErrorPanelSuppression = suppressCesiumErrorPanels(viewer);
     const cameraController = viewer.scene.screenSpaceCameraController;
     cameraController.enableCollisionDetection = collisionEnabledRef.current;
     cameraController.inertiaSpin = 0.82;
@@ -1552,7 +1530,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       poller.stopAll();
       rasterLayer.unload();
       viewer.camera.changed.removeEventListener(onCameraChanged);
-      restoreUnsupportedZoomHandling();
+      restoreErrorPanelSuppression();
 
       if (selectionRingRef.current) {
         viewer.entities.remove(selectionRingRef.current);

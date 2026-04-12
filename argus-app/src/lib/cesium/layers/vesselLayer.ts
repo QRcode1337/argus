@@ -29,8 +29,8 @@ export class VesselLayer {
   private activeTrailVesselId: string | null = null;
 
   private readonly marker = createBoatSvg({
-    fill: "#458588",
-    glow: "#83a598",
+    fill: "#b8bb26",
+    glow: "#d5c4a1",
     stroke: "#1d2021",
   });
 
@@ -111,7 +111,7 @@ export class VesselLayer {
 
       const displayName = vessel.vesselName?.trim() || vessel.callsign?.trim() || vessel.mmsi;
       const isMilitary = intel.isPotentialMilitary;
-      const labelColor = isMilitary ? "#fabd2f" : "#83a598";
+      const labelColor = isMilitary ? "#fabd2f" : "#d5c4a1";
 
       const entity = this.viewer.entities.add({
         id: `vessel-${vessel.mmsi}`,
@@ -182,7 +182,7 @@ export class VesselLayer {
     const history = this.positionHistory.get(vesselId);
     if (!history || history.length < 2) return;
 
-    const color = Color.fromCssColorString("#458588");
+    const color = Color.fromCssColorString("#b8bb26");
 
     this.trailEntity = this.viewer.entities.add({
       id: `vessel-trail-${vesselId}`,

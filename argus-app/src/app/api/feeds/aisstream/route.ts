@@ -3,16 +3,23 @@ import { reportFeedHealth } from "@/lib/feedHealth";
 
 export const dynamic = "force-dynamic";
 
-// Multiple bounding boxes ensure coverage of strategic areas
-// AISStream sends messages matching ANY box, so critical regions get guaranteed coverage
+// Focused bounding boxes for strategic maritime regions.
+// NO global box — a global box floods the stream with random vessels worldwide
+// and you hit the message cap before getting meaningful density in key areas.
+// AISStream sends messages matching ANY box, so each region gets dedicated coverage.
 const DEFAULT_BOUNDS = [
-  [[-90, -180], [90, 180]],           // Global
   [[23, 48], [30, 60]],               // Persian Gulf & Strait of Hormuz
   [[10, 40], [16, 46]],               // Bab el-Mandeb & Gulf of Aden
-  [[28, 30], [32, 35]],               // Suez Canal & Red Sea north
-  [[32, 32], [37, 36]],               // Eastern Mediterranean
+  [[12, 32], [32, 44]],               // Red Sea & Suez Canal (full length)
+  [[30, 24], [42, 37]],               // Eastern Mediterranean
   [[-5, 98], [8, 106]],               // Strait of Malacca
   [[20, 118], [28, 123]],             // Taiwan Strait & South China Sea
+  [[48, -8], [62, 12]],               // North Sea & English Channel
+  [[33, -10], [48, 5]],               // Western Mediterranean & Gibraltar
+  [[25, -82], [32, -78]],             // Straits of Florida
+  [[8, 76], [22, 90]],                // Bay of Bengal & Indian Ocean approaches
+  [[-8, 38], [12, 52]],               // East African coast / Mozambique Channel
+  [[30, 125], [45, 145]],             // East China Sea & Sea of Japan
 ];
 
 type AisVessel = {
@@ -71,8 +78,8 @@ type WsConstructor = new (
 let cache: AisCache | null = null;
 const CACHE_TTL_MS = 45_000; // Serve cached data for 45s to avoid hammering the WebSocket
 
-const REQUEST_TIMEOUT_MS = Number(process.env.AISSTREAM_TIMEOUT_MS ?? 25000);
-const MAX_MESSAGES = Number(process.env.AISSTREAM_MAX_MESSAGES ?? 1500);
+const REQUEST_TIMEOUT_MS = Number(process.env.AISSTREAM_TIMEOUT_MS ?? 40000);
+const MAX_MESSAGES = Number(process.env.AISSTREAM_MAX_MESSAGES ?? 2000);
 
 function rawDataToString(data: unknown): string {
   if (typeof data === "string") return data;
