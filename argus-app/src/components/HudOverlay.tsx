@@ -1060,7 +1060,7 @@ export function HudOverlay({
 
       {/* LEFT SIDEBAR - Collapsible Accordion Panels — desktop only */}
       {sidebarVisible ? (
-        <nav className="pointer-events-auto absolute left-4 top-[8.5rem] hidden max-h-[calc(100vh-11rem)] w-[260px] overflow-y-auto rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md md:block">
+        <nav className="pointer-events-auto absolute left-4 top-[8.5rem] hidden max-h-[calc(100vh-11rem)] w-[320px] overflow-y-auto rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md md:block">
           {/* Sidebar header with hide button */}
           <div className="flex items-center justify-between border-b border-[#3c3836] px-3 py-2">
             <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#a89984]">
@@ -1075,13 +1075,13 @@ export function HudOverlay({
             </button>
           </div>
 
-          <div className="grid grid-cols-5 gap-1 border-b border-[#3c3836] px-2 py-1.5">
+          <div className="flex flex-wrap gap-1 border-b border-[#3c3836] px-2 py-1.5">
             {workspaceDefs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setWorkspace(tab.id)}
-                className={`rounded px-1 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
+                className={`flex-1 min-w-[fit-content] rounded px-1.5 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
                   workspace === tab.id
                     ? "border border-[#83a598] bg-[#504945] text-[#d5c4a1]"
                     : "border border-transparent text-[#a89984] hover:border-[#504945] hover:bg-[#282828]"
