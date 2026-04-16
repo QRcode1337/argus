@@ -21,6 +21,10 @@ export const ARGUS_CONFIG = {
     zerveAnalysis: process.env.ZERVE_API_ENDPOINT ?? "/api/feeds/zerve",
     settings: "/api/settings",
     analyticsLayers: "/api/analytics/layers",
+    acled: "/api/feeds/acled",
+    polymarket: "/api/feeds/polymarket",
+    gdacs: "/api/feeds/gdacs",
+    faa: "/api/feeds/faa",
   },
   pollMs: {
     openSky: 10_000,
@@ -36,6 +40,10 @@ export const ARGUS_CONFIG = {
     phantom: 10_000,
     threatRadar: 300_000, // 5 minutes
     zerve: 30 * 60_000, // 30 minutes — batch geospatial analysis cadence
+    acled: 30 * 60_000,
+    polymarket: 5 * 60_000,
+    gdacs: 10 * 60_000,
+    faa: 10 * 60_000,
   },
   limits: {
     maxFlights: 7000,
