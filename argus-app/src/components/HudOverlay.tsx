@@ -76,6 +76,7 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "anomalies", label: "Chaos Anomalies", feed: "Phantom" },
   { key: "weather", label: "Weather Radar", feed: "RainViewer" },
   { key: "vessels", label: "AIS Vessels", feed: "AISStream" },
+  { key: "instability", label: "Instability Index", feed: "CII" },
 ];
 
 const analyticsIntelDefs: { key: LayerKey; label: string; feed: string }[] = [
@@ -1495,6 +1496,7 @@ export function HudOverlay({
                     anomalies: counts.anomalies,
                     weather: counts.weather,
                     vessels: counts.vessels,
+                    instability: 0,
                   };
                   const value = valueMap[layer.key];
 
@@ -1595,6 +1597,7 @@ export function HudOverlay({
                         anomalies: counts.anomalies,
                         weather: counts.weather,
                         vessels: counts.vessels,
+                        instability: 0,
                       };
                       const value = valueMap[layer.key];
 

@@ -10,7 +10,8 @@ export type LayerKey =
   | "gdelt"
   | "anomalies"
   | "weather"
-  | "vessels";
+  | "vessels"
+  | "instability";
 export type SceneMode = "globe_sat" | "globe_street" | "globe_map" | "flat_map";
 export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "cfradar" | "otx" | "fred" | "ais" | "gdelt" | "threatradar" | "phantom" | "acled" | "polymarket" | "gdacs" | "faa" | "news";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";

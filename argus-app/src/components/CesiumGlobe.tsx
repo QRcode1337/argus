@@ -45,6 +45,7 @@ import { SeismicLayer } from "@/lib/cesium/layers/seismicLayer";
 import { GdeltLayer } from "@/lib/cesium/layers/gdeltLayer";
 import { WeatherLayer } from "@/lib/cesium/layers/weatherLayer";
 import { VesselLayer } from "@/lib/cesium/layers/vesselLayer";
+import { CiiLayer } from "@/lib/cesium/layers/ciiLayer";
 import { VisualModeController } from "@/lib/cesium/shaders/visualModes";
 import { fetchMilitaryFlights } from "@/lib/ingest/adsb";
 import { fetchOpenSkyFlights } from "@/lib/ingest/opensky";
@@ -652,6 +653,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const anomalyLayerRef = useRef<AnomalyLayer | null>(null);
   const weatherLayerRef = useRef<WeatherLayer | null>(null);
   const vesselLayerRef = useRef<VesselLayer | null>(null);
+  const ciiLayerRef = useRef<CiiLayer | null>(null);
   const visualModeRef = useRef<VisualModeController | null>(null);
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
   const platformModeRef = useRef<PlatformMode>("live");
@@ -1046,6 +1048,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     weatherLayerRef.current = weatherLayer;
     rasterLayerRef.current = rasterLayer;
     sentinelLayerRef.current = sentinelLayer;
+
+    const ciiLayer = new CiiLayer(viewer);
+    ciiLayerRef.current = ciiLayer;
 
     // Load static bases layer immediately
     const basesCount = basesLayer.load();
@@ -1862,6 +1867,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       gdeltLayerRef.current?.setVisible(layers.gdelt);
       anomalyLayerRef.current?.setVisible(layers.anomalies);
       vesselLayerRef.current?.setVisible(false);
+      ciiLayerRef.current?.setVisible(layers.instability);
     } else if (platformMode === "playback") {
       const { layers } = useArgusStore.getState();
 
@@ -1876,6 +1882,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       gdeltLayerRef.current?.setVisible(false);
       anomalyLayerRef.current?.setVisible(false);
       vesselLayerRef.current?.setVisible(false);
+      ciiLayerRef.current?.setVisible(false);
       setIsPlaying(false);
 
       void fetch("/api/playback/range", { cache: "no-store" })
@@ -1924,8 +1931,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       gdeltLayerRef.current?.setVisible(layers.gdelt);
       anomalyLayerRef.current?.setVisible(layers.anomalies);
       vesselLayerRef.current?.setVisible(layers.vessels);
+      ciiLayerRef.current?.setVisible(layers.instability);
     }
-  }, [layers.gdelt, layers.outages, layers.threats, layers.anomalies, layers.vessels, platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
+  }, [layers.gdelt, layers.outages, layers.threats, layers.anomalies, layers.vessels, layers.instability, platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
 
   // Fetch analytics tile URLs once on mount, store in refs
   const gfsTileUrlRef = useRef<string | null>(null);

@@ -5,6 +5,7 @@ import type {
   AnalyticsLayerKey,
   CameraReadout,
   ClickedCoordinates,
+  CorroborationAlert,
   FeedHealth,
   FeedKey,
   LayerKey,
@@ -39,6 +40,11 @@ type ArgusStore = {
     weather: number;
     vessels: number;
   };
+  ciiScores: Record<string, { score: number; signals: Record<string, number>; updatedAt: number }>;
+  setCiiScores: (scores: Record<string, { score: number; signals: Record<string, number>; updatedAt: number }>) => void;
+  alerts: CorroborationAlert[];
+  addAlert: (alert: CorroborationAlert) => void;
+  updateAlert: (id: string, patch: Partial<CorroborationAlert>) => void;
   feedHealth: Record<FeedKey, FeedHealth>;
   activePoiId: string | null;
   camera: CameraReadout;
@@ -133,6 +139,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     anomalies: true,
     weather: false,
     vessels: true,
+    instability: false,
   },
   counts: {
     flights: 0,
@@ -300,4 +307,9 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setPlaybackCurrentTime: (time) => set({ playbackCurrentTime: time }),
   dayNight: false,
   toggleDayNight: () => set((state) => ({ dayNight: !state.dayNight })),
+  ciiScores: {},
+  setCiiScores: (scores) => set({ ciiScores: scores }),
+  alerts: [],
+  addAlert: (alert) => set((s) => ({ alerts: [alert, ...s.alerts].slice(0, 100) })),
+  updateAlert: (id, patch) => set((s) => ({ alerts: s.alerts.map((a) => (a.id === id ? { ...a, ...patch } : a)) })),
 }));
