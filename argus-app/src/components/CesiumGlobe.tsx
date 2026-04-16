@@ -1336,6 +1336,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
             "opensky",
             error instanceof Error ? error.message : "Failed to fetch OpenSky",
           );
+          throw error;
         }
       },
     });
@@ -1356,6 +1357,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           recordMilitary(bounded);
         } catch (error) {
           setFeedError("adsb", error instanceof Error ? error.message : "Failed to fetch ADS-B");
+          throw error;
         }
       },
     });
@@ -1393,6 +1395,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
             "celestrak",
             error instanceof Error ? error.message : "Failed to fetch CelesTrak",
           );
+          throw error;
         }
       },
     });
@@ -1447,6 +1450,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
             .catch(() => {});
         } catch (error) {
           setFeedError("usgs", error instanceof Error ? error.message : "Failed to fetch USGS");
+          throw error;
         }
       },
     });
@@ -1463,6 +1467,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           recordOutages(outages);
         } catch (error) {
           setFeedError("cfradar", error instanceof Error ? error.message : "Failed to fetch CF Radar");
+          throw error;
         }
       },
     });
@@ -1479,6 +1484,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           recordThreats(threats);
         } catch (error) {
           setFeedError("otx", error instanceof Error ? error.message : "Failed to fetch OTX");
+          throw error;
         }
       },
     });
@@ -1492,6 +1498,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setFeedHealthy("fred");
         } catch (error) {
           setFeedError("fred", error instanceof Error ? error.message : "Failed to fetch FRED");
+          throw error;
         }
       },
     });
@@ -1508,6 +1515,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           pushIncidents(mapVesselIncidents(vessels));
         } catch (error) {
           setFeedError("ais", error instanceof Error ? error.message : "Failed to fetch AISStream");
+          throw error;
         }
       },
     });
@@ -1524,6 +1532,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           pushIncidents(mapGdeltIncidents(events));
         } catch (error) {
           setFeedError("gdelt", error instanceof Error ? error.message : "Failed to fetch GDELT");
+          throw error;
         }
       },
     });
