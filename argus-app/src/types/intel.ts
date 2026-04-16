@@ -247,3 +247,16 @@ export interface RecordedSatelliteFrame {
   timestamp: number;
   data: PlaybackSatelliteSnapshot[];
 }
+
+export type SourceDomain = "news" | "gdelt" | "military" | "seismic" | "maritime" | "economic" | "cyber" | "infrastructure" | "conflict";
+
+export interface CorroborationAlert {
+  id: string;
+  stage: 1 | 2 | 3 | 4 | 5;
+  region: string;
+  domains: SourceDomain[];
+  keywords: string[];
+  summary: string;
+  createdAt: number;
+  updatedAt: number;
+}
