@@ -149,7 +149,7 @@ router.get("/quakes", async (req, res, next) => {
         depth_km  AS "depthKm",
         magnitude,
         place,
-        ts        AS timestamp
+        bucket    AS timestamp
       FROM recorded_quakes_1m
       ${TIME_WINDOW_CLAUSE}
       ORDER BY event_id, bucket DESC`;
@@ -222,20 +222,20 @@ router.get("/range", async (_req, res, next) => {
   try {
     const sql = `
       SELECT
-        MIN(ts) AS earliest,
-        MAX(ts) AS latest
+        MIN(bucket) AS earliest,
+        MAX(bucket) AS latest
       FROM (
-        SELECT ts FROM recorded_flights_1m
+        SELECT bucket FROM recorded_flights_1m
         UNION ALL
-        SELECT ts FROM recorded_military_1m
+        SELECT bucket FROM recorded_military_1m
         UNION ALL
-        SELECT ts FROM recorded_satellites_1m
+        SELECT bucket FROM recorded_satellites_1m
         UNION ALL
-        SELECT ts FROM recorded_quakes_1m
+        SELECT bucket FROM recorded_quakes_1m
         UNION ALL
-        SELECT ts FROM recorded_outages_1m
+        SELECT bucket FROM recorded_outages_1m
         UNION ALL
-        SELECT ts FROM recorded_threats_1m
+        SELECT bucket FROM recorded_threats_1m
       ) AS recorded`;
 
     const { rows } = await pool.query(sql);

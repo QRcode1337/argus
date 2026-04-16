@@ -74,13 +74,13 @@ function parseTsv(tsv: string): ParsedEvent[] {
 
     const lat = parseFloat(cols[COL.ACTION_GEO_LAT]);
     const lon = parseFloat(cols[COL.ACTION_GEO_LON]);
-    if (!lat || !lon || (lat === 0 && lon === 0)) continue;
+    if (isNaN(lat) || isNaN(lon) || (lat === 0 && lon === 0)) continue;
 
     const goldsteinScale = parseFloat(cols[COL.GOLDSTEIN_SCALE]) || 0;
     const numMentions = parseInt(cols[COL.NUM_MENTIONS], 10) || 0;
     const quadClass = parseInt(cols[COL.QUAD_CLASS], 10) || 0;
 
-    // Filter to high-signal events
+    // Filter to high-signal events: keep extreme Goldstein (≤-5 or ≥7) OR widely-mentioned (≥5)
     if (goldsteinScale > -5 && goldsteinScale < 7 && numMentions < 5) continue;
 
     events.push({
