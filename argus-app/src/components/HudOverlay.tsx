@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { ARGUS_CONFIG, CAMERA_PRESETS } from "@/lib/config";
+import { ARGUS_CONFIG, CAMERA_PRESETS, computeFreshness } from "@/lib/config";
 import { LIVE_FEEDS } from "@/data/liveFeeds";
 import type { IntelBriefing, AlertSeverity, IntelAlert, ThreatLevel } from "@/lib/intel/analysisEngine";
 import { fetchNewsFeed, type NewsItem, type RegionDigest } from "@/lib/ingest/news";
 import { useArgusStore } from "@/store/useArgusStore";
-import type { ClickedCoordinates, LayerKey, PlatformMode, PlaybackSpeed, SceneMode, SelectedIntel, VisualMode } from "@/types/intel";
+import type { ClickedCoordinates, FeedHealth, LayerKey, PlatformMode, PlaybackSpeed, SceneMode, SelectedIntel, VisualMode } from "@/types/intel";
 import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
 
 import { VideoOverlay } from "./VideoOverlay";
@@ -574,10 +574,25 @@ export function HudOverlay({
     counts.satelliteLinks +
     counts.bases;
 
-  const activeFeedCount = Object.values(feedHealth).filter(
-    (fh) => fh.status === "ok",
-  ).length;
-  const feedTotal = Object.keys(feedHealth).length;
+  const feedEntries = Object.entries(feedHealth) as [string, FeedHealth][];
+  const activeFeedCount = feedEntries.filter(([, fh]) => fh.status === "ok").length;
+  const feedTotal = feedEntries.length;
+
+  const feedFreshnessCounts = feedEntries.reduce(
+    (acc, [key, fh]) => {
+      const f = computeFreshness(key, fh.lastSuccessAt);
+      acc[f]++;
+      return acc;
+    },
+    { fresh: 0, aging: 0, stale: 0, critical: 0 },
+  );
+
+  const healthBadgeColor =
+    feedFreshnessCounts.critical > 0 || feedEntries.some(([, fh]) => fh.status === "error" || fh.status === "cooldown")
+      ? "text-red-400"
+      : feedFreshnessCounts.stale > 0
+        ? "text-yellow-400"
+        : "text-green-400";
   const activeLayerCount = Object.values(layers).filter(Boolean).length;
   const activePoiLabel = CAMERA_PRESETS.find((poi) => poi.id === activePoiId)?.label ?? null;
   const mobileAlerts = useMemo(() => {
@@ -783,7 +798,13 @@ export function HudOverlay({
 
       {/* Bottom info strip */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[25] hidden h-7 items-center justify-between border-t border-[#3c3836] bg-[#1d2021e6] px-4 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374] md:flex">
-        <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: {activeFeedCount}/{feedTotal}</span>
+        <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: <button
+          onClick={() => { setWorkspace("status"); setSidebarVisible(true); }}
+          className={`font-mono text-[9px] ${healthBadgeColor} hover:underline pointer-events-auto`}
+          title={`${feedFreshnessCounts.fresh} fresh, ${feedFreshnessCounts.aging} aging, ${feedFreshnessCounts.stale} stale, ${feedFreshnessCounts.critical} critical`}
+        >
+          {activeFeedCount}/{feedTotal} feeds
+        </button></span>
         <span className="flex items-center gap-3">
           <span>Region {newsRegionFilter} · {activeRegionDigest?.posture ?? "STABLE"}{clickedCoordinates ? ` · ${clickedCoordinates.lat.toFixed(3)}, ${clickedCoordinates.lon.toFixed(3)}` : ""}</span>
           <a
@@ -1717,15 +1738,47 @@ export function HudOverlay({
             <div className="space-y-1.5">
               <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
                 <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Feed Health</div>
-                <div>OpenSky: {feedHealth.opensky.status} @ {fmtDate(feedHealth.opensky.lastSuccessAt)}</div>
-                <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
-                <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
-                <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
-
-                <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
-                <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
-                <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
-                <div>AISStream: {feedHealth.ais.status} @ {fmtDate(feedHealth.ais.lastSuccessAt)}</div>
+                <div className="mb-1.5 text-[9px] text-[#a89984]">
+                  {feedFreshnessCounts.fresh} fresh &middot; {feedFreshnessCounts.aging} aging &middot; {feedFreshnessCounts.stale} stale &middot; {feedFreshnessCounts.critical} critical
+                </div>
+                {feedEntries
+                  .sort(([, a], [, b]) => {
+                    const order: Record<string, number> = { error: 0, cooldown: 1, idle: 2, ok: 3 };
+                    const aOrd = order[a.status] ?? 2;
+                    const bOrd = order[b.status] ?? 2;
+                    if (aOrd !== bOrd) return aOrd - bOrd;
+                    return (a.lastSuccessAt ?? 0) - (b.lastSuccessAt ?? 0);
+                  })
+                  .map(([key, fh]) => {
+                    const freshness = computeFreshness(key, fh.lastSuccessAt);
+                    const dotColor =
+                      freshness === "fresh" ? "bg-green-400"
+                      : freshness === "aging" ? "bg-yellow-400"
+                      : freshness === "stale" ? "bg-orange-400"
+                      : "bg-red-400";
+                    const ago = fh.lastSuccessAt
+                      ? `${Math.round((Date.now() - fh.lastSuccessAt) / 1000)}s ago`
+                      : "never";
+                    return (
+                      <div key={key} className="flex items-center justify-between py-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`inline-block h-1.5 w-1.5 rounded-full ${dotColor}`} />
+                          <span>{key}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[#a89984]">
+                          <span>{ago}</span>
+                          {fh.circuitState !== "closed" && (
+                            <span className="rounded bg-red-900/50 px-1 text-[8px] text-red-300">
+                              {fh.circuitState}
+                            </span>
+                          )}
+                          {fh.consecutiveFailures > 0 && (
+                            <span className="text-red-400">({fh.consecutiveFailures}x)</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
 
               <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
