@@ -91,6 +91,12 @@ import {
   mapSeismicIncidents,
 } from "@/lib/epicFuryMappers";
 import { FlatMapView } from "./FlatMapView";
+import { baselines } from "@/lib/analysis/baselines";
+import { corroborationEngine } from "@/lib/analysis/corroboration";
+import { computeCii } from "@/lib/analysis/cii";
+import { latLonToRegion } from "@/lib/analysis/countryLookup";
+import { processBreakingNews } from "@/lib/analysis/breakingNews";
+import { clusterNews } from "@/lib/analysis/newsClustering";
 
 type CesiumGlobeProps = {
   className?: string;
@@ -1290,6 +1296,29 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const poller = new PollingManager();
     let lastTleFetchAt = 0;
 
+    // Wire corroboration engine callbacks
+    corroborationEngine.setCallbacks(
+      (alert) => {
+        useArgusStore.getState().addAlert(alert);
+        // Browser notification on Stage 5 alerts
+        if (alert.stage === 5 && typeof Notification !== "undefined" && Notification.permission === "granted") {
+          new Notification("ARGUS Strategic Alert", { body: alert.summary, icon: "/favicon.ico" });
+        }
+      },
+      (id, patch) => {
+        useArgusStore.getState().updateAlert(id, patch);
+        // Browser notification on Stage 5 promotion
+        if (patch.stage === 5 && typeof Notification !== "undefined" && Notification.permission === "granted") {
+          new Notification("ARGUS Strategic Alert", { body: patch.summary ?? "Alert promoted to Strategic", icon: "/favicon.ico" });
+        }
+      },
+    );
+
+    // Request notification permission
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+
     poller.add({
       id: "opensky",
       intervalMs: ARGUS_CONFIG.pollMs.openSky,
@@ -1360,6 +1389,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           pushIncidents(mapMilitaryIncidents(bounded));
           militaryAlertsRef.current = analyzeMilitary(bounded);
           recordMilitary(bounded);
+          // Feed into corroboration engine
+          const milRegionEvents = bounded.filter((f) => f.latitude && f.longitude).map((f) => ({
+            domain: "military" as const,
+            region: latLonToRegion(f.latitude, f.longitude),
+            timestamp: Date.now(),
+            severity: 0.5,
+            keywords: [f.callsign ?? ""],
+          }));
+          corroborationEngine.ingest(milRegionEvents);
         } catch (error) {
           setFeedError("adsb", error instanceof Error ? error.message : "Failed to fetch ADS-B");
           throw error;
@@ -1418,6 +1456,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           pushIncidents(mapSeismicIncidents(quakes));
           seismicAlertsRef.current = analyzeSeismic(count);
           recordQuakes(quakes);
+          // Feed into corroboration engine
+          const seismicRegionEvents = quakes.filter((q) => q.latitude && q.longitude).map((q) => ({
+            domain: "seismic" as const,
+            region: latLonToRegion(q.latitude, q.longitude),
+            timestamp: Date.now(),
+            severity: (q.magnitude ?? 0) / 10,
+            keywords: ["earthquake"],
+          }));
+          corroborationEngine.ingest(seismicRegionEvents);
 
           // Phantom seismic anomaly detection (non-blocking, via server proxy)
           fetch("/api/phantom/seismic", {
@@ -1470,6 +1517,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setCount("outages", count);
           setFeedHealthy("cfradar");
           recordOutages(outages);
+          // Feed into corroboration engine
+          const infraRegionEvents = outages.map((o) => ({
+            domain: "infrastructure" as const,
+            region: latLonToRegion(o.lat, o.lon),
+            timestamp: Date.now(),
+            severity: 0.5,
+            keywords: ["outage"],
+          }));
+          corroborationEngine.ingest(infraRegionEvents);
         } catch (error) {
           setFeedError("cfradar", error instanceof Error ? error.message : "Failed to fetch CF Radar");
           throw error;
@@ -1487,6 +1543,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setCount("threats", count);
           setFeedHealthy("otx");
           recordThreats(threats);
+          // Feed into corroboration engine
+          const cyberRegionEvents = threats.map((t) => ({
+            domain: "cyber" as const,
+            region: t.targetedCountry || latLonToRegion(t.lat, t.lon),
+            timestamp: Date.now(),
+            severity: 0.6,
+            keywords: [t.name ?? "cyber"],
+          }));
+          corroborationEngine.ingest(cyberRegionEvents);
         } catch (error) {
           setFeedError("otx", error instanceof Error ? error.message : "Failed to fetch OTX");
           throw error;
@@ -1518,6 +1583,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setCount("vessels", count);
           setFeedHealthy("ais");
           pushIncidents(mapVesselIncidents(vessels));
+          // Feed into corroboration engine
+          const maritimeRegionEvents = vessels.filter((v) => v.lat && v.lon).map((v) => ({
+            domain: "maritime" as const,
+            region: latLonToRegion(v.lat, v.lon),
+            timestamp: Date.now(),
+            severity: 0.3,
+            keywords: [v.vesselName ?? "vessel"],
+          }));
+          corroborationEngine.ingest(maritimeRegionEvents);
         } catch (error) {
           setFeedError("ais", error instanceof Error ? error.message : "Failed to fetch AISStream");
           throw error;
@@ -1535,6 +1609,15 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setCount("gdelt", count);
           setFeedHealthy("gdelt");
           pushIncidents(mapGdeltIncidents(events));
+          // Feed into corroboration engine
+          const gdeltRegionEvents = events.map((e) => ({
+            domain: "gdelt" as const,
+            region: latLonToRegion(e.latitude, e.longitude),
+            timestamp: Date.now(),
+            severity: Math.abs(e.goldsteinScale ?? 0) / 10,
+            keywords: [e.eventCode ?? ""],
+          }));
+          corroborationEngine.ingest(gdeltRegionEvents);
         } catch (error) {
           setFeedError("gdelt", error instanceof Error ? error.message : "Failed to fetch GDELT");
           throw error;
@@ -1542,8 +1625,129 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
+    // --- New feed polling tasks ---
+    poller.add({
+      id: "acled",
+      intervalMs: ARGUS_CONFIG.pollMs.acled,
+      run: async () => {
+        try {
+          const res = await fetch(ARGUS_CONFIG.endpoints.acled, { signal: AbortSignal.timeout(15_000) });
+          if (!res.ok) throw new Error(`ACLED ${res.status}`);
+          const { events } = await res.json();
+          useArgusStore.getState().setAcledEvents(events);
+          setFeedHealthy("acled");
+          // Feed into corroboration engine
+          const conflictRegionEvents = (events as Array<{latitude: number; longitude: number; event_type: string; fatalities: number}>).map((e) => ({
+            domain: "conflict" as const,
+            region: latLonToRegion(e.latitude, e.longitude),
+            timestamp: Date.now(),
+            severity: Math.min((e.fatalities ?? 0) / 20, 1),
+            keywords: [e.event_type ?? "conflict"],
+          }));
+          corroborationEngine.ingest(conflictRegionEvents);
+        } catch (error) {
+          setFeedError("acled", error instanceof Error ? error.message : "ACLED fetch failed");
+          throw error;
+        }
+      },
+    });
+
+    poller.add({
+      id: "polymarket",
+      intervalMs: ARGUS_CONFIG.pollMs.polymarket,
+      run: async () => {
+        try {
+          const res = await fetch(ARGUS_CONFIG.endpoints.polymarket, { signal: AbortSignal.timeout(15_000) });
+          if (!res.ok) throw new Error(`Polymarket ${res.status}`);
+          const { events } = await res.json();
+          useArgusStore.getState().setPolymarketEvents(events);
+          setFeedHealthy("polymarket");
+        } catch (error) {
+          setFeedError("polymarket", error instanceof Error ? error.message : "Polymarket fetch failed");
+          throw error;
+        }
+      },
+    });
+
+    poller.add({
+      id: "gdacs",
+      intervalMs: ARGUS_CONFIG.pollMs.gdacs,
+      run: async () => {
+        try {
+          const res = await fetch(ARGUS_CONFIG.endpoints.gdacs, { signal: AbortSignal.timeout(15_000) });
+          if (!res.ok) throw new Error(`GDACS ${res.status}`);
+          const { events } = await res.json();
+          useArgusStore.getState().setGdacsEvents(events);
+          setFeedHealthy("gdacs");
+          // Feed into corroboration engine (natural disasters can correlate with infrastructure events)
+          const disasterRegionEvents = (events as Array<{lat: number; lon: number; type: string; severity: string}>).map((e) => ({
+            domain: "seismic" as const,
+            region: latLonToRegion(e.lat, e.lon),
+            timestamp: Date.now(),
+            severity: e.severity === "red" ? 0.9 : e.severity === "orange" ? 0.6 : 0.3,
+            keywords: [e.type ?? "disaster"],
+          }));
+          corroborationEngine.ingest(disasterRegionEvents);
+        } catch (error) {
+          setFeedError("gdacs", error instanceof Error ? error.message : "GDACS fetch failed");
+          throw error;
+        }
+      },
+    });
+
+    poller.add({
+      id: "faa",
+      intervalMs: ARGUS_CONFIG.pollMs.faa,
+      run: async () => {
+        try {
+          const res = await fetch(ARGUS_CONFIG.endpoints.faa, { signal: AbortSignal.timeout(15_000) });
+          if (!res.ok) throw new Error(`FAA ${res.status}`);
+          const { delays, notams } = await res.json();
+          useArgusStore.getState().setFaaDelays(delays ?? []);
+          useArgusStore.getState().setFaaNotams(notams ?? []);
+          setFeedHealthy("faa");
+        } catch (error) {
+          setFeedError("faa", error instanceof Error ? error.message : "FAA fetch failed");
+          throw error;
+        }
+      },
+    });
+
+    // CII computation task
+    poller.add({
+      id: "cii",
+      intervalMs: 15 * 60_000,
+      run: async () => {
+        if (platformModeRef.current !== "live") return;
+        const s = useArgusStore.getState();
+        const ciiScores = computeCii({
+          gdeltEvents: [],
+          militaryFlights: [],
+          seismicEvents: [],
+          threatPulses: [],
+          outages: [],
+          fredIndicators: {},
+        });
+        s.setCiiScores(ciiScores);
+        if (ciiLayerRef.current && s.layers.instability) {
+          const entries = Object.entries(ciiScores).map(([iso, data]) => ({
+            iso, score: data.score, signals: data.signals,
+          }));
+          ciiLayerRef.current.updateHotspots(entries);
+        }
+        // Promote regions with CII > 60 to Strategic Alert
+        for (const [iso, data] of Object.entries(ciiScores)) {
+          if (data.score > 60) corroborationEngine.promoteToStrategic(iso);
+        }
+      },
+    });
+
+    // Periodically save baselines
+    const baselineSaveInterval = setInterval(() => baselines.save(), 5 * 60_000);
+
     return () => {
       poller.stopAll();
+      clearInterval(baselineSaveInterval);
       rasterLayer.unload();
       viewer.camera.changed.removeEventListener(onCameraChanged);
       restoreErrorPanelSuppression();

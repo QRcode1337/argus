@@ -16,6 +16,15 @@ import type {
   VisualParams,
 } from "@/types/intel";
 
+import type { BreakingNewsCard } from "@/lib/analysis/breakingNews";
+import type { NewsCluster } from "@/lib/analysis/newsClustering";
+
+export type AcledEvent = { event_type: string; country: string; location: string; fatalities: number; actor1: string; event_date: string; latitude: number; longitude: number };
+export type PolymarketEvent = { question: string; probability: number; volume: number; category: string; slug: string };
+export type GdacsEvent = { type: string; severity: string; country: string; title: string; populationExposed: number; date: string; lat: number; lon: number };
+export type FaaDelay = { airport: string; delayType: string; reason: string; avgDelay: string };
+export type FaaNotam = { id: string; location: string; type: string; description: string };
+
 export interface SearchResult {
   id: string;
   name: string;
@@ -114,6 +123,21 @@ type ArgusStore = {
   setClickedCoordinates: (coords: ClickedCoordinates | null) => void;
   dayNight: boolean;
   toggleDayNight: () => void;
+  // New feed data
+  acledEvents: AcledEvent[];
+  setAcledEvents: (events: AcledEvent[]) => void;
+  polymarketEvents: PolymarketEvent[];
+  setPolymarketEvents: (events: PolymarketEvent[]) => void;
+  gdacsEvents: GdacsEvent[];
+  setGdacsEvents: (events: GdacsEvent[]) => void;
+  faaDelays: FaaDelay[];
+  setFaaDelays: (delays: FaaDelay[]) => void;
+  faaNotams: FaaNotam[];
+  setFaaNotams: (notams: FaaNotam[]) => void;
+  breakingNews: BreakingNewsCard[];
+  setBreakingNews: (news: BreakingNewsCard[]) => void;
+  newsClusters: NewsCluster<{ title: string; score: number }>[];
+  setNewsClusters: (clusters: NewsCluster<{ title: string; score: number }>[]) => void;
 };
 
 const emptyFeed = (): FeedHealth => ({
@@ -307,6 +331,21 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setPlaybackCurrentTime: (time) => set({ playbackCurrentTime: time }),
   dayNight: false,
   toggleDayNight: () => set((state) => ({ dayNight: !state.dayNight })),
+  // New feed data
+  acledEvents: [],
+  setAcledEvents: (events) => set({ acledEvents: events }),
+  polymarketEvents: [],
+  setPolymarketEvents: (events) => set({ polymarketEvents: events }),
+  gdacsEvents: [],
+  setGdacsEvents: (events) => set({ gdacsEvents: events }),
+  faaDelays: [],
+  setFaaDelays: (delays) => set({ faaDelays: delays }),
+  faaNotams: [],
+  setFaaNotams: (notams) => set({ faaNotams: notams }),
+  breakingNews: [],
+  setBreakingNews: (news) => set({ breakingNews: news }),
+  newsClusters: [],
+  setNewsClusters: (clusters) => set({ newsClusters: clusters }),
   ciiScores: {},
   setCiiScores: (scores) => set({ ciiScores: scores }),
   alerts: [],

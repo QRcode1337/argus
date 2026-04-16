@@ -288,6 +288,13 @@ export function HudOverlay({
   const setPlaybackSpeed = useArgusStore((s) => s.setPlaybackSpeed);
   const playbackTimeRange = useArgusStore((s) => s.playbackTimeRange);
   const playbackCurrentTime = useArgusStore((s) => s.playbackCurrentTime);
+  const acledEvents = useArgusStore((s) => s.acledEvents);
+  const polymarketEvents = useArgusStore((s) => s.polymarketEvents);
+  const gdacsEvents = useArgusStore((s) => s.gdacsEvents);
+  const faaDelays = useArgusStore((s) => s.faaDelays);
+  const faaNotams = useArgusStore((s) => s.faaNotams);
+  const alerts = useArgusStore((s) => s.alerts);
+  const breakingNews = useArgusStore((s) => s.breakingNews);
 
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [workspace, setWorkspace] = useState<WorkspaceId>("news");
@@ -840,7 +847,7 @@ export function HudOverlay({
 
       {/* ARGUS header */}
       <header className="absolute left-3 top-[calc(var(--safe-top)+0.35rem)] font-mono md:left-6 md:top-[5.5rem]">
-        <h1 className="text-[20px] font-semibold leading-none tracking-[0.34em] text-[#ebdbb2] md:text-[42px]">
+        <h1 className={`text-[20px] font-semibold leading-none tracking-[0.34em] text-[#ebdbb2] md:text-[42px]${alerts.some((a) => a.stage === 5) ? " animate-pulse" : ""}`}>
           ARG<span className="text-[#83a598]">US</span>
         </h1>
         <p className="mt-1 hidden text-[10px] uppercase tracking-[0.45em] text-[#928374] md:block">Epsilon LLC</p>
@@ -1230,6 +1237,49 @@ export function HudOverlay({
                 ))}
               </div>
             </section>
+          )}
+
+          {/* CORROBORATION ALERTS */}
+          {workspace === "intel" && alerts.filter((a) => a.stage >= 3).length > 0 && (
+            <div className="space-y-1 px-2">
+              {alerts.filter((a) => a.stage >= 3).slice(0, 10).map((alert) => {
+                const bgColor = alert.stage === 5 ? "bg-red-900/40 border-red-500" : alert.stage === 4 ? "bg-orange-900/30 border-orange-500" : "bg-yellow-900/20 border-yellow-500";
+                const stageLabel = alert.stage === 5 ? "STRATEGIC" : alert.stage === 4 ? "HIGH CONFIDENCE" : "CORROBORATED";
+                return (
+                  <div key={alert.id} className={`rounded border-l-2 ${bgColor} border border-[#3c3836] px-2 py-1.5 font-mono text-[10px]`}>
+                    <div className="flex items-center justify-between">
+                      <span className={alert.stage === 5 ? "font-bold text-red-400" : alert.stage === 4 ? "font-bold text-orange-400" : "text-yellow-400"}>{stageLabel}</span>
+                      <span className="text-[#a89984]">{alert.region}</span>
+                    </div>
+                    <div className="mt-0.5 text-[#d4be98]">{alert.summary}</div>
+                    <div className="mt-0.5 flex flex-wrap gap-1">
+                      {alert.domains.map((d) => (<span key={d} className="rounded bg-[#3c3836] px-1 text-[8px] text-[#a89984]">{d}</span>))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* BREAKING NEWS */}
+          {workspace === "intel" && breakingNews.length > 0 && (
+            <CollapsibleSection title="Breaking News" badge={`${breakingNews.length}`} defaultOpen>
+              <div className="space-y-1">
+                {breakingNews.slice(0, 8).map((item, i) => (
+                  <div key={`bn-${i}`} className="rounded-md border border-[#fb4934]/30 bg-[#2e1a1a] px-2 py-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#fb4934]">Breaking</span>
+                      <span className="font-mono text-[8px] text-[#a89984]">{item.region}</span>
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10px] text-[#ebdbb2]">{item.headline}</div>
+                    <div className="mt-0.5 flex flex-wrap gap-1">
+                      {item.spikedKeywords.map((kw) => (<span key={kw} className="rounded bg-[#3c3836] px-1 text-[8px] text-[#fabd2f]">{kw}</span>))}
+                    </div>
+                    <div className="mt-0.5 font-mono text-[8px] text-[#928374]">{item.sources.join(", ")}</div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
           )}
 
           {/* INTEL BRIEF section */}
@@ -1711,6 +1761,108 @@ export function HudOverlay({
               </div>
             </CollapsibleSection>
           ) : null}
+
+          {/* Conflict Events (ACLED) */}
+          <CollapsibleSection title="Conflict Events" badge={acledEvents.length > 0 ? `${acledEvents.length}` : null}>
+            <div className="max-h-[300px] space-y-1 overflow-y-auto pr-0.5">
+              {acledEvents.length === 0 ? (
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">Awaiting ACLED data...</div>
+              ) : acledEvents.slice(0, 30).map((evt, i) => {
+                const typeColor = evt.event_type.toLowerCase().includes("battle") ? "text-[#fb4934]" : evt.event_type.toLowerCase().includes("protest") ? "text-[#fabd2f]" : evt.event_type.toLowerCase().includes("riot") ? "text-[#fe8019]" : "text-[#83a598]";
+                return (
+                  <div key={`acled-${i}`} className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className={`font-mono text-[8px] uppercase tracking-[0.1em] ${typeColor}`}>{evt.event_type}</span>
+                      {evt.fatalities > 0 && <span className="font-mono text-[8px] text-[#fb4934]">{evt.fatalities} fatal</span>}
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10px] text-[#d4be98]">{evt.location}, {evt.country}</div>
+                    <div className="mt-0.5 flex items-center justify-between">
+                      <span className="font-mono text-[8px] text-[#a89984]">{evt.actor1}</span>
+                      <span className="font-mono text-[8px] text-[#4e6a7a]">{evt.event_date}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleSection>
+
+          {/* Prediction Markets (Polymarket) */}
+          <CollapsibleSection title="Prediction Markets" badge={polymarketEvents.length > 0 ? `${polymarketEvents.length}` : null}>
+            <div className="max-h-[300px] space-y-1 overflow-y-auto pr-0.5">
+              {polymarketEvents.length === 0 ? (
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">Awaiting Polymarket data...</div>
+              ) : polymarketEvents.slice(0, 20).map((evt, i) => (
+                <div key={`pm-${i}`} className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                  <div className="font-mono text-[10px] text-[#d4be98]">{evt.question}</div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="flex-1 rounded-full bg-[#3c3836] h-1.5">
+                      <div className="h-1.5 rounded-full bg-[#83a598]" style={{ width: `${Math.round(evt.probability * 100)}%` }} />
+                    </div>
+                    <span className="font-mono text-[10px] font-bold text-[#83a598]">{Math.round(evt.probability * 100)}%</span>
+                  </div>
+                  <div className="mt-0.5 flex items-center justify-between">
+                    <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-[#a89984]">{evt.category}</span>
+                    <span className="font-mono text-[8px] text-[#4e6a7a]">${compact(evt.volume)} vol</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CollapsibleSection>
+
+          {/* Natural Disasters (GDACS) */}
+          <CollapsibleSection title="Natural Disasters" badge={gdacsEvents.length > 0 ? `${gdacsEvents.length}` : null}>
+            <div className="max-h-[300px] space-y-1 overflow-y-auto pr-0.5">
+              {gdacsEvents.length === 0 ? (
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">Awaiting GDACS data...</div>
+              ) : gdacsEvents.slice(0, 20).map((evt, i) => {
+                const sevBorder = evt.severity === "red" ? "border-l-[#fb4934]" : evt.severity === "orange" ? "border-l-[#fe8019]" : "border-l-[#fabd2f]";
+                return (
+                  <div key={`gdacs-${i}`} className={`rounded-md border border-[#3c3836] border-l-2 ${sevBorder} bg-[#1d2021] px-2 py-1.5`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-[#7fb4c5]">{evt.type}</span>
+                      <span className="font-mono text-[8px] uppercase text-[#a89984]">{evt.severity}</span>
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10px] text-[#d4be98]">{evt.title}</div>
+                    <div className="mt-0.5 flex items-center justify-between">
+                      <span className="font-mono text-[8px] text-[#a89984]">{evt.country}</span>
+                      {evt.populationExposed > 0 && <span className="font-mono text-[8px] text-[#fb4934]">{compact(evt.populationExposed)} exposed</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleSection>
+
+          {/* Aviation Status (FAA) */}
+          <CollapsibleSection title="Aviation Status" badge={faaDelays.length > 0 ? `${faaDelays.length} delays` : null}>
+            <div className="max-h-[300px] space-y-1 overflow-y-auto pr-0.5">
+              {faaDelays.length === 0 && faaNotams.length === 0 ? (
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">Awaiting FAA data...</div>
+              ) : (
+                <>
+                  {faaDelays.map((delay, i) => (
+                    <div key={`faa-d-${i}`} className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-[10px] font-bold text-[#fabd2f]">{delay.airport}</span>
+                        <span className="font-mono text-[8px] text-[#a89984]">{delay.avgDelay}</span>
+                      </div>
+                      <div className="mt-0.5 font-mono text-[9px] text-[#d4be98]">{delay.delayType}</div>
+                      <div className="mt-0.5 font-mono text-[8px] text-[#928374]">{delay.reason}</div>
+                    </div>
+                  ))}
+                  {faaNotams.slice(0, 10).map((notam, i) => (
+                    <div key={`faa-n-${i}`} className="rounded-md border border-[#3c3836] border-l-2 border-l-[#fb4934] bg-[#1d2021] px-2 py-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-[#fb4934]">TFR</span>
+                        <span className="font-mono text-[8px] text-[#a89984]">{notam.location}</span>
+                      </div>
+                      <div className="mt-0.5 font-mono text-[9px] text-[#d4be98]">{notam.description}</div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </CollapsibleSection>
           </>
           )}
 
