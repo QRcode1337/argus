@@ -1,3 +1,5 @@
+import type { FeedFreshness } from "@/types/intel";
+
 export const ARGUS_CONFIG = {
   endpoints: {
     openSky: process.env.NEXT_PUBLIC_OPENSKY_ENDPOINT ?? "/api/feeds/opensky",
@@ -43,6 +45,36 @@ export const ARGUS_CONFIG = {
     orbitSampleStepMinutes: 4,
   },
 } as const;
+
+/** Map from FeedKey to expected poll interval for freshness computation */
+export const FEED_EXPECTED_INTERVAL: Record<string, number> = {
+  opensky: ARGUS_CONFIG.pollMs.openSky,
+  adsb: ARGUS_CONFIG.pollMs.adsbMilitary,
+  celestrak: ARGUS_CONFIG.pollMs.satellites,
+  usgs: ARGUS_CONFIG.pollMs.usgs,
+  cfradar: ARGUS_CONFIG.pollMs.cloudflareRadar,
+  otx: ARGUS_CONFIG.pollMs.otx,
+  fred: ARGUS_CONFIG.pollMs.fred,
+  ais: ARGUS_CONFIG.pollMs.aisstream,
+  gdelt: ARGUS_CONFIG.pollMs.gdelt,
+  news: ARGUS_CONFIG.pollMs.news,
+  threatradar: ARGUS_CONFIG.pollMs.threatRadar,
+  phantom: ARGUS_CONFIG.pollMs.phantom,
+  acled: 30 * 60_000,
+  polymarket: 5 * 60_000,
+  gdacs: 10 * 60_000,
+  faa: 10 * 60_000,
+};
+
+export function computeFreshness(feedKey: string, lastSuccessAt: number | null): FeedFreshness {
+  if (!lastSuccessAt) return "critical";
+  const expected = FEED_EXPECTED_INTERVAL[feedKey] ?? 60_000;
+  const elapsed = Date.now() - lastSuccessAt;
+  if (elapsed < expected) return "fresh";
+  if (elapsed < expected * 2) return "aging";
+  if (elapsed < expected * 4) return "stale";
+  return "critical";
+}
 
 export const CAMERA_PRESETS = [
   { id: "pentagon", label: "Pentagon", lon: -77.0559, lat: 38.8719, height: 4200, heading: 0, pitch: -0.75, roll: 0 },

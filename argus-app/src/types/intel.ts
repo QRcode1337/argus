@@ -12,7 +12,7 @@ export type LayerKey =
   | "weather"
   | "vessels";
 export type SceneMode = "globe_sat" | "globe_street" | "globe_map" | "flat_map";
-export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "cfradar" | "otx" | "fred" | "ais" | "gdelt" | "threatradar" | "phantom";
+export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "cfradar" | "otx" | "fred" | "ais" | "gdelt" | "threatradar" | "phantom" | "acled" | "polymarket" | "gdacs" | "faa" | "news";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
 export type PlatformMode = "live" | "playback" | "analytics" | "epic-fury";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";
@@ -46,12 +46,17 @@ export type VisualParams = {
   crt: CrtVisualParams;
 };
 
-export type FeedStatus = "idle" | "ok" | "stale" | "error";
+export type FeedStatus = "idle" | "ok" | "error" | "cooldown";
+export type FeedFreshness = "fresh" | "aging" | "stale" | "critical";
+export type CircuitState = "closed" | "open" | "half-open";
 
 export interface FeedHealth {
   status: FeedStatus;
   lastSuccessAt: number | null;
   lastError: string | null;
+  nextRefreshAt: number | null;
+  consecutiveFailures: number;
+  circuitState: CircuitState;
 }
 
 export interface CameraReadout {

@@ -114,6 +114,9 @@ const emptyFeed = (): FeedHealth => ({
   status: "idle",
   lastSuccessAt: null,
   lastError: null,
+  nextRefreshAt: null,
+  consecutiveFailures: 0,
+  circuitState: "closed",
 });
 
 export const useArgusStore = create<ArgusStore>((set) => ({
@@ -157,6 +160,11 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     gdelt: emptyFeed(),
     threatradar: emptyFeed(),
     phantom: emptyFeed(),
+    news: emptyFeed(),
+    acled: emptyFeed(),
+    polymarket: emptyFeed(),
+    gdacs: emptyFeed(),
+    faa: emptyFeed(),
   },
   activePoiId: null,
   camera: {
@@ -213,27 +221,37 @@ export const useArgusStore = create<ArgusStore>((set) => ({
       },
     })),
   setFeedHealthy: (key) =>
-    set((state) => ({
+    set((s) => ({
       feedHealth: {
-        ...state.feedHealth,
+        ...s.feedHealth,
         [key]: {
           status: "ok",
           lastSuccessAt: Date.now(),
           lastError: null,
+          nextRefreshAt: s.feedHealth[key]?.nextRefreshAt ?? null,
+          consecutiveFailures: 0,
+          circuitState: "closed",
         },
       },
     })),
   setFeedError: (key, message) =>
-    set((state) => ({
-      feedHealth: {
-        ...state.feedHealth,
-        [key]: {
-          ...state.feedHealth[key],
-          status: "error",
-          lastError: message,
+    set((s) => {
+      const prev = s.feedHealth[key];
+      const failures = (prev?.consecutiveFailures ?? 0) + 1;
+      return {
+        feedHealth: {
+          ...s.feedHealth,
+          [key]: {
+            status: failures >= 2 ? "cooldown" : "error",
+            lastSuccessAt: prev?.lastSuccessAt ?? null,
+            lastError: message,
+            nextRefreshAt: prev?.nextRefreshAt ?? null,
+            consecutiveFailures: failures,
+            circuitState: failures >= 2 ? "open" : prev?.circuitState ?? "closed",
+          },
         },
-      },
-    })),
+      };
+    }),
   setCamera: (camera) => set({ camera }),
   setActivePoiId: (poiId) => set({ activePoiId: poiId }),
   setVisualMode: (mode) => set({ visualMode: mode }),
