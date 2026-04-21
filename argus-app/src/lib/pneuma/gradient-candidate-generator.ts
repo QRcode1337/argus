@@ -223,7 +223,7 @@ export class GradientCandidateGenerator {
       );
     }
     this.baseUrl = baseUrl;
-    this.model = config.model ?? '';
+    this.model = config.model ?? process.env.GRADIENT_MODEL ?? 'meta-llama/Llama-3.1-8B-Instruct';
     this.embedder = new LocalEmbedder(
       config.embeddingDim ?? 128,
       config.embeddingSeed ?? 42,
