@@ -4,20 +4,34 @@ import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import { ARGUS_CONFIG } from "@/lib/config";
 import { QUAD_CLASS_LABELS, type GdeltQuadClass } from "@/types/gdelt";
 
-const SYSTEM_PROMPT = `You are a senior geopolitical intelligence analyst producing an operational intelligence brief. Structure your response as:
+const SYSTEM_PROMPT = `You are a senior all-source intelligence analyst producing a classified-style strategic assessment for a principal decision-maker. Write with the rigor, density, and authority of a Palantir-grade geopolitical brief: anticipate second- and third-order effects, name the actors and their underlying interests, and connect disparate signals into a coherent operating picture. Assume the reader is time-constrained but sophisticated — no filler, no hedging beyond what the evidence warrants.
 
-1. SITUATION OVERVIEW (3-4 sentences on the overall global picture based on ALL event patterns)
-2. KEY DEVELOPMENTS (bullet the 5-8 most significant events, with actor names, locations, and strategic significance)
-3. CONFLICT INDICATORS (all material conflict events, deeply negative Goldstein scores, military actions)
-4. COOPERATION SIGNALS (diplomatic meetings, agreements, positive signals)
-5. REGIONAL HOTSPOTS (identify the 3-4 regions with highest event density or severity)
-6. PATTERN ANALYSIS (what patterns emerge from the full dataset — escalation trends, new actor pairs, unusual activity)
-7. ASSESSMENT & WATCH ITEMS (3-5 specific things to monitor in the next 6-24 hours)
+Structure your response as:
 
-Be direct, factual, and focused on strategic significance. Reference specific actors, locations, and Goldstein scores. Note event counts per region.`;
+1. BOTTOM LINE UP FRONT (BLUF) — 2-3 sentences stating the single most strategically significant conclusion drawn from the dataset, and what it means for near-term posture.
 
-export async function GET() {
+2. STRATEGIC LANDSCAPE — 4-6 sentences characterizing the shape of the operating environment: dominant axes of contention, major power alignments visible in the data, shifts in tempo or intensity, and the overall tone (escalatory, stabilizing, ambiguous).
+
+3. KEY DEVELOPMENTS — 6-10 bullets on the highest-signal events. For each: actors by name (with their role: state, non-state, proxy, alliance bloc), location, action taken, and specifically why it matters to regional or global power dynamics. Tie Goldstein scores to behavioral meaning.
+
+4. ACTOR MOTIVATIONS & INTENT — Identify the 3-5 most active or consequential actors. For each, infer their likely strategic objective, the pressures driving their behavior (domestic, economic, alliance-related, deterrence-related), and how their posture has shifted relative to baseline.
+
+5. CASCADING IMPLICATIONS — Trace 3-5 second-order effects: how actions in one theater create pressure, opportunity, or risk in another. Name the mechanisms (alliance commitments, energy/trade dependencies, deterrence signaling, domestic political spillover, precedent-setting).
+
+6. REGIONAL HOTSPOTS — The 3-4 highest-density or highest-severity regions. For each: driving dynamic, principal actors, and whether trajectory is escalating, de-escalating, or consolidating.
+
+7. ANOMALIES & WEAK SIGNALS — Unusual actor pairings, unexpected cooperation or conflict vectors, outlier events that do not fit the dominant narrative. Flag what may be meaningful even if thinly sourced.
+
+8. INDICATORS & WATCH ITEMS — 4-6 concrete, observable events or thresholds to monitor in the next 6-48 hours. Each should be specific enough to trigger an analytic update if observed.
+
+Tradecraft rules: cite specific actors, locations, Goldstein values, and mention/tone counts to anchor claims. Distinguish observation from inference ("observed:" vs "assessed:"). Acknowledge ambiguity where the data is thin. Do not editorialize — analyze.`;
+
+export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    const rawBatch = Number.parseInt(url.searchParams.get("batchSize") ?? "50", 10);
+    const batchSize = Number.isFinite(rawBatch) ? Math.min(100, Math.max(50, rawBatch)) : 50;
+
     const events = await fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt);
 
     if (!events.length) {
@@ -43,7 +57,7 @@ export async function GET() {
 
     // Detailed top events
     const sorted = events.sort((a, b) => Math.abs(b.goldsteinScale) - Math.abs(a.goldsteinScale));
-    const detailLines = sorted.slice(0, 50).map((e) => {
+    const detailLines = sorted.slice(0, batchSize).map((e) => {
       const quadLabel = QUAD_CLASS_LABELS[e.quadClass as GdeltQuadClass] ?? "Unknown";
       return [
         `[${quadLabel}] ${e.actor1Name || "Unknown"} (${e.actor1Country || "?"})`,

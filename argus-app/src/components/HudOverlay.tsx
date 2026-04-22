@@ -135,11 +135,14 @@ const workspaceDefs = [
   { id: "news", label: "News" },
   { id: "feeds", label: "Feeds" },
   { id: "gdelt", label: "GDELT" },
-  { id: "anomalies", label: "Anomalies" },
+  { id: "anomalies", label: "Strange" },
   { id: "signal", label: "Signal" },
   { id: "status", label: "Status" },
   { id: "settings", label: "Settings" },
 ] as const;
+
+const primaryWorkspaceIds = ["intel", "news", "feeds", "gdelt", "anomalies"] as const;
+const secondaryWorkspaceIds = ["signal", "status", "settings"] as const;
 
 type WorkspaceId = (typeof workspaceDefs)[number]["id"];
 type MobileTabId = "brief" | "news" | "ops";
@@ -331,6 +334,7 @@ export function HudOverlay({
   );
   const [gdeltDigestLoading, setGdeltDigestLoading] = useState(false);
   const [gdeltDigestError, setGdeltDigestError] = useState<string | null>(null);
+  const [gdeltDigestBatchSize, setGdeltDigestBatchSize] = useState(50);
   const [anomalyCategoryFilter, setAnomalyCategoryFilter] = useState<AnomalyCategory | null>(null);
   const [gdeltEvents, setGdeltEvents] = useState<GdeltEvent[]>([]);
   const [gdeltQuadFilter, setGdeltQuadFilter] = useState<GdeltQuadClass | null>(null);
@@ -735,7 +739,7 @@ export function HudOverlay({
     setGdeltDigestLoading(true);
     setGdeltDigestError(null);
     try {
-      const res = await fetch("/api/ai/gdelt-digest");
+      const res = await fetch(`/api/ai/gdelt-digest?batchSize=${gdeltDigestBatchSize}`);
       const data = await res.json();
       if (data.summary) {
         setShowPneumaPanel(false);
@@ -1104,20 +1108,27 @@ export function HudOverlay({
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-1 border-b border-[#3c3836] px-2 py-1.5">
-            {workspaceDefs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setWorkspace(tab.id)}
-                className={`flex-1 min-w-fit rounded px-1.5 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
-                  workspace === tab.id
-                    ? "border border-[#83a598] bg-[#504945] text-[#d5c4a1]"
-                    : "border border-transparent text-[#a89984] hover:border-[#504945] hover:bg-[#282828]"
-                }`}
-              >
-                {tab.label}
-              </button>
+          <div className="space-y-1 border-b border-[#3c3836] px-2 py-1.5">
+            {[primaryWorkspaceIds, secondaryWorkspaceIds].map((group, rowIdx) => (
+              <div key={rowIdx} className="flex gap-1">
+                {group.map((id) => {
+                  const tab = workspaceDefs.find((t) => t.id === id)!;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setWorkspace(tab.id)}
+                      className={`flex-1 min-w-fit rounded px-1.5 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
+                        workspace === tab.id
+                          ? "border border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                          : "border border-transparent text-[#a89984] hover:border-[#504945] hover:bg-[#282828]"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
             ))}
           </div>
 
@@ -2062,6 +2073,26 @@ export function HudOverlay({
                   ))}
                 </div>
 
+                {/* Batch size selector */}
+                <div className="flex items-center justify-between gap-2 rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                  <label className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]" htmlFor="gdelt-batch-size">
+                    Digest Batch
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="gdelt-batch-size"
+                      type="range"
+                      min={50}
+                      max={100}
+                      step={5}
+                      value={gdeltDigestBatchSize}
+                      onChange={(e) => setGdeltDigestBatchSize(Number(e.target.value))}
+                      className="h-1 w-24 accent-[#fabd2f]"
+                    />
+                    <span className="font-mono text-[10px] tabular-nums text-[#fabd2f] w-8 text-right">{gdeltDigestBatchSize}</span>
+                  </div>
+                </div>
+
                 {/* Digest button */}
                 <button
                   type="button"
@@ -2069,7 +2100,7 @@ export function HudOverlay({
                   disabled={gdeltDigestLoading}
                   className="w-full rounded-lg border border-[#fabd2f]/30 bg-[#fabd2f]/10 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#fabd2f] transition hover:border-[#fabd2f] hover:bg-[#fabd2f]/20 disabled:opacity-50"
                 >
-                  {gdeltDigestLoading ? "Generating Strategic Digest..." : gdeltDigestDocument ? "Refresh Strategic Digest" : `Generate Strategic Digest (${gdeltEvents.length} events)`}
+                  {gdeltDigestLoading ? "Generating Strategic Digest..." : gdeltDigestDocument ? `Refresh Strategic Digest (top ${gdeltDigestBatchSize})` : `Generate Strategic Digest (top ${gdeltDigestBatchSize} of ${gdeltEvents.length})`}
                 </button>
                 {gdeltDigestError && (
                   <div className="rounded-md border border-red-900/50 bg-red-900/10 px-2 py-1.5 font-mono text-[9px] text-red-400">
@@ -2123,14 +2154,35 @@ export function HudOverlay({
             </CollapsibleSection>
           )}
 
-          {/* Anomaly Atlas workspace */}
+          {/* Strange Atlas workspace */}
           {workspace === "anomalies" && (
             <CollapsibleSection
-              title="Anomaly Atlas"
+              title="Strange Atlas"
               badge={`${ANOMALY_SITES.length} sites`}
               defaultOpen
             >
               <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const subject = encodeURIComponent("Argus Strange Atlas — New Submission");
+                    const body = encodeURIComponent(
+                      [
+                        "Name:",
+                        "Latitude:",
+                        "Longitude:",
+                        "Category (geometric/crater/censored/desert/underwater/military/natural/vanished/antarctica/other):",
+                        "Status (confirmed/ambiguous/unresolved/unexplained/unknown):",
+                        "Description:",
+                        "Source URL(s):",
+                      ].join("\n"),
+                    );
+                    window.open(`mailto:psugi@proton.me?subject=${subject}&body=${body}`);
+                  }}
+                  className="w-full rounded-lg border border-[#fabd2f]/40 bg-[#fabd2f]/10 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#fabd2f] transition hover:border-[#fabd2f] hover:bg-[#fabd2f]/20"
+                >
+                  + Submit New
+                </button>
                 <div className="flex flex-wrap gap-1">
                   <button
                     type="button"
