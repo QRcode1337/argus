@@ -216,6 +216,8 @@ export class GradientCandidateGenerator {
       );
     }
 
+    this.baseUrl = process.env.GRADIENT_BASE_URL ?? 'https://uwziiweo6bvm7fyvapqsmdxp.agents.do-ai.run/api/v1';
+    this.model = config.model ?? '';
     const baseUrl = process.env.GRADIENT_BASE_URL;
     if (!baseUrl) {
       throw new Error(
