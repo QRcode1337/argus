@@ -21,9 +21,12 @@ export class RasterLayer {
    * Replaces any previously loaded layer.
    * @param tileUrl - UrlTemplate string with {z}/{x}/{y} placeholders
    */
-  load(tileUrl: string): void {
+  load(tileUrl: string, options?: { maximumLevel?: number }): void {
     this.unload();
-    const provider = new UrlTemplateImageryProvider({ url: tileUrl });
+    const provider = new UrlTemplateImageryProvider({
+      url: tileUrl,
+      maximumLevel: options?.maximumLevel,
+    });
     this.layer = this.viewer.imageryLayers.addImageryProvider(provider);
     this.layer.alpha = 0.8;
   }

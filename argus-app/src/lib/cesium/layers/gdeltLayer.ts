@@ -73,6 +73,7 @@ export class GdeltLayer {
           scale: 0.55,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(1_000_000, 1.2, 20_000_000, 0.4),
+          disableDepthTestDistance: 0,
         },
         label: {
           text: event.actionGeoName.length > 9 ? `${event.actionGeoName.slice(0, 9)}…` : event.actionGeoName,

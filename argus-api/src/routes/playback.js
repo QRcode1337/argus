@@ -41,8 +41,8 @@ function parseTimeParams(req, res) {
  * Expects $1 = ts (timestamptz) and $2 = window (text, seconds).
  */
 const TIME_WINDOW_CLAUSE = `
-  WHERE ts BETWEEN $1::timestamptz - ($2 || ' seconds')::interval
-                AND $1::timestamptz + ($2 || ' seconds')::interval`;
+  WHERE bucket BETWEEN time_bucket('1 minute', $1::timestamptz - ($2 || ' seconds')::interval)
+                AND time_bucket('1 minute', $1::timestamptz + ($2 || ' seconds')::interval)`;
 
 // ---------------------------------------------------------------------------
 // GET /flights  ->  recorded_flights (deduplicated by icao24)
@@ -65,9 +65,9 @@ router.get("/flights", async (req, res, next) => {
         on_ground     AS "onGround",
         origin_country AS "originCountry",
         squawk
-      FROM recorded_flights
+      FROM recorded_flights_1m
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY icao24, ts DESC`;
+      ORDER BY icao24, bucket DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ flights: rows });
@@ -94,9 +94,9 @@ router.get("/military", async (req, res, next) => {
         velocity,
         heading       AS "trueTrack",
         aircraft_type AS type
-      FROM recorded_military
+      FROM recorded_military_1m
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY icao24, ts DESC`;
+      ORDER BY icao24, bucket DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ flights: rows });
@@ -122,9 +122,9 @@ router.get("/satellites", async (req, res, next) => {
         alt_km    AS "altitudeKm",
         tle_line1 AS tle1,
         tle_line2 AS tle2
-      FROM recorded_satellites
+      FROM recorded_satellites_1m
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY norad_id, ts DESC`;
+      ORDER BY norad_id, bucket DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ satellites: rows });
@@ -149,10 +149,10 @@ router.get("/quakes", async (req, res, next) => {
         depth_km  AS "depthKm",
         magnitude,
         place,
-        ts        AS timestamp
-      FROM recorded_quakes
+        bucket    AS timestamp
+      FROM recorded_quakes_1m
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY event_id, ts DESC`;
+      ORDER BY event_id, bucket DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ quakes: rows });
@@ -177,9 +177,9 @@ router.get("/outages", async (req, res, next) => {
         start_date  AS "startDate",
         end_date    AS "endDate",
         asn_name    AS "asnName"
-      FROM recorded_outages
+      FROM recorded_outages_1m
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY location, cause, ts DESC`;
+      ORDER BY location, cause, bucket DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ outages: rows });
@@ -204,9 +204,9 @@ router.get("/threats", async (req, res, next) => {
         targeted_country  AS "targetedCountry",
         lon               AS longitude,
         lat               AS latitude
-      FROM recorded_threats
+      FROM recorded_threats_1m
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY pulse_id, ts DESC`;
+      ORDER BY pulse_id, bucket DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ threats: rows });
@@ -222,20 +222,20 @@ router.get("/range", async (_req, res, next) => {
   try {
     const sql = `
       SELECT
-        MIN(ts) AS earliest,
-        MAX(ts) AS latest
+        MIN(bucket) AS earliest,
+        MAX(bucket) AS latest
       FROM (
-        SELECT ts FROM recorded_flights
+        SELECT bucket FROM recorded_flights_1m
         UNION ALL
-        SELECT ts FROM recorded_military
+        SELECT bucket FROM recorded_military_1m
         UNION ALL
-        SELECT ts FROM recorded_satellites
+        SELECT bucket FROM recorded_satellites_1m
         UNION ALL
-        SELECT ts FROM recorded_quakes
+        SELECT bucket FROM recorded_quakes_1m
         UNION ALL
-        SELECT ts FROM recorded_outages
+        SELECT bucket FROM recorded_outages_1m
         UNION ALL
-        SELECT ts FROM recorded_threats
+        SELECT bucket FROM recorded_threats_1m
       ) AS recorded`;
 
     const { rows } = await pool.query(sql);

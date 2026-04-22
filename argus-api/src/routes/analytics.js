@@ -1,12 +1,7 @@
-const fs = require("fs/promises");
-const path = require("path");
 const express = require("express");
+const db = require("../db");
 
 const router = express.Router();
-
-const TILE_ROOT = process.env.TILES_DIR || "/data/tiles";
-const TITILER_BASE_PATH = process.env.TITILER_BASE_PATH || "/tiles";
-const MAX_SCAN_DEPTH = 3;
 
 const LAYER_DEFS = [
   { id: 1, name: "GFS Temperature 2m", variable: "t2m" },
@@ -14,126 +9,53 @@ const LAYER_DEFS = [
   { id: 3, name: "GFS Wind V 10m", variable: "v10" },
 ];
 
-const FILE_PRIORITY = [".tif", ".tiff", ".grib2", ".grb2"];
-
-function getFilePriority(fileName) {
-  const lower = fileName.toLowerCase();
-  const idx = FILE_PRIORITY.findIndex((ext) => lower.endsWith(ext));
-  return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
-}
-
-function inferVariable(fileName) {
-  const lower = fileName.toLowerCase();
-  if (lower.includes("t2m")) return "t2m";
-  if (lower.includes("u10")) return "u10";
-  if (lower.includes("v10")) return "v10";
-  return null;
-}
-
-function parseValidTime(fileName, fallbackTimeMs) {
-  const match = fileName.match(/(\d{8})_(\d{2})z/i);
-  if (!match) {
-    return new Date(fallbackTimeMs).toISOString();
-  }
-
-  const [, yyyymmdd, hh] = match;
-  const year = Number(yyyymmdd.slice(0, 4));
-  const month = Number(yyyymmdd.slice(4, 6)) - 1;
-  const day = Number(yyyymmdd.slice(6, 8));
-  const hour = Number(hh);
-  return new Date(Date.UTC(year, month, day, hour, 0, 0)).toISOString();
-}
-
-function buildTiTilerUrl(absPath) {
-  return (
-    `${TITILER_BASE_PATH}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png` +
-    `?url=${encodeURIComponent(absPath)}` +
-    "&colormap_name=rdylbu_r"
-  );
-}
-
-async function scanRasterFiles(rootDir, maxDepth = MAX_SCAN_DEPTH) {
-  const files = [];
-
-  async function walk(dir, depth) {
-    if (depth > maxDepth) return;
-
-    let entries;
-    try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-
-      if (entry.isDirectory()) {
-        await walk(fullPath, depth + 1);
-        continue;
-      }
-
-      if (!entry.isFile()) continue;
-      if (getFilePriority(entry.name) === Number.MAX_SAFE_INTEGER) continue;
-
-      try {
-        const stats = await fs.stat(fullPath);
-        files.push({
-          absPath: fullPath,
-          fileName: entry.name,
-          mtimeMs: stats.mtimeMs,
-          variable: inferVariable(entry.name),
-          priority: getFilePriority(entry.name),
-        });
-      } catch {
-        // Ignore files that disappear between readdir and stat.
-      }
-    }
-  }
-
-  await walk(rootDir, 0);
-
-  files.sort((a, b) => {
-    if (a.priority !== b.priority) {
-      return a.priority - b.priority;
-    }
-    return b.mtimeMs - a.mtimeMs;
-  });
-
-  return files;
-}
-
 router.get("/layers", async (_req, res) => {
-  const rasterFiles = await scanRasterFiles(TILE_ROOT);
+  try {
+    const { rows } = await db.query(`
+      SELECT DISTINCT ON (variable)
+        variable, valid_time, tile_url, cog_path as source_file
+      FROM weather_layers
+      ORDER BY variable, valid_time DESC;
+    `);
 
-  const latestAny = rasterFiles.length > 0 ? rasterFiles[0] : null;
-  const layers = LAYER_DEFS.map((def) => {
-    const latestForVariable =
-      rasterFiles.find((file) => file.variable === def.variable) ?? latestAny;
+    const rasterData = rows.reduce((acc, row) => {
+      acc[row.variable] = row;
+      return acc;
+    }, {});
 
-    if (!latestForVariable) {
+    const layers = LAYER_DEFS.map((def) => {
+      const data = rasterData[def.variable];
+
+      if (!data) {
+        return {
+          ...def,
+          valid_time: null,
+          tile_url: null,
+          source_file: null,
+          error: "No raster file found in database yet.",
+        };
+      }
+
       return {
         ...def,
-        valid_time: null,
-        tile_url: null,
-        source_file: null,
-        error: "No raster file found under /data/tiles yet.",
+        valid_time: data.valid_time,
+        tile_url: data.tile_url,
+        source_file: data.source_file,
+        error: null,
       };
-    }
+    });
 
-    return {
-      ...def,
-      valid_time: parseValidTime(latestForVariable.fileName, latestForVariable.mtimeMs),
-      tile_url: buildTiTilerUrl(latestForVariable.absPath),
-      source_file: latestForVariable.absPath,
-      error: null,
-    };
-  });
+    const countRes = await db.query('SELECT COUNT(*) FROM weather_layers');
+    const available_file_count = parseInt(countRes.rows[0].count, 10);
 
-  return res.json({
-    layers,
-    available_file_count: rasterFiles.length,
-  });
+    return res.json({
+      layers,
+      available_file_count,
+    });
+  } catch (error) {
+    console.error("Error fetching layers:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 module.exports = router;

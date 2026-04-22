@@ -1,15 +1,32 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { ARGUS_CONFIG, CAMERA_PRESETS } from "@/lib/config";
+import { ARGUS_CONFIG, CAMERA_PRESETS, computeFreshness } from "@/lib/config";
 import { LIVE_FEEDS } from "@/data/liveFeeds";
 import type { IntelBriefing, AlertSeverity, IntelAlert, ThreatLevel } from "@/lib/intel/analysisEngine";
 import { fetchNewsFeed, type NewsItem, type RegionDigest } from "@/lib/ingest/news";
 import { useArgusStore } from "@/store/useArgusStore";
-import type { ClickedCoordinates, LayerKey, PlatformMode, PlaybackSpeed, SceneMode, SelectedIntel, VisualMode } from "@/types/intel";
+import type { ClickedCoordinates, FeedHealth, LayerKey, PlatformMode, PlaybackSpeed, SceneMode, SelectedIntel, VisualMode } from "@/types/intel";
 import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
+
 import { VideoOverlay } from "./VideoOverlay";
 import PneumaHud from "./PneumaHud";
+import { SettingsModal } from "./SettingsModal";
+import {
+  EPIC_FURY_THEATER,
+  filterEpicFuryIncidents,
+  useEpicFuryStore,
+  type TimeWindow,
+} from "@/store/useEpicFuryStore";
+import {
+  ANOMALY_SITES,
+  CATEGORY_COLORS,
+  CATEGORY_LABELS,
+  STATUS_ICONS,
+  type AnomalyCategory,
+} from "@/data/anomalyAtlas";
+import { QUAD_CLASS_LABELS, QUAD_CLASS_COLORS, type GdeltEvent, type GdeltQuadClass } from "@/types/gdelt";
+import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 
 type HudOverlayProps = {
   onFlyToPoi: (poiId: string) => void;
@@ -57,6 +74,9 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "threats", label: "Cyber Threats", feed: "OTX" },
   { key: "gdelt", label: "GDELT Events", feed: "GDELT" },
   { key: "anomalies", label: "Chaos Anomalies", feed: "Phantom" },
+  { key: "weather", label: "Weather Radar", feed: "RainViewer" },
+  { key: "vessels", label: "AIS Vessels", feed: "AISStream" },
+  { key: "instability", label: "Instability Index", feed: "CII" },
 ];
 
 const analyticsIntelDefs: { key: LayerKey; label: string; feed: string }[] = [
@@ -114,10 +134,15 @@ const workspaceDefs = [
   { id: "intel", label: "Intel" },
   { id: "news", label: "News" },
   { id: "feeds", label: "Feeds" },
+  { id: "gdelt", label: "GDELT" },
+  { id: "anomalies", label: "Strange" },
   { id: "signal", label: "Signal" },
   { id: "status", label: "Status" },
   { id: "settings", label: "Settings" },
 ] as const;
+
+const primaryWorkspaceIds = ["intel", "news", "feeds", "gdelt", "anomalies"] as const;
+const secondaryWorkspaceIds = ["signal", "status", "settings"] as const;
 
 type WorkspaceId = (typeof workspaceDefs)[number]["id"];
 type MobileTabId = "brief" | "news" | "ops";
@@ -256,6 +281,7 @@ export function HudOverlay({
     dayNight,
     toggleDayNight,
   } = useArgusStore();
+  const epicFuryActive = platformMode === "epic-fury";
 
   const searchQuery = useArgusStore((s) => s.searchQuery);
   const setSearchQuery = useArgusStore((s) => s.setSearchQuery);
@@ -265,6 +291,13 @@ export function HudOverlay({
   const setPlaybackSpeed = useArgusStore((s) => s.setPlaybackSpeed);
   const playbackTimeRange = useArgusStore((s) => s.playbackTimeRange);
   const playbackCurrentTime = useArgusStore((s) => s.playbackCurrentTime);
+  const acledEvents = useArgusStore((s) => s.acledEvents);
+  const polymarketEvents = useArgusStore((s) => s.polymarketEvents);
+  const gdacsEvents = useArgusStore((s) => s.gdacsEvents);
+  const faaDelays = useArgusStore((s) => s.faaDelays);
+  const faaNotams = useArgusStore((s) => s.faaNotams);
+  const alerts = useArgusStore((s) => s.alerts);
+  const breakingNews = useArgusStore((s) => s.breakingNews);
 
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [workspace, setWorkspace] = useState<WorkspaceId>("news");
@@ -287,8 +320,76 @@ export function HudOverlay({
   const [llmModel, setLlmModel] = useState("llama3");
   const [llmApiKey, setLlmApiKey] = useState("");
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [showPneumaPanel, setShowPneumaPanel] = useState(false);
+  const efTimeWindow = useEpicFuryStore((s) => s.timeWindow);
+  const efSetTimeWindow = useEpicFuryStore((s) => s.setTimeWindow);
+  const efLockedRegion = useEpicFuryStore((s) => s.lockedRegion);
+  const efAllIncidents = useEpicFuryStore((s) => s.incidents);
+  const efFilteredIncidents = useMemo(
+    () => filterEpicFuryIncidents(efAllIncidents, efTimeWindow, efLockedRegion),
+    [efAllIncidents, efTimeWindow, efLockedRegion],
+  );
+  const [gdeltDigestLoading, setGdeltDigestLoading] = useState(false);
+  const [gdeltDigestError, setGdeltDigestError] = useState<string | null>(null);
+  const [gdeltDigestBatchSize, setGdeltDigestBatchSize] = useState(50);
+  const [anomalyCategoryFilter, setAnomalyCategoryFilter] = useState<AnomalyCategory | null>(null);
+  const [gdeltEvents, setGdeltEvents] = useState<GdeltEvent[]>([]);
+  const [gdeltQuadFilter, setGdeltQuadFilter] = useState<GdeltQuadClass | null>(null);
+  const [efNews, setEfNews] = useState<{ id: string; title: string; link: string; source: string; pubDate: string; snippet: string }[]>([]);
+  const [efSocial, setEfSocial] = useState<{ id: string; text: string; author: string; link: string; pubDate: string }[]>([]);
+  const [gdeltDigestDocument, setGdeltDigestDocument] = useState<{
+    title: string;
+    content: string;
+    analyzedCount?: number;
+    eventCount?: number;
+    generatedAt: string;
+  } | null>(null);
+  const [hypotheses, setHypotheses] = useState([
+    { id: 1, text: "Submarine cable cut in Atlantic linked to observed vessel patterns.", score: 0 },
+    { id: 2, text: "Unusual troop movement correlates with recent cyber outages.", score: 0 },
+  ]);
+  const [cognitiveLens, setCognitiveLens] = useState<"tactical" | "strategic" | "anomaly">("tactical");
+
+  useEffect(() => {
+    if (epicFuryActive) {
+      setWorkspace("intel");
+    }
+  }, [epicFuryActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch Epic Fury regional data
+  useEffect(() => {
+    if (!epicFuryActive) return;
+    let cancelled = false;
+    void fetch("/api/feeds/epic-fury-news").then(r => r.json()).then(d => {
+      if (!cancelled && d.items) setEfNews(d.items);
+    }).catch(() => {});
+    void fetch("/api/feeds/epic-fury-social").then(r => r.json()).then(d => {
+      if (!cancelled && d.posts) setEfSocial(d.posts);
+    }).catch(() => {});
+    // Refresh every 5 minutes
+    const interval = setInterval(() => {
+      void fetch("/api/feeds/epic-fury-news").then(r => r.json()).then(d => {
+        if (!cancelled && d.items) setEfNews(d.items);
+      }).catch(() => {});
+      void fetch("/api/feeds/epic-fury-social").then(r => r.json()).then(d => {
+        if (!cancelled && d.posts) setEfSocial(d.posts);
+      }).catch(() => {});
+    }, 300_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [epicFuryActive]);
+
+  // Fetch GDELT events when workspace is "gdelt"
+  useEffect(() => {
+    if (workspace !== "gdelt") return;
+    let cancelled = false;
+    void fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt).then((events) => {
+      if (!cancelled) setGdeltEvents(events);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [workspace]);
 
   useEffect(() => {
     const syncClock = () => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC"));
@@ -485,10 +586,25 @@ export function HudOverlay({
     counts.satelliteLinks +
     counts.bases;
 
-  const activeFeedCount = Object.values(feedHealth).filter(
-    (fh) => fh.status === "ok",
-  ).length;
-  const feedTotal = Object.keys(feedHealth).length;
+  const feedEntries = Object.entries(feedHealth) as [string, FeedHealth][];
+  const activeFeedCount = feedEntries.filter(([, fh]) => fh.status === "ok").length;
+  const feedTotal = feedEntries.length;
+
+  const feedFreshnessCounts = feedEntries.reduce(
+    (acc, [key, fh]) => {
+      const f = computeFreshness(key, fh.lastSuccessAt);
+      acc[f]++;
+      return acc;
+    },
+    { fresh: 0, aging: 0, stale: 0, critical: 0 },
+  );
+
+  const healthBadgeColor =
+    feedFreshnessCounts.critical > 0 || feedEntries.some(([, fh]) => fh.status === "error" || fh.status === "cooldown")
+      ? "text-red-400"
+      : feedFreshnessCounts.stale > 0
+        ? "text-yellow-400"
+        : "text-green-400";
   const activeLayerCount = Object.values(layers).filter(Boolean).length;
   const activePoiLabel = CAMERA_PRESETS.find((poi) => poi.id === activePoiId)?.label ?? null;
   const mobileAlerts = useMemo(() => {
@@ -500,6 +616,44 @@ export function HudOverlay({
   const mobileAlertPreview = useMemo(() => mobileAlerts.slice(0, 5), [mobileAlerts]);
   const mobileHeadlinePreview = useMemo(() => filteredNewsItems.slice(0, 8), [filteredNewsItems]);
   const activeViewLabel = sceneModeDefs.find((mode) => mode.key === sceneMode)?.label ?? sceneMode;
+
+  const openChaosInfoPanel = () => {
+    onSelectIntel({
+      id: "chaos-anomalies-info",
+      name: "Chaos Anomalies",
+      kind: "info",
+      importance: "important",
+      quickFacts: [
+        { label: "Source", value: "Phantom Analysis Engine" },
+        { label: "Active Anomalies", value: String(counts.anomalies) },
+        { label: "Feed Status", value: feedHealth.phantom.status.toUpperCase() },
+        { label: "Coverage", value: "Flight & Seismic" },
+      ],
+      fullFacts: [
+        {
+          label: "What is this?",
+          value:
+            "Chaos Anomalies are unusual patterns detected across live data feeds by the Phantom analysis engine. These include unexpected earthquake clusters, abnormal seismic depths, flight path deviations, unusual military activity, and other statistical outliers.",
+        },
+        {
+          label: "Severity Levels",
+          value:
+            "Critical (red) \u2014 extreme deviation requiring immediate attention. High (orange) \u2014 significant anomaly. Medium (yellow) \u2014 notable pattern. Low (cyan) \u2014 minor irregularity worth monitoring.",
+        },
+        {
+          label: "How it works",
+          value:
+            "The Phantom engine continuously analyzes incoming flight and seismic data, scoring each event for chaos indicators like magnitude spikes, depth clustering, trajectory deviations, and spatial anomalies. Events scoring above threshold are flagged on the globe.",
+        },
+        {
+          label: "Chaos Score",
+          value:
+            "Each anomaly receives a score from 0 to 1. Scores above 0.7 are marked as important. Click individual anomaly markers on the globe for detailed breakdowns.",
+        },
+      ],
+      analysisSummary: `Currently tracking ${counts.anomalies} anomalies across flight and seismic feeds. Toggle this layer to show or hide anomaly markers on the globe. Click individual markers for detailed analysis.`,
+    });
+  };
 
   const selectNewsIntel = (item: NewsItem) => {
     onSelectIntel({
@@ -552,10 +706,11 @@ export function HudOverlay({
         ...intel.quickFacts.map((f) => `${f.label}: ${f.value}`),
         ...intel.fullFacts.map((f) => `${f.label}: ${f.value}`),
       ].join("\n");
+      const context = intel.kind === "info" ? "anomaly" : intel.kind;
       const res = await fetch("/api/ai/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, context: intel.kind }),
+        body: JSON.stringify({ text, context }),
       });
       const data = await res.json();
       if (data.summary) {
@@ -563,10 +718,69 @@ export function HudOverlay({
           ...intel,
           analysisSummary: data.summary,
         });
+      } else if (data.error) {
+        onSelectIntel({
+          ...intel,
+          analysisSummary: `[AI Summary unavailable: ${data.error}]`,
+        });
       }
-    } catch {} finally {
+    } catch (err) {
+      onSelectIntel({
+        ...intel,
+        analysisSummary: `[AI Summary failed: ${err instanceof Error ? err.message : "network error"}]`,
+      });
+    } finally {
       setAiSummaryLoading(false);
     }
+  };
+
+  const requestGdeltDigest = async () => {
+    if (gdeltDigestLoading) return;
+    setGdeltDigestLoading(true);
+    setGdeltDigestError(null);
+    try {
+      const res = await fetch(`/api/ai/gdelt-digest?batchSize=${gdeltDigestBatchSize}`);
+      const data = await res.json();
+      if (data.summary) {
+        setShowPneumaPanel(false);
+        setGdeltDigestDocument({
+          title: "GDELT Strategic Digest",
+          content: data.summary,
+          analyzedCount: data.analyzedCount,
+          eventCount: data.eventCount,
+          generatedAt: new Date().toUTCString(),
+        });
+      } else {
+        setGdeltDigestError(data.error ?? "No summary returned — check LLM configuration in Settings");
+      }
+    } catch (e) {
+      setGdeltDigestError(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setGdeltDigestLoading(false);
+    }
+  };
+
+  const exportGdeltDigest = () => {
+    if (!gdeltDigestDocument) return;
+    const body = [
+      `# ${gdeltDigestDocument.title}`,
+      "",
+      `Generated: ${gdeltDigestDocument.generatedAt}`,
+      `Events Analyzed: ${gdeltDigestDocument.analyzedCount ?? "?"} of ${gdeltDigestDocument.eventCount ?? "?"}`,
+      `Region Filter: ${newsRegionFilter}`,
+      "",
+      gdeltDigestDocument.content,
+      "",
+    ].join("\n");
+    const blob = new Blob([body], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `gdelt-strategic-digest-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.md`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -574,14 +788,46 @@ export function HudOverlay({
       {/* Top info strip */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[25] hidden h-8 items-center justify-between border-b border-[#3c3836] bg-[#1d2021e6] px-4 font-mono uppercase tracking-[0.22em] text-[#928374] md:flex">
         <span>Global Situation</span>
-        <span>{utcTimestamp || "SYNCING UTC"}</span>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              setShowPneumaPanel((prev) => !prev);
+              if (!showPneumaPanel) onCloseIntel();
+            }}
+            className={`pointer-events-auto rounded-md border px-3 py-0.5 text-[11px] font-black tracking-[0.35em] transition ${
+              showPneumaPanel
+                ? "border-[#fabd2f] bg-[#fabd2f]/20 text-[#fabd2f]"
+                : "border-[#504945] text-[#d5c4a1] hover:border-[#fabd2f] hover:text-[#fabd2f]"
+            }`}
+            style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}
+          >
+            PNEUMA
+          </button>
+          <span>{utcTimestamp || "SYNCING UTC"}</span>
+        </div>
       </div>
 
       {/* Bottom info strip */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[25] hidden h-7 items-center justify-between border-t border-[#3c3836] bg-[#1d2021e6] px-4 font-mono text-[9px] uppercase tracking-[0.18em] text-[#928374] md:flex">
-        <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: {activeFeedCount}/{feedTotal}</span>
-        <span>
-          Region {newsRegionFilter} · {activeRegionDigest?.posture ?? "STABLE"}{clickedCoordinates ? ` · ${clickedCoordinates.lat.toFixed(3)}, ${clickedCoordinates.lon.toFixed(3)}` : ""}
+        <span>Live Entities: {compact(totalLiveCount)} · Active Feeds: <button
+          onClick={() => { setWorkspace("status"); setSidebarVisible(true); }}
+          className={`font-mono text-[9px] ${healthBadgeColor} hover:underline pointer-events-auto`}
+          title={`${feedFreshnessCounts.fresh} fresh, ${feedFreshnessCounts.aging} aging, ${feedFreshnessCounts.stale} stale, ${feedFreshnessCounts.critical} critical`}
+        >
+          {activeFeedCount}/{feedTotal} feeds
+        </button></span>
+        <span className="flex items-center gap-3">
+          <span>Region {newsRegionFilter} · {activeRegionDigest?.posture ?? "STABLE"}{clickedCoordinates ? ` · ${clickedCoordinates.lat.toFixed(3)}, ${clickedCoordinates.lon.toFixed(3)}` : ""}</span>
+          <a
+            href="https://github.com/QRcode1337/argus"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pointer-events-auto inline-flex items-center gap-1 text-[#504945] transition hover:text-[#83a598]"
+            title="View on GitHub"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          </a>
         </span>
       </div>
 
@@ -605,7 +851,7 @@ export function HudOverlay({
 
       {/* ARGUS header */}
       <header className="absolute left-3 top-[calc(var(--safe-top)+0.35rem)] font-mono md:left-6 md:top-[5.5rem]">
-        <h1 className="text-[20px] font-semibold leading-none tracking-[0.34em] text-[#ebdbb2] md:text-[42px]">
+        <h1 className={`text-[20px] font-semibold leading-none tracking-[0.34em] text-[#ebdbb2] md:text-[42px]${alerts.some((a) => a.stage === 5) ? " animate-pulse" : ""}`}>
           ARG<span className="text-[#83a598]">US</span>
         </h1>
         <p className="mt-1 hidden text-[10px] uppercase tracking-[0.45em] text-[#928374] md:block">Epsilon LLC</p>
@@ -685,148 +931,158 @@ export function HudOverlay({
       {selectedIntel ? (
         <section className="pointer-events-auto absolute right-8 top-[5.5rem] hidden w-[348px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] p-4 shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md md:block">
           <div className="flex items-center justify-between">
-            <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#fabd2f]">Target Intel</div>
-            <button
-              type="button"
-              onClick={onCloseIntel}
-              className="rounded-md border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#83a598]"
-            >
-              Clear
-            </button>
-          </div>
-
-          <div className="mt-2 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono">
-            <div className="text-[15px] text-[#ebdbb2]">{selectedIntel.name}</div>
-            <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[#a89984]">
-              {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority Target" : "Standard Target"}
+            <div className="font-mono text-[12px] uppercase tracking-[0.3em] text-[#fabd2f]">Target Data Intel</div>
+            <div className="flex items-center gap-2">
+              {selectedIntel ? (
+                <button
+                  type="button"
+                  onClick={onCloseIntel}
+                  className="rounded-md border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#83a598]"
+                >
+                  Clear
+                </button>
+              ) : null}
             </div>
           </div>
 
-          <div className="mt-2 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
-            {selectedIntel.quickFacts.map((fact) => (
-              <div key={`quick-${fact.label}`}>
-                {fact.label}: {fact.value}
-              </div>
-            ))}
-          </div>
-
-          {selectedIntel.analysisSummary ? (
-            <div className="mt-2 rounded-xl border border-[#5b4a1f] bg-[#2a2415] p-3 font-mono text-[11px] leading-relaxed text-[#f3d98b]">
-              {selectedIntel.analysisSummary}
-            </div>
-          ) : null}
-
-          {selectedIntel.importance === "important" || showFullIntel ? (
-            <div className="mt-2 max-h-[180px] overflow-auto rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
-              {selectedIntel.fullFacts.map((fact) => (
-                <div key={`full-${fact.label}`}>
-                  {fact.label}: {fact.value}
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          {selectedIntel.streamUrl ? (
-            <div className="relative mt-2">
-              <iframe
-                src={selectedIntel.streamUrl}
-                title={selectedIntel.name}
-                className="h-44 w-full rounded border border-[#504945]"
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-                sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setEnlargedStream({
-                    src: selectedIntel.streamUrl!,
-                    title: selectedIntel.name,
-                  })
-                }
-                className="absolute right-1.5 top-1.5 rounded border border-[#504945] bg-[#282828]/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#83a598] transition hover:border-[#83a598] hover:bg-[#282828]"
-              >
-                Enlarge
-              </button>
-              <div className="absolute left-1.5 top-1.5 flex items-center gap-1">
-                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-                <span className="font-mono text-[8px] uppercase tracking-wider text-red-400/80">Live</span>
-              </div>
-            </div>
-          ) : selectedIntel.imageUrl ? (
+          {selectedIntel ? (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={selectedIntel.imageUrl}
-                alt={selectedIntel.name}
-                className="mt-2 h-32 w-full rounded border border-[#504945] object-cover"
-              />
-            </>
-          ) : null}
+              <div className="mt-2 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono">
+                <div className="text-[15px] text-[#ebdbb2]">{selectedIntel.name}</div>
+                <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[#a89984]">
+                  {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority Target" : "Standard Target"}
+                </div>
+              </div>
 
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={onFlyToEntity}
-              className={actionButtonClass}
-            >
-              Fly To
-            </button>
-            {selectedIntel.externalUrl ? (
-              <a
-                href={selectedIntel.externalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={actionButtonClass}
-              >
-                {selectedIntel.externalLabel ?? "External"}
-              </a>
-            ) : null}
-            {(selectedIntel.kind === "flight" || selectedIntel.kind === "military" || selectedIntel.kind === "satellite") && (
+              <div className="mt-2 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
+                {selectedIntel.quickFacts.map((fact) => (
+                  <div key={`quick-${fact.label}`}>
+                    {fact.label}: {fact.value}
+                  </div>
+                ))}
+              </div>
+
+              {selectedIntel.analysisSummary ? (
+                <div className="mt-2 rounded-xl border border-[#5b4a1f] bg-[#2a2415] p-3 font-mono text-[11px] leading-relaxed text-[#f3d98b]">
+                  {selectedIntel.analysisSummary}
+                </div>
+              ) : null}
+
+              {selectedIntel.importance === "important" || showFullIntel ? (
+                <div className="mt-2 max-h-[180px] overflow-auto rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
+                  {selectedIntel.fullFacts.map((fact) => (
+                    <div key={`full-${fact.label}`}>
+                      {fact.label}: {fact.value}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {selectedIntel.streamUrl ? (
+                <div className="relative mt-2">
+                  <iframe
+                    src={selectedIntel.streamUrl}
+                    title={selectedIntel.name}
+                    className="h-44 w-full rounded border border-[#504945]"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                    sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEnlargedStream({
+                        src: selectedIntel.streamUrl!,
+                        title: selectedIntel.name,
+                      })
+                    }
+                    className="absolute right-1.5 top-1.5 rounded border border-[#504945] bg-[#282828]/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#83a598] transition hover:border-[#83a598] hover:bg-[#282828]"
+                  >
+                    Enlarge
+                  </button>
+                  <div className="absolute left-1.5 top-1.5 flex items-center gap-1">
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                    <span className="font-mono text-[8px] uppercase tracking-wider text-red-400/80">Live</span>
+                  </div>
+                </div>
+              ) : selectedIntel.imageUrl ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={selectedIntel.imageUrl}
+                    alt={selectedIntel.name}
+                    className="mt-2 h-32 w-full rounded border border-[#504945] object-cover"
+                  />
+                </>
+              ) : null}
+
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={onFlyToEntity}
+                  className={actionButtonClass}
+                >
+                  Fly To
+                </button>
+                {selectedIntel.externalUrl ? (
+                  <a
+                    href={selectedIntel.externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={actionButtonClass}
+                  >
+                    {selectedIntel.externalLabel ?? "External"}
+                  </a>
+                ) : null}
+                {(selectedIntel.kind === "flight" || selectedIntel.kind === "military" || selectedIntel.kind === "satellite") && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      trackedEntityId === selectedIntel.id
+                        ? onTrackEntity(null)
+                        : onTrackEntity(selectedIntel.id)
+                    }
+                    className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition ${
+                      trackedEntityId === selectedIntel.id
+                        ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                        : "border-[#504945] bg-[#282828] text-[#d5c4a1] hover:border-[#83a598]"
+                    }`}
+                  >
+                    {trackedEntityId === selectedIntel.id ? "Stop Tracking" : "Track"}
+                  </button>
+                )}
+              </div>
+
+              {trackedEntityId === selectedIntel.id && (
+                <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#83a598]">
+                  Tracking Active
+                </div>
+              )}
+
+              {selectedIntel.importance !== "important" ? (
+                <button
+                  type="button"
+                  onClick={onToggleFullIntel}
+                  className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#83a598]"
+                >
+                  {showFullIntel ? "Hide Full Intel" : "Load Full Intel"}
+                </button>
+              ) : null}
+
               <button
                 type="button"
-                onClick={() =>
-                  trackedEntityId === selectedIntel.id
-                    ? onTrackEntity(null)
-                    : onTrackEntity(selectedIntel.id)
-                }
-                className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition ${
-                  trackedEntityId === selectedIntel.id
-                    ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
-                    : "border-[#504945] bg-[#282828] text-[#d5c4a1] hover:border-[#83a598]"
-                }`}
+                onClick={() => requestAiSummary(selectedIntel)}
+                disabled={aiSummaryLoading}
+                className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#83a598] transition hover:border-[#83a598] disabled:opacity-50"
               >
-                {trackedEntityId === selectedIntel.id ? "Stop Tracking" : "Track"}
+                {aiSummaryLoading ? "Generating AI Summary..." : selectedIntel.analysisSummary ? "Generate Detailed AI Summary" : "Generate AI Summary"}
               </button>
-            )}
-          </div>
-
-          {trackedEntityId === selectedIntel.id && (
-            <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-[#83a598]">
-              Tracking Active
+            </>
+          ) : (
+            <div className="mt-3 rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] leading-relaxed text-[#7fb4c5]">
+              No target is selected. Pick a flight, vessel, event, or map point to open AI summary and detailed target intel here.
             </div>
           )}
-
-          {selectedIntel.importance !== "important" ? (
-            <button
-              type="button"
-              onClick={onToggleFullIntel}
-              className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#83a598]"
-            >
-              {showFullIntel ? "Hide Full Intel" : "Load Full Intel"}
-            </button>
-          ) : null}
-
-          {!selectedIntel.analysisSummary ? (
-            <button
-              type="button"
-              onClick={() => requestAiSummary(selectedIntel)}
-              disabled={aiSummaryLoading}
-              className="mt-2 w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#83a598] transition hover:border-[#83a598] disabled:opacity-50"
-            >
-              {aiSummaryLoading ? "Generating AI Summary..." : "Generate AI Summary"}
-            </button>
-          ) : null}
         </section>
       ) : null}
 
@@ -837,11 +1093,11 @@ export function HudOverlay({
 
       {/* LEFT SIDEBAR - Collapsible Accordion Panels — desktop only */}
       {sidebarVisible ? (
-        <nav className="pointer-events-auto absolute left-4 top-[8.5rem] hidden max-h-[calc(100vh-11rem)] w-[260px] overflow-y-auto rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md md:block">
+        <nav className="pointer-events-auto absolute left-4 top-[8.5rem] hidden max-h-[calc(100vh-11rem)] w-96 overflow-y-auto rounded-2xl border border-[#3c3836] bg-[#1d2021d9] shadow-[0_0_40px_rgba(131,165,152,0.2)] backdrop-blur-md md:block">
           {/* Sidebar header with hide button */}
           <div className="flex items-center justify-between border-b border-[#3c3836] px-3 py-2">
             <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#a89984]">
-              {platformMode === "analytics" ? "Analytics" : platformMode === "playback" ? "Playback" : "Live"} Panels
+              {platformMode === "analytics" ? "Analytics" : platformMode === "playback" ? "Playback" : platformMode === "epic-fury" ? "Op Epic Fury" : "Live"} Panels
             </span>
             <button
               type="button"
@@ -852,20 +1108,27 @@ export function HudOverlay({
             </button>
           </div>
 
-          <div className="grid grid-cols-5 gap-1 border-b border-[#3c3836] px-2 py-1.5">
-            {workspaceDefs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setWorkspace(tab.id)}
-                className={`rounded px-1 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
-                  workspace === tab.id
-                    ? "border border-[#83a598] bg-[#504945] text-[#d5c4a1]"
-                    : "border border-transparent text-[#a89984] hover:border-[#504945] hover:bg-[#282828]"
-                }`}
-              >
-                {tab.label}
-              </button>
+          <div className="space-y-1 border-b border-[#3c3836] px-2 py-1.5">
+            {[primaryWorkspaceIds, secondaryWorkspaceIds].map((group, rowIdx) => (
+              <div key={rowIdx} className="flex gap-1">
+                {group.map((id) => {
+                  const tab = workspaceDefs.find((t) => t.id === id)!;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setWorkspace(tab.id)}
+                      className={`flex-1 min-w-fit rounded px-1.5 py-1 font-mono text-[8px] uppercase tracking-[0.12em] transition ${
+                        workspace === tab.id
+                          ? "border border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                          : "border border-transparent text-[#a89984] hover:border-[#504945] hover:bg-[#282828]"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
             ))}
           </div>
 
@@ -987,8 +1250,51 @@ export function HudOverlay({
             </section>
           )}
 
+          {/* CORROBORATION ALERTS */}
+          {workspace === "intel" && alerts.filter((a) => a.stage >= 3).length > 0 && (
+            <div className="space-y-1 px-2">
+              {alerts.filter((a) => a.stage >= 3).slice(0, 10).map((alert) => {
+                const bgColor = alert.stage === 5 ? "bg-red-900/40 border-red-500" : alert.stage === 4 ? "bg-orange-900/30 border-orange-500" : "bg-yellow-900/20 border-yellow-500";
+                const stageLabel = alert.stage === 5 ? "STRATEGIC" : alert.stage === 4 ? "HIGH CONFIDENCE" : "CORROBORATED";
+                return (
+                  <div key={alert.id} className={`rounded border-l-2 ${bgColor} border border-[#3c3836] px-2 py-1.5 font-mono text-[10px]`}>
+                    <div className="flex items-center justify-between">
+                      <span className={alert.stage === 5 ? "font-bold text-red-400" : alert.stage === 4 ? "font-bold text-orange-400" : "text-yellow-400"}>{stageLabel}</span>
+                      <span className="text-[#a89984]">{alert.region}</span>
+                    </div>
+                    <div className="mt-0.5 text-[#d4be98]">{alert.summary}</div>
+                    <div className="mt-0.5 flex flex-wrap gap-1">
+                      {alert.domains.map((d) => (<span key={d} className="rounded bg-[#3c3836] px-1 text-[8px] text-[#a89984]">{d}</span>))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* BREAKING NEWS */}
+          {workspace === "intel" && breakingNews.length > 0 && (
+            <CollapsibleSection title="Breaking News" badge={`${breakingNews.length}`} defaultOpen>
+              <div className="space-y-1">
+                {breakingNews.slice(0, 8).map((item, i) => (
+                  <div key={`bn-${i}`} className="rounded-md border border-[#fb4934]/30 bg-[#2e1a1a] px-2 py-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#fb4934]">Breaking</span>
+                      <span className="font-mono text-[8px] text-[#a89984]">{item.region}</span>
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10px] text-[#ebdbb2]">{item.headline}</div>
+                    <div className="mt-0.5 flex flex-wrap gap-1">
+                      {item.spikedKeywords.map((kw) => (<span key={kw} className="rounded bg-[#3c3836] px-1 text-[8px] text-[#fabd2f]">{kw}</span>))}
+                    </div>
+                    <div className="mt-0.5 font-mono text-[8px] text-[#928374]">{item.sources.join(", ")}</div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+
           {/* INTEL BRIEF section */}
-          {workspace === "intel" && platformMode === "live" && (
+          {workspace === "intel" && (platformMode !== "playback") && (
             <CollapsibleSection
               title="Intel Brief"
               badge={
@@ -1050,6 +1356,27 @@ export function HudOverlay({
                     ))}
                   </div>
 
+                  {/* GDELT Digest button */}
+                  {counts.gdelt > 0 && (
+                    <button
+                      type="button"
+                      onClick={requestGdeltDigest}
+                      disabled={gdeltDigestLoading}
+                      className="w-full rounded-lg border border-[#3498db]/40 bg-[#3498db]/10 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#3498db] transition hover:border-[#3498db] hover:bg-[#3498db]/20 disabled:opacity-50"
+                    >
+                      {gdeltDigestLoading
+                        ? "Generating GDELT Digest..."
+                        : gdeltDigestDocument
+                          ? `Refresh GDELT Digest (${compact(counts.gdelt)} events)`
+                          : `Generate GDELT Digest (${compact(counts.gdelt)} events)`}
+                    </button>
+                  )}
+                  {gdeltDigestError && (
+                    <div className="rounded-md border border-red-900/50 bg-red-900/10 px-2 py-1.5 font-mono text-[9px] text-red-400">
+                      Digest failed: {gdeltDigestError}
+                    </div>
+                  )}
+
                   {/* Alerts list — clickable, filterable, scrollable */}
                   {(() => {
                     const filtered = alertFilter
@@ -1073,7 +1400,33 @@ export function HudOverlay({
                               key={alert.id}
                               type="button"
                               onClick={() => {
-                                if (alert.entityId) {
+                                if (alert.category === "PHANTOM") {
+                                  setShowPneumaPanel(false);
+                                  onSelectIntel({
+                                    id: alert.id,
+                                    name: alert.title,
+                                    kind: "anomaly",
+                                    importance: alert.severity === "CRITICAL" ? "important" : "normal",
+                                    quickFacts: [
+                                      { label: "Severity", value: alert.severity },
+                                      { label: "Category", value: "Chaos Anomaly" },
+                                      { label: "Source", value: "Phantom Detection Engine" },
+                                      ...(alert.coordinates ? [
+                                        { label: "Latitude", value: alert.coordinates.lat.toFixed(4) },
+                                        { label: "Longitude", value: alert.coordinates.lon.toFixed(4) },
+                                      ] : []),
+                                    ],
+                                    fullFacts: [
+                                      { label: "Detail", value: alert.detail },
+                                      { label: "Detection", value: new Date(alert.timestamp).toUTCString() },
+                                      { label: "What is this?", value: "Chaos Anomalies are statistically improbable patterns detected across seismic, flight, and electromagnetic feeds. The Phantom engine flags correlated outliers that deviate from baseline models — potential indicators of novel geophysical, military, or infrastructure events." },
+                                    ],
+                                    coordinates: alert.coordinates,
+                                  });
+                                  if (alert.coordinates) {
+                                    onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
+                                  }
+                                } else if (alert.entityId) {
                                   onFlyToEntityById(alert.entityId);
                                 } else if (alert.coordinates) {
                                   onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
@@ -1123,7 +1476,7 @@ export function HudOverlay({
           )}
 
           {/* SEARCH section */}
-          {workspace === "intel" && platformMode === "live" && (
+          {workspace === "intel" && (platformMode !== "playback") && (
             <CollapsibleSection title="Search" badge={searchResults.length > 0 ? `${searchResults.length}` : null}>
               <div className="space-y-1.5">
                 <input
@@ -1185,9 +1538,67 @@ export function HudOverlay({
           <>
           <CollapsibleSection
             title="Intel Feeds"
-            badge={platformMode === "analytics" ? "Raster" : `${compact(totalLiveCount)}`}
+            badge={`${compact(totalLiveCount)}`}
           >
-            {platformMode === "analytics" ? (
+              <div className="space-y-1">
+                {layerDefs
+                  .filter((layer) => layer.key !== "outages" && layer.key !== "threats" && layer.key !== "gdelt")
+                  .map((layer) => {
+                  const valueMap: Record<LayerKey, number> = {
+                    flights: counts.flights,
+                    military: counts.military,
+                    satellites: counts.satellites,
+                    satelliteLinks: counts.satelliteLinks,
+                    seismic: counts.seismic,
+                    bases: counts.bases,
+                    outages: counts.outages,
+                    threats: counts.threats,
+                    gdelt: counts.gdelt,
+                    anomalies: counts.anomalies,
+                    weather: counts.weather,
+                    vessels: counts.vessels,
+                    instability: 0,
+                  };
+                  const value = valueMap[layer.key];
+
+                  return (
+                    <button
+                      key={layer.key}
+                      type="button"
+                      onClick={() => {
+                        toggleLayer(layer.key);
+                        if (layer.key === "anomalies") openChaosInfoPanel();
+                      }}
+                      className="flex w-full items-center justify-between rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-1.5 text-left transition hover:border-[#2eb8d4]"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
+                        <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">{layer.feed}</div>
+                      </div>
+                      <div className="ml-2 flex shrink-0 items-center gap-2 text-right font-mono">
+                        <span className="text-[11px] text-[#a5f0ff]">{compact(value)}</span>
+                        <span
+                          className={`rounded-md border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] ${
+                            layers[layer.key]
+                              ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                              : "border-[#504945] bg-[#282828] text-[#a89984]"
+                          }`}
+                        >
+                          {layers[layer.key] ? "On" : "Off"}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+          </CollapsibleSection>
+
+          {platformMode === "analytics" && (
+          <CollapsibleSection
+            title="Analytics Raster"
+            badge="Raster"
+            defaultOpen
+          >
               <div className="space-y-1.5">
                 {analyticsLayerDefs.map((layer) => (
                   <button
@@ -1245,6 +1656,9 @@ export function HudOverlay({
                         threats: counts.threats,
                         gdelt: counts.gdelt,
                         anomalies: counts.anomalies,
+                        weather: counts.weather,
+                        vessels: counts.vessels,
+                        instability: 0,
                       };
                       const value = valueMap[layer.key];
 
@@ -1252,7 +1666,10 @@ export function HudOverlay({
                         <button
                           key={`analytics-${layer.key}`}
                           type="button"
-                          onClick={() => toggleLayer(layer.key)}
+                          onClick={() => {
+                            toggleLayer(layer.key);
+                            if (layer.key === "anomalies") openChaosInfoPanel();
+                          }}
                           className="flex w-full items-center justify-between rounded border border-[#3c3836] bg-[#282828] px-2 py-1 text-left transition hover:border-[#83a598]"
                         >
                           <div className="min-w-0">
@@ -1271,55 +1688,8 @@ export function HudOverlay({
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-1">
-                {layerDefs
-                  .filter((layer) => layer.key !== "outages" && layer.key !== "threats" && layer.key !== "gdelt")
-                  .map((layer) => {
-                  const valueMap: Record<LayerKey, number> = {
-                    flights: counts.flights,
-                    military: counts.military,
-                    satellites: counts.satellites,
-                    satelliteLinks: counts.satelliteLinks,
-                    seismic: counts.seismic,
-                    bases: counts.bases,
-                    outages: counts.outages,
-                    threats: counts.threats,
-                    gdelt: counts.gdelt,
-                    anomalies: counts.anomalies,
-                  };
-                  const value = valueMap[layer.key];
-
-                  return (
-                    <button
-                      key={layer.key}
-                      type="button"
-                      onClick={() => toggleLayer(layer.key)}
-                      className="flex w-full items-center justify-between rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-1.5 text-left transition hover:border-[#2eb8d4]"
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
-                        <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">{layer.feed}</div>
-                      </div>
-                      <div className="ml-2 flex shrink-0 items-center gap-2 text-right font-mono">
-                        <span className="text-[11px] text-[#a5f0ff]">{compact(value)}</span>
-                        <span
-                          className={`rounded-md border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] ${
-                            layers[layer.key]
-                              ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
-                              : "border-[#504945] bg-[#282828] text-[#a89984]"
-                          }`}
-                        >
-                          {layers[layer.key] ? "On" : "Off"}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-
-              </div>
-            )}
           </CollapsibleSection>
+          )}
           {platformMode !== "analytics" ? (
             <CollapsibleSection title="Live Feeds" badge={`${LIVE_FEEDS.length}`}>
               <div className="space-y-1">
@@ -1402,6 +1772,108 @@ export function HudOverlay({
               </div>
             </CollapsibleSection>
           ) : null}
+
+          {/* Conflict Events (ACLED) */}
+          <CollapsibleSection title="Conflict Events" badge={acledEvents.length > 0 ? `${acledEvents.length}` : null}>
+            <div className="max-h-[300px] space-y-1 overflow-y-auto pr-0.5">
+              {acledEvents.length === 0 ? (
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">Awaiting ACLED data...</div>
+              ) : acledEvents.slice(0, 30).map((evt, i) => {
+                const typeColor = evt.event_type.toLowerCase().includes("battle") ? "text-[#fb4934]" : evt.event_type.toLowerCase().includes("protest") ? "text-[#fabd2f]" : evt.event_type.toLowerCase().includes("riot") ? "text-[#fe8019]" : "text-[#83a598]";
+                return (
+                  <div key={`acled-${i}`} className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className={`font-mono text-[8px] uppercase tracking-[0.1em] ${typeColor}`}>{evt.event_type}</span>
+                      {evt.fatalities > 0 && <span className="font-mono text-[8px] text-[#fb4934]">{evt.fatalities} fatal</span>}
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10px] text-[#d4be98]">{evt.location}, {evt.country}</div>
+                    <div className="mt-0.5 flex items-center justify-between">
+                      <span className="font-mono text-[8px] text-[#a89984]">{evt.actor1}</span>
+                      <span className="font-mono text-[8px] text-[#4e6a7a]">{evt.event_date}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleSection>
+
+          {/* Prediction Markets (Polymarket) */}
+          <CollapsibleSection title="Prediction Markets" badge={polymarketEvents.length > 0 ? `${polymarketEvents.length}` : null}>
+            <div className="max-h-[300px] space-y-1 overflow-y-auto pr-0.5">
+              {polymarketEvents.length === 0 ? (
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">Awaiting Polymarket data...</div>
+              ) : polymarketEvents.slice(0, 20).map((evt, i) => (
+                <div key={`pm-${i}`} className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                  <div className="font-mono text-[10px] text-[#d4be98]">{evt.question}</div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="flex-1 rounded-full bg-[#3c3836] h-1.5">
+                      <div className="h-1.5 rounded-full bg-[#83a598]" style={{ width: `${Math.round(evt.probability * 100)}%` }} />
+                    </div>
+                    <span className="font-mono text-[10px] font-bold text-[#83a598]">{Math.round(evt.probability * 100)}%</span>
+                  </div>
+                  <div className="mt-0.5 flex items-center justify-between">
+                    <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-[#a89984]">{evt.category}</span>
+                    <span className="font-mono text-[8px] text-[#4e6a7a]">${compact(evt.volume)} vol</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CollapsibleSection>
+
+          {/* Natural Disasters (GDACS) */}
+          <CollapsibleSection title="Natural Disasters" badge={gdacsEvents.length > 0 ? `${gdacsEvents.length}` : null}>
+            <div className="max-h-[300px] space-y-1 overflow-y-auto pr-0.5">
+              {gdacsEvents.length === 0 ? (
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">Awaiting GDACS data...</div>
+              ) : gdacsEvents.slice(0, 20).map((evt, i) => {
+                const sevBorder = evt.severity === "red" ? "border-l-[#fb4934]" : evt.severity === "orange" ? "border-l-[#fe8019]" : "border-l-[#fabd2f]";
+                return (
+                  <div key={`gdacs-${i}`} className={`rounded-md border border-[#3c3836] border-l-2 ${sevBorder} bg-[#1d2021] px-2 py-1.5`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-[#7fb4c5]">{evt.type}</span>
+                      <span className="font-mono text-[8px] uppercase text-[#a89984]">{evt.severity}</span>
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10px] text-[#d4be98]">{evt.title}</div>
+                    <div className="mt-0.5 flex items-center justify-between">
+                      <span className="font-mono text-[8px] text-[#a89984]">{evt.country}</span>
+                      {evt.populationExposed > 0 && <span className="font-mono text-[8px] text-[#fb4934]">{compact(evt.populationExposed)} exposed</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleSection>
+
+          {/* Aviation Status (FAA) */}
+          <CollapsibleSection title="Aviation Status" badge={faaDelays.length > 0 ? `${faaDelays.length} delays` : null}>
+            <div className="max-h-[300px] space-y-1 overflow-y-auto pr-0.5">
+              {faaDelays.length === 0 && faaNotams.length === 0 ? (
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">Awaiting FAA data...</div>
+              ) : (
+                <>
+                  {faaDelays.map((delay, i) => (
+                    <div key={`faa-d-${i}`} className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-[10px] font-bold text-[#fabd2f]">{delay.airport}</span>
+                        <span className="font-mono text-[8px] text-[#a89984]">{delay.avgDelay}</span>
+                      </div>
+                      <div className="mt-0.5 font-mono text-[9px] text-[#d4be98]">{delay.delayType}</div>
+                      <div className="mt-0.5 font-mono text-[8px] text-[#928374]">{delay.reason}</div>
+                    </div>
+                  ))}
+                  {faaNotams.slice(0, 10).map((notam, i) => (
+                    <div key={`faa-n-${i}`} className="rounded-md border border-[#3c3836] border-l-2 border-l-[#fb4934] bg-[#1d2021] px-2 py-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-[#fb4934]">TFR</span>
+                        <span className="font-mono text-[8px] text-[#a89984]">{notam.location}</span>
+                      </div>
+                      <div className="mt-0.5 font-mono text-[9px] text-[#d4be98]">{notam.description}</div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </CollapsibleSection>
           </>
           )}
 
@@ -1432,15 +1904,47 @@ export function HudOverlay({
             <div className="space-y-1.5">
               <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
                 <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Feed Health</div>
-                <div>OpenSky: {feedHealth.opensky.status} @ {fmtDate(feedHealth.opensky.lastSuccessAt)}</div>
-                <div>ADS-B: {feedHealth.adsb.status} @ {fmtDate(feedHealth.adsb.lastSuccessAt)}</div>
-                <div>CelesTrak: {feedHealth.celestrak.status} @ {fmtDate(feedHealth.celestrak.lastSuccessAt)}</div>
-                <div>USGS: {feedHealth.usgs.status} @ {fmtDate(feedHealth.usgs.lastSuccessAt)}</div>
-
-                <div>CF Radar: {feedHealth.cfradar.status} @ {fmtDate(feedHealth.cfradar.lastSuccessAt)}</div>
-                <div>OTX: {feedHealth.otx.status} @ {fmtDate(feedHealth.otx.lastSuccessAt)}</div>
-                <div>FRED: {feedHealth.fred.status} @ {fmtDate(feedHealth.fred.lastSuccessAt)}</div>
-                <div>AISStream: {feedHealth.ais.status} @ {fmtDate(feedHealth.ais.lastSuccessAt)}</div>
+                <div className="mb-1.5 text-[9px] text-[#a89984]">
+                  {feedFreshnessCounts.fresh} fresh &middot; {feedFreshnessCounts.aging} aging &middot; {feedFreshnessCounts.stale} stale &middot; {feedFreshnessCounts.critical} critical
+                </div>
+                {feedEntries
+                  .sort(([, a], [, b]) => {
+                    const order: Record<string, number> = { error: 0, cooldown: 1, idle: 2, ok: 3 };
+                    const aOrd = order[a.status] ?? 2;
+                    const bOrd = order[b.status] ?? 2;
+                    if (aOrd !== bOrd) return aOrd - bOrd;
+                    return (a.lastSuccessAt ?? 0) - (b.lastSuccessAt ?? 0);
+                  })
+                  .map(([key, fh]) => {
+                    const freshness = computeFreshness(key, fh.lastSuccessAt);
+                    const dotColor =
+                      freshness === "fresh" ? "bg-green-400"
+                      : freshness === "aging" ? "bg-yellow-400"
+                      : freshness === "stale" ? "bg-orange-400"
+                      : "bg-red-400";
+                    const ago = fh.lastSuccessAt
+                      ? `${Math.round((Date.now() - fh.lastSuccessAt) / 1000)}s ago`
+                      : "never";
+                    return (
+                      <div key={key} className="flex items-center justify-between py-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`inline-block h-1.5 w-1.5 rounded-full ${dotColor}`} />
+                          <span>{key}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[#a89984]">
+                          <span>{ago}</span>
+                          {fh.circuitState !== "closed" && (
+                            <span className="rounded bg-red-900/50 px-1 text-[8px] text-red-300">
+                              {fh.circuitState}
+                            </span>
+                          )}
+                          {fh.consecutiveFailures > 0 && (
+                            <span className="text-red-400">({fh.consecutiveFailures}x)</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
 
               <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[10px] text-[#7fb4c5]">
@@ -1453,66 +1957,321 @@ export function HudOverlay({
           </CollapsibleSection>
           )}
 
-          {workspace === "settings" && (
-          <CollapsibleSection title="LLM Configuration" defaultOpen={true}>
-            <div className="space-y-2">
-              <label className="block">
-                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Provider</span>
-                <select
-                  className={`${controlInputClass} mt-1`}
-                  value={llmProvider}
-                  onChange={(e) => setLlmProvider(e.target.value as "ollama" | "openai_compatible")}
-                >
-                  <option value="ollama">Ollama</option>
-                  <option value="openai_compatible">OpenAI-Compatible</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Endpoint URL</span>
-                <input
-                  type="text"
-                  className={`${controlInputClass} mt-1`}
-                  value={llmEndpoint}
-                  onChange={(e) => setLlmEndpoint(e.target.value)}
-                  placeholder="http://localhost:11434"
-                />
-              </label>
-              <label className="block">
-                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Model</span>
-                <input
-                  type="text"
-                  className={`${controlInputClass} mt-1`}
-                  value={llmModel}
-                  onChange={(e) => setLlmModel(e.target.value)}
-                  placeholder="llama3"
-                />
-              </label>
-              {llmProvider === "openai_compatible" && (
-                <label className="block">
-                  <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">API Key (optional)</span>
-                  <input
-                    type="password"
-                    className={`${controlInputClass} mt-1`}
-                    value={llmApiKey}
-                    onChange={(e) => setLlmApiKey(e.target.value)}
-                    placeholder="sk-..."
-                  />
-                </label>
-              )}
-              <div className="flex gap-2">
+          {/* OP EPIC FURY — comprehensive regional intelligence */}
+          {workspace === "intel" && epicFuryActive && (
+            <>
+              {/* Theater Status */}
+              <CollapsibleSection
+                title={efLockedRegion ? `Op Epic Fury — ${efLockedRegion.label}` : "Op Epic Fury — CENTCOM AOR"}
+                badge={`${efFilteredIncidents.length} incidents`}
+                defaultOpen
+              >
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { label: "MIL", count: efFilteredIncidents.filter(i => i.type === "military").length, color: "#fb4934" },
+                      { label: "VES", count: efFilteredIncidents.filter(i => i.type === "vessel").length, color: "#83a598" },
+                      { label: "GEO", count: efFilteredIncidents.filter(i => i.type === "gdelt").length, color: "#fabd2f" },
+                      { label: "SEI", count: efFilteredIncidents.filter(i => i.type === "seismic").length, color: "#fe8019" },
+                    ].map(({ label, count, color }) => (
+                      <div key={label} className="rounded border border-[#3c3836] bg-[#1d2021] px-1 py-1 text-center">
+                        <div className="font-mono text-[12px] font-bold" style={{ color }}>{count}</div>
+                        <div className="font-mono text-[7px] uppercase tracking-[0.14em] text-[#928374]">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="max-h-[200px] space-y-1 overflow-y-auto pr-0.5">
+                    {efFilteredIncidents.slice(0, 20).map((incident) => {
+                      const typeIcons: Record<string, string> = { gdelt: "\u{1F310}", military: "\u2708\uFE0F", vessel: "\u{1F6A2}", seismic: "\u{1F534}" };
+                      const sevBorder: Record<string, string> = { critical: "border-l-red-500", high: "border-l-orange-400", medium: "border-l-[#83a598]", low: "border-l-[#504945]" };
+                      return (
+                        <button key={incident.id} type="button" onClick={() => onFlyToCoordinates(incident.lat, incident.lon)}
+                          className={`w-full rounded-md border border-[#3c3836] border-l-2 ${sevBorder[incident.severity]} bg-[#1d2021] px-2 py-1 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]`}>
+                          <div className="flex items-start justify-between gap-1">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="text-[9px]">{typeIcons[incident.type]}</span>
+                              <span className="truncate font-mono text-[9px] font-bold text-[#ebdbb2]">{incident.title}</span>
+                            </div>
+                            <span className="shrink-0 font-mono text-[7px] text-[#928374]">
+                              {(() => { const d = Date.now() - incident.timestamp; if (d < 60000) return "now"; if (d < 3600000) return `${Math.floor(d/60000)}m`; return `${Math.floor(d/3600000)}h`; })()}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 font-mono text-[8px] text-[#a89984] truncate">{incident.detail}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CollapsibleSection>
+
+              {/* Regional News */}
+              <CollapsibleSection title="Regional OSINT" badge={efNews.length > 0 ? `${efNews.length}` : null} defaultOpen>
+                <div className="max-h-[250px] space-y-1 overflow-y-auto pr-0.5">
+                  {efNews.length === 0 ? (
+                    <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-2 text-center font-mono text-[9px] text-[#928374]">Loading regional feeds...</div>
+                  ) : efNews.map((item) => (
+                    <a key={item.id} href={item.link} target="_blank" rel="noopener noreferrer"
+                      className="block w-full rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]">
+                      <div className="flex items-start justify-between gap-1">
+                        <span className="font-mono text-[9px] font-bold text-[#ebdbb2] line-clamp-2">{item.title}</span>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        <span className="rounded border border-[#504945] bg-[#282828] px-1 py-0.5 font-mono text-[7px] uppercase tracking-[0.1em] text-[#fabd2f]">{item.source}</span>
+                        <span className="font-mono text-[7px] text-[#928374]">{new Date(item.pubDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </CollapsibleSection>
+
+              {/* Social Intelligence */}
+              <CollapsibleSection title="Social SIGINT" badge={efSocial.length > 0 ? `${efSocial.length}` : null}>
+                <div className="max-h-[200px] space-y-1 overflow-y-auto pr-0.5">
+                  {efSocial.length === 0 ? (
+                    <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-2 text-center font-mono text-[9px] text-[#928374]">Monitoring social channels...</div>
+                  ) : efSocial.map((post) => (
+                    <a key={post.id} href={post.link} target="_blank" rel="noopener noreferrer"
+                      className="block w-full rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]">
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <span className="font-mono text-[8px] font-bold text-[#83a598]">@{post.author}</span>
+                        <span className="font-mono text-[7px] text-[#928374]">{new Date(post.pubDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                      <div className="font-mono text-[9px] text-[#d5c4a1] line-clamp-3">{post.text}</div>
+                    </a>
+                  ))}
+                </div>
+              </CollapsibleSection>
+            </>
+          )}
+
+          {/* GDELT workspace */}
+          {workspace === "gdelt" && (
+            <CollapsibleSection
+              title="GDELT Events"
+              badge={`${gdeltEvents.length}`}
+              defaultOpen
+            >
+              <div className="space-y-2">
+                <div className="flex gap-1 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setGdeltQuadFilter(null)}
+                    className={`rounded-md border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] transition ${
+                      gdeltQuadFilter === null ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]" : "border-[#504945] bg-[#282828] text-[#a89984]"
+                    }`}
+                  >All</button>
+                  {([1, 2, 3, 4] as GdeltQuadClass[]).map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => setGdeltQuadFilter(gdeltQuadFilter === q ? null : q)}
+                      className={`rounded-md border px-1.5 py-0.5 font-mono text-[8px] tracking-[0.1em] transition ${
+                        gdeltQuadFilter === q ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]" : "border-[#504945] bg-[#282828]"
+                      }`}
+                      style={{ color: gdeltQuadFilter === q ? undefined : QUAD_CLASS_COLORS[q] }}
+                    >{QUAD_CLASS_LABELS[q]}</button>
+                  ))}
+                </div>
+
+                {/* Batch size selector */}
+                <div className="flex items-center justify-between gap-2 rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                  <label className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]" htmlFor="gdelt-batch-size">
+                    Digest Batch
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="gdelt-batch-size"
+                      type="range"
+                      min={50}
+                      max={100}
+                      step={5}
+                      value={gdeltDigestBatchSize}
+                      onChange={(e) => setGdeltDigestBatchSize(Number(e.target.value))}
+                      className="h-1 w-24 accent-[#fabd2f]"
+                    />
+                    <span className="font-mono text-[10px] tabular-nums text-[#fabd2f] w-8 text-right">{gdeltDigestBatchSize}</span>
+                  </div>
+                </div>
+
+                {/* Digest button */}
                 <button
                   type="button"
-                  onClick={saveSettings}
-                  className={actionButtonClass}
+                  onClick={requestGdeltDigest}
+                  disabled={gdeltDigestLoading}
+                  className="w-full rounded-lg border border-[#fabd2f]/30 bg-[#fabd2f]/10 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#fabd2f] transition hover:border-[#fabd2f] hover:bg-[#fabd2f]/20 disabled:opacity-50"
                 >
-                  {settingsSaved ? "Saved!" : "Save Settings"}
+                  {gdeltDigestLoading ? "Generating Strategic Digest..." : gdeltDigestDocument ? `Refresh Strategic Digest (top ${gdeltDigestBatchSize})` : `Generate Strategic Digest (top ${gdeltDigestBatchSize} of ${gdeltEvents.length})`}
                 </button>
+                {gdeltDigestError && (
+                  <div className="rounded-md border border-red-900/50 bg-red-900/10 px-2 py-1.5 font-mono text-[9px] text-red-400">
+                    {gdeltDigestError}
+                  </div>
+                )}
+
+                <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5">
+                  {gdeltEvents
+                    .filter((e) => !gdeltQuadFilter || e.quadClass === gdeltQuadFilter)
+                    .sort((a, b) => Math.abs(b.goldsteinScale) - Math.abs(a.goldsteinScale))
+                    .map((event) => (
+                      <button
+                        key={event.id}
+                        type="button"
+                        onClick={() => {
+                          onFlyToCoordinates(event.latitude, event.longitude);
+                          onSelectIntel({
+                            id: `gdelt-${event.id}`,
+                            name: `${event.actor1Name || "Unknown"} → ${event.actor2Name || "Unknown"}`,
+                            kind: "gdelt",
+                            importance: Math.abs(event.goldsteinScale) >= 5 ? "important" : "normal",
+                            quickFacts: [
+                              { label: "Type", value: QUAD_CLASS_LABELS[event.quadClass as GdeltQuadClass] ?? "Unknown" },
+                              { label: "Goldstein", value: String(event.goldsteinScale) },
+                              { label: "Actor 1", value: `${event.actor1Name || "?"} (${event.actor1Country || "?"})` },
+                              { label: "Actor 2", value: `${event.actor2Name || "?"} (${event.actor2Country || "?"})` },
+                              { label: "Location", value: event.actionGeoName },
+                              { label: "Mentions", value: String(event.numMentions) },
+                              { label: "Tone", value: event.avgTone.toFixed(1) },
+                            ],
+                            fullFacts: [],
+                            coordinates: { lat: event.latitude, lon: event.longitude },
+                          });
+                        }}
+                        className="w-full rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <span className="truncate font-mono text-[10px] font-bold text-[#ebdbb2]">
+                            {event.actor1Name || "?"} → {event.actor2Name || "?"}
+                          </span>
+                          <span className="shrink-0 rounded border border-[#504945] bg-[#282828] px-1 py-0.5 font-mono text-[8px]" style={{ color: QUAD_CLASS_COLORS[event.quadClass as GdeltQuadClass] }}>
+                            {event.goldsteinScale > 0 ? "+" : ""}{event.goldsteinScale}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 font-mono text-[9px] text-[#a89984] truncate">{event.actionGeoName}</div>
+                      </button>
+                    ))}
+                </div>
               </div>
-              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">
-                Configure a local LLM (Ollama, LM Studio, etc.) to enable AI-powered intel summaries. Your keys stay on your server.
+            </CollapsibleSection>
+          )}
+
+          {/* Strange Atlas workspace */}
+          {workspace === "anomalies" && (
+            <CollapsibleSection
+              title="Strange Atlas"
+              badge={`${ANOMALY_SITES.length} sites`}
+              defaultOpen
+            >
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const subject = encodeURIComponent("Argus Strange Atlas — New Submission");
+                    const body = encodeURIComponent(
+                      [
+                        "Name:",
+                        "Latitude:",
+                        "Longitude:",
+                        "Category (geometric/crater/censored/desert/underwater/military/natural/vanished/antarctica/other):",
+                        "Status (confirmed/ambiguous/unresolved/unexplained/unknown):",
+                        "Description:",
+                        "Source URL(s):",
+                      ].join("\n"),
+                    );
+                    window.open(`mailto:psugi@proton.me?subject=${subject}&body=${body}`);
+                  }}
+                  className="w-full rounded-lg border border-[#fabd2f]/40 bg-[#fabd2f]/10 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#fabd2f] transition hover:border-[#fabd2f] hover:bg-[#fabd2f]/20"
+                >
+                  + Submit New
+                </button>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setAnomalyCategoryFilter(null)}
+                    className={`rounded-md border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] transition ${
+                      anomalyCategoryFilter === null
+                        ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                        : "border-[#504945] bg-[#282828] text-[#a89984] hover:text-[#d5c4a1]"
+                    }`}
+                  >
+                    All
+                  </button>
+                  {(Object.keys(CATEGORY_LABELS) as AnomalyCategory[]).map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setAnomalyCategoryFilter(anomalyCategoryFilter === cat ? null : cat)}
+                      className={`rounded-md border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em] transition ${
+                        anomalyCategoryFilter === cat
+                          ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                          : "border-[#504945] bg-[#282828] text-[#a89984] hover:text-[#d5c4a1]"
+                      }`}
+                    >
+                      {CATEGORY_LABELS[cat]}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="max-h-[400px] space-y-1 overflow-y-auto pr-0.5">
+                  {ANOMALY_SITES
+                    .filter((site) => !anomalyCategoryFilter || site.category === anomalyCategoryFilter)
+                    .map((site) => (
+                      <button
+                        key={site.id}
+                        type="button"
+                        onClick={() => {
+                          onFlyToCoordinates(site.lat, site.lon);
+                          onSelectIntel({
+                            id: site.id,
+                            name: site.name,
+                            kind: "anomaly",
+                            importance: site.status === "ambiguous" || site.status === "unexplained" ? "important" : "normal",
+                            quickFacts: [
+                              { label: "Category", value: CATEGORY_LABELS[site.category] },
+                              { label: "Status", value: `${STATUS_ICONS[site.status]} ${site.status}` },
+                              { label: "Coordinates", value: `${site.lat.toFixed(4)}, ${site.lon.toFixed(4)}` },
+                            ],
+                            fullFacts: [],
+                            analysisSummary: site.description,
+                            coordinates: { lat: site.lat, lon: site.lon },
+                          });
+                        }}
+                        className="w-full rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-[10px]">{STATUS_ICONS[site.status]}</span>
+                            <span className="truncate font-mono text-[10px] font-bold text-[#ebdbb2]">{site.name}</span>
+                          </div>
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-1.5">
+                          <span
+                            className="rounded border border-[#504945] bg-[#282828] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em]"
+                            style={{ color: CATEGORY_COLORS[site.category] }}
+                          >
+                            {CATEGORY_LABELS[site.category]}
+                          </span>
+                          <span className="font-mono text-[8px] text-[#4e6a7a]">{site.lat.toFixed(2)}, {site.lon.toFixed(2)}</span>
+                        </div>
+                      </button>
+                    ))}
+                </div>
               </div>
-            </div>
-          </CollapsibleSection>
+            </CollapsibleSection>
+          )}
+
+          {workspace === "settings" && (
+            <section className="space-y-2 px-3 py-2.5">
+              <button
+                type="button"
+                onClick={() => setSettingsModalOpen(true)}
+                className="w-full rounded-lg border border-[#83a598] bg-[#504945] px-3 py-3 font-mono text-[11px] uppercase tracking-[0.18em] text-[#ebdbb2] transition hover:bg-[#665c54]"
+              >
+                Open Configuration Panel
+              </button>
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-2 font-mono text-[9px] text-[#928374] leading-relaxed">
+                Configure LLM providers, view data feed status, manage API keys, and learn about Argus subsystems including PNEUMA and Phantom.
+              </div>
+            </section>
           )}
         </nav>
       ) : (
@@ -1565,6 +2324,7 @@ export function HudOverlay({
               <option value="live">Live</option>
               <option value="playback">Playback</option>
               <option value="analytics">Analytics</option>
+              <option value="epic-fury">Op Epic Fury</option>
             </select>
           </label>
 
@@ -2073,7 +2833,10 @@ export function HudOverlay({
                           <button
                             key={layer.key}
                             type="button"
-                            onClick={() => toggleLayer(layer.key)}
+                            onClick={() => {
+                              toggleLayer(layer.key);
+                              if (layer.key === "anomalies") openChaosInfoPanel();
+                            }}
                             className="flex w-full items-center justify-between rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left"
                           >
                             <span className="font-mono text-[10px] text-[#ebdbb2]">{layer.label}</span>
@@ -2146,6 +2909,91 @@ export function HudOverlay({
         />
       )}
 
+      {gdeltDigestDocument ? (
+        <div className="pointer-events-auto absolute inset-0 z-[55] flex items-center justify-center bg-black/35 px-6 py-10">
+          <div className="relative h-[78vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-[#5b4a1f] bg-[#14181bcc] shadow-[0_0_60px_rgba(0,0,0,0.45)] backdrop-blur-md">
+            <div className="flex items-center justify-between border-b border-[#3c3836] bg-[#1d2021cc] px-5 py-3">
+              <div>
+                <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#fabd2f]">
+                  Strategic Document
+                </div>
+                <div className="mt-1 font-mono text-[18px] text-[#ebdbb2]">
+                  {gdeltDigestDocument.title}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={exportGdeltDigest}
+                  className="rounded-lg border border-[#83a598] bg-[#1f2c2a] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#b8e0d2] transition hover:border-[#b8e0d2]"
+                >
+                  Export
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGdeltDigestDocument(null)}
+                  className="rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#a89984] transition hover:border-[#83a598]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 border-b border-[#3c3836] bg-[#171b1ecc] px-5 py-3 md:grid-cols-4">
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-3 py-2">
+                <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Generated</div>
+                <div className="mt-1 font-mono text-[11px] text-[#d5c4a1]">{gdeltDigestDocument.generatedAt}</div>
+              </div>
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-3 py-2">
+                <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Events Analyzed</div>
+                <div className="mt-1 font-mono text-[11px] text-[#d5c4a1]">
+                  {gdeltDigestDocument.analyzedCount ?? "?"} of {gdeltDigestDocument.eventCount ?? "?"}
+                </div>
+              </div>
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-3 py-2">
+                <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Region Filter</div>
+                <div className="mt-1 font-mono text-[11px] text-[#d5c4a1]">{newsRegionFilter}</div>
+              </div>
+              <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-3 py-2">
+                <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Source</div>
+                <div className="mt-1 font-mono text-[11px] text-[#d5c4a1]">GDELT Global Event Database</div>
+              </div>
+            </div>
+
+            <div className="h-[calc(78vh-10.5rem)] overflow-y-auto px-5 py-5">
+              <div className="mx-auto max-w-3xl rounded-xl border border-[#3c3836] bg-[#191d20cc] px-6 py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+                <div className="mb-4 border-b border-[#3c3836] pb-3">
+                  <div className="font-serif text-[30px] leading-tight text-[#f3e7c2]">
+                    {gdeltDigestDocument.title}
+                  </div>
+                  <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[#83a598]">
+                    Produced Intelligence Brief
+                  </div>
+                </div>
+                <div className="whitespace-pre-wrap font-serif text-[16px] leading-8 text-[#d7dbe0]">
+                  {gdeltDigestDocument.content}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <SettingsModal
+        open={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+        llmProvider={llmProvider}
+        setLlmProvider={setLlmProvider}
+        llmEndpoint={llmEndpoint}
+        setLlmEndpoint={setLlmEndpoint}
+        llmModel={llmModel}
+        setLlmModel={setLlmModel}
+        llmApiKey={llmApiKey}
+        setLlmApiKey={setLlmApiKey}
+        saveSettings={saveSettings}
+        settingsSaved={settingsSaved}
+      />
+
       {/* Playback Timeline Bar */}
       {platformMode === "playback" && playbackTimeRange && (
         <div className="pointer-events-auto absolute bottom-[calc(var(--safe-bottom)+5rem)] left-1/2 flex w-[calc(100%-1rem)] max-w-sm -translate-x-1/2 items-center gap-2 rounded border border-cyan-800/50 bg-black/80 px-3 py-2 font-mono text-xs text-cyan-400 backdrop-blur-sm md:bottom-20 md:w-auto md:max-w-none md:gap-3 md:px-4">
@@ -2162,14 +3010,26 @@ export function HudOverlay({
             {new Date(playbackCurrentTime).toLocaleTimeString()}
           </span>
 
-          <input
-            type="range"
-            min={playbackTimeRange.start}
-            max={playbackTimeRange.end}
-            value={playbackCurrentTime}
-            onChange={(e) => onSeek?.(Number(e.target.value))}
-            className="h-1 w-48 cursor-pointer accent-cyan-500"
-          />
+          <div className="flex flex-col gap-1">
+            <input
+              type="range"
+              min={playbackTimeRange.start}
+              max={playbackTimeRange.end}
+              value={playbackCurrentTime}
+              onChange={(e) => onSeek?.(Number(e.target.value))}
+              className="h-1.5 w-48 cursor-pointer appearance-none rounded-full bg-cyan-900/40 accent-cyan-400 outline-none"
+              title="Time Track"
+            />
+            <input
+              type="range"
+              min={playbackTimeRange.start}
+              max={playbackTimeRange.end}
+              value={playbackCurrentTime}
+              readOnly
+              className="h-0.5 w-48 cursor-default appearance-none rounded-full bg-blue-900/40 accent-blue-500 outline-none opacity-80"
+              title="Intelligence Density Track"
+            />
+          </div>
 
           <select
             value={playbackSpeed}
@@ -2197,10 +3057,80 @@ export function HudOverlay({
         </div>
       )}
 
-      {/* PNEUMA Cognitive State Indicator — bottom-right corner */}
-      <div className="pointer-events-auto absolute bottom-10 right-4 z-[26] hidden md:block">
-        <PneumaHud />
-      </div>
+      {/* PNEUMA Full Panel — replaces Target Intel on the right side */}
+      {showPneumaPanel && !selectedIntel ? (
+        <section className="pointer-events-auto absolute right-8 top-[5.5rem] hidden w-[348px] rounded-2xl border border-[#3c3836] bg-[#1d2021d9] p-4 shadow-[0_0_40px_rgba(250,189,47,0.15)] backdrop-blur-md md:block">
+          <div className="flex items-center justify-between">
+            <div className="font-mono text-[12px] font-black uppercase tracking-[0.3em] text-[#fabd2f]">PNEUMA</div>
+            <button
+              type="button"
+              onClick={() => setShowPneumaPanel(false)}
+              className="rounded-md border border-[#504945] bg-[#282828] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#fabd2f]"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="mt-2 rounded-xl border border-[#5b4a1f] bg-[#2a2415] p-3 font-mono text-[10px] leading-relaxed text-[#f3d98b]">
+            PNEUMA is the cognitive awareness subsystem powering Argus&apos;s autonomous intelligence loop. It monitors the system&apos;s own reasoning state in real-time.
+          </div>
+
+          <PneumaHud threatLevel={intelBriefing?.threatLevel ?? "GREEN"} inline />
+
+          <div className="mt-3 space-y-2">
+            <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">
+              <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#fabd2f]">PHI — Consciousness Index</div>
+              Integrated Information Theory metric (0.0–1.0). Measures the degree of unified awareness across all active intelligence feeds. Higher values indicate richer cross-feed pattern recognition.
+            </div>
+            <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">
+              <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#fabd2f]">MOOD — Cognitive Regime</div>
+              Current reasoning posture: EXPLORATORY (broad scanning), ANALYTICAL (focused correlation), EMPATHETIC (human-impact priority), or CREATIVE (novel pattern synthesis).
+            </div>
+            <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">
+              <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#fabd2f]">MEM / CYCLES / PIPELINE</div>
+              MEM: active memory graph nodes. CYCLES: completed reasoning iterations. PIPELINE: end-to-end processing latency per intelligence cycle.
+            </div>
+
+            <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">
+              <div className="mb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-[#fabd2f]">COGNITIVE LENS</div>
+              <div className="flex gap-2">
+                {(["tactical", "strategic", "anomaly"] as const).map((lens) => (
+                  <button
+                    key={lens}
+                    type="button"
+                    onClick={() => setCognitiveLens(lens)}
+                    className={`rounded px-2 py-1 text-[9px] uppercase tracking-[0.14em] transition ${
+                      cognitiveLens === lens
+                        ? "bg-[#fabd2f]/20 border border-[#fabd2f] text-[#fabd2f]"
+                        : "bg-[#282828] border border-[#504945] text-[#a89984] hover:border-[#fabd2f]"
+                    }`}
+                  >
+                    {lens}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">
+              <div className="mb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-[#fabd2f]">ACTIVE HYPOTHESES</div>
+              <div className="space-y-2">
+                {hypotheses.map(hyp => (
+                  <div key={hyp.id} className="rounded border border-[#504945] bg-[#282828] p-2 flex flex-col gap-1">
+                    <div className="text-[#ebdbb2] leading-relaxed">{hyp.text}</div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#a89984] text-[8px] uppercase tracking-[0.1em]">Score: {hyp.score}</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => setHypotheses(hs => hs.map(h => h.id === hyp.id ? { ...h, score: h.score + 1 } : h))} className="hover:text-[#b8bb26] transition text-[#a89984]">▲</button>
+                        <button onClick={() => setHypotheses(hs => hs.map(h => h.id === hyp.id ? { ...h, score: h.score - 1 } : h))} className="hover:text-[#fb4934] transition text-[#a89984]">▼</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

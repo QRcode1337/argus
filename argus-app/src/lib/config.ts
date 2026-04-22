@@ -1,3 +1,5 @@
+import type { FeedFreshness } from "@/types/intel";
+
 export const ARGUS_CONFIG = {
   endpoints: {
     openSky: process.env.NEXT_PUBLIC_OPENSKY_ENDPOINT ?? "/api/feeds/opensky",
@@ -19,6 +21,10 @@ export const ARGUS_CONFIG = {
     zerveAnalysis: process.env.ZERVE_API_ENDPOINT ?? "/api/feeds/zerve",
     settings: "/api/settings",
     analyticsLayers: "/api/analytics/layers",
+    acled: "/api/feeds/acled",
+    polymarket: "/api/feeds/polymarket",
+    gdacs: "/api/feeds/gdacs",
+    faa: "/api/feeds/faa",
   },
   pollMs: {
     openSky: 10_000,
@@ -34,6 +40,10 @@ export const ARGUS_CONFIG = {
     phantom: 10_000,
     threatRadar: 300_000, // 5 minutes
     zerve: 30 * 60_000, // 30 minutes — batch geospatial analysis cadence
+    acled: 30 * 60_000,
+    polymarket: 5 * 60_000,
+    gdacs: 10 * 60_000,
+    faa: 10 * 60_000,
   },
   limits: {
     maxFlights: 7000,
@@ -43,6 +53,36 @@ export const ARGUS_CONFIG = {
     orbitSampleStepMinutes: 4,
   },
 } as const;
+
+/** Map from FeedKey to expected poll interval for freshness computation */
+export const FEED_EXPECTED_INTERVAL: Record<string, number> = {
+  opensky: ARGUS_CONFIG.pollMs.openSky,
+  adsb: ARGUS_CONFIG.pollMs.adsbMilitary,
+  celestrak: ARGUS_CONFIG.pollMs.satellites,
+  usgs: ARGUS_CONFIG.pollMs.usgs,
+  cfradar: ARGUS_CONFIG.pollMs.cloudflareRadar,
+  otx: ARGUS_CONFIG.pollMs.otx,
+  fred: ARGUS_CONFIG.pollMs.fred,
+  ais: ARGUS_CONFIG.pollMs.aisstream,
+  gdelt: ARGUS_CONFIG.pollMs.gdelt,
+  news: ARGUS_CONFIG.pollMs.news,
+  threatradar: ARGUS_CONFIG.pollMs.threatRadar,
+  phantom: ARGUS_CONFIG.pollMs.phantom,
+  acled: 30 * 60_000,
+  polymarket: 5 * 60_000,
+  gdacs: 10 * 60_000,
+  faa: 10 * 60_000,
+};
+
+export function computeFreshness(feedKey: string, lastSuccessAt: number | null): FeedFreshness {
+  if (!lastSuccessAt) return "critical";
+  const expected = FEED_EXPECTED_INTERVAL[feedKey] ?? 60_000;
+  const elapsed = Date.now() - lastSuccessAt;
+  if (elapsed < expected) return "fresh";
+  if (elapsed < expected * 2) return "aging";
+  if (elapsed < expected * 4) return "stale";
+  return "critical";
+}
 
 export const CAMERA_PRESETS = [
   { id: "pentagon", label: "Pentagon", lon: -77.0559, lat: 38.8719, height: 4200, heading: 0, pitch: -0.75, roll: 0 },
@@ -59,4 +99,5 @@ export const CAMERA_PRESETS = [
   { id: "banff-park", label: "Banff Nat. Park", lon: -115.5564, lat: 51.4968, height: 16000, heading: 0, pitch: -0.4, roll: 0 },
   { id: "shibuya", label: "Shibuya Crossing", lon: 139.7005, lat: 35.6595, height: 1500, heading: 0, pitch: -0.7, roll: 0 },
   { id: "venice", label: "Venice Canals", lon: 12.3155, lat: 45.4408, height: 4000, heading: 0.2, pitch: -0.6, roll: 0 },
+  { id: "strait-of-hormuz", label: "Strait of Hormuz", lon: 56.2500, lat: 26.5667, height: 250000, heading: 0, pitch: -0.8, roll: 0 },
 ] as const;

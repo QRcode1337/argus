@@ -16,6 +16,7 @@ argus-app/.next/
 argus-app/node_modules/
 argus-app/.turbo/
 argus-api/node_modules/
+.next/
 
 # Secrets
 certbot/
@@ -29,3 +30,4 @@ logs/
 node_modules/
 .vercel
 phantom/target/
+.worktrees/

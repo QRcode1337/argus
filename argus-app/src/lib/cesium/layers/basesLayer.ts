@@ -59,6 +59,7 @@ export class BasesLayer {
           scale: 0.7,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(1_000_000, 1.2, 20_000_000, 0.4),
+          disableDepthTestDistance: 0,
         },
         label: {
           text: (() => { const t = `${typeTag} ${base.name}`; return t.length > 9 ? `${t.slice(0, 9)}…` : t; })(),

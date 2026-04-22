@@ -1,0 +1,7 @@
+{
+  "llm": {
+    "provider": "openai_compatible",
+    "endpoint": "",
+    "model": "llama-3.3-70b-instruct"
+  }
+}

@@ -8,11 +8,14 @@ export type LayerKey =
   | "outages"
   | "threats"
   | "gdelt"
-  | "anomalies";
+  | "anomalies"
+  | "weather"
+  | "vessels"
+  | "instability";
 export type SceneMode = "globe_sat" | "globe_street" | "globe_map" | "flat_map";
-export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "cfradar" | "otx" | "fred" | "ais" | "gdelt" | "threatradar" | "phantom";
+export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "cfradar" | "otx" | "fred" | "ais" | "gdelt" | "threatradar" | "phantom" | "acled" | "polymarket" | "gdacs" | "faa" | "news";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
-export type PlatformMode = "live" | "playback" | "analytics";
+export type PlatformMode = "live" | "playback" | "analytics" | "epic-fury";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";
 export type CameraCategory = "Traffic" | "Nature" | "Landmark" | "Wildlife" | "Scenic" | "Infrastructure";
 export type CameraProvider = "TFL" | "Windy" | "Hardcoded";
@@ -44,12 +47,17 @@ export type VisualParams = {
   crt: CrtVisualParams;
 };
 
-export type FeedStatus = "idle" | "ok" | "stale" | "error";
+export type FeedStatus = "idle" | "ok" | "error" | "cooldown";
+export type FeedFreshness = "fresh" | "aging" | "stale" | "critical";
+export type CircuitState = "closed" | "open" | "half-open";
 
 export interface FeedHealth {
   status: FeedStatus;
   lastSuccessAt: number | null;
   lastError: string | null;
+  nextRefreshAt: number | null;
+  consecutiveFailures: number;
+  circuitState: CircuitState;
 }
 
 export interface CameraReadout {
@@ -239,4 +247,17 @@ export interface RecordedMilitaryFrame {
 export interface RecordedSatelliteFrame {
   timestamp: number;
   data: PlaybackSatelliteSnapshot[];
+}
+
+export type SourceDomain = "news" | "gdelt" | "military" | "seismic" | "maritime" | "economic" | "cyber" | "infrastructure" | "conflict";
+
+export interface CorroborationAlert {
+  id: string;
+  stage: 1 | 2 | 3 | 4 | 5;
+  region: string;
+  domains: SourceDomain[];
+  keywords: string[];
+  summary: string;
+  createdAt: number;
+  updatedAt: number;
 }

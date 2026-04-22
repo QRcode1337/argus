@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useArgusStore } from "@/store/useArgusStore";
 
 interface PneumaState {
   phi: number;
@@ -34,7 +35,8 @@ function getPhiBarWidth(phi: number): string {
   return `${Math.max(0, Math.min(100, phi * 100))}%`;
 }
 
-export default function PneumaHud({ threatLevel = "GREEN" }: { threatLevel?: string }) {
+export default function PneumaHud({ threatLevel = "GREEN", inline = false }: { threatLevel?: string; inline?: boolean }) {
+  const camera = useArgusStore((s) => s.camera);
   const [state, setState] = useState<PneumaState>({
     phi: 0,
     moodRegime: "unknown",
@@ -68,7 +70,7 @@ export default function PneumaHud({ threatLevel = "GREEN" }: { threatLevel?: str
   const threatColor = THREAT_COLORS[threatLevel] ?? "text-[#928374]";
 
   return (
-    <div className="pointer-events-auto w-[200px] rounded-md border border-[#3c3836] bg-[#1d2021e6] font-mono text-[9px] uppercase tracking-[0.18em]">
+    <div className={`font-mono text-[9px] uppercase tracking-[0.18em] ${inline ? "mt-2 w-full rounded-xl border border-[#3c3836] bg-[#1d2021]" : "pointer-events-auto w-[200px] rounded-md border border-[#3c3836] bg-[#1d2021e6]"}`}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[#3c3836] px-2.5 py-1.5">
         <span className="text-[10px] tracking-[0.28em] text-[#fabd2f]">
@@ -132,6 +134,14 @@ export default function PneumaHud({ threatLevel = "GREEN" }: { threatLevel?: str
         <div className="flex items-center justify-between text-[#a89984]">
           <span>PIPELINE</span>
           <span className="text-[#83a598]">{state.pipelineTimeMs}ms</span>
+        </div>
+
+        {/* Geospatial Anchor */}
+        <div className="flex items-center justify-between text-[#a89984] pt-1 border-t border-[#3c3836]">
+          <span>ANCHOR</span>
+          <span className="text-[#83a598]">
+            {camera.lat.toFixed(3)}N {camera.lon.toFixed(3)}E
+          </span>
         </div>
       </div>
     </div>

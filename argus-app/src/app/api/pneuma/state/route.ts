@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readSettings } from "@/lib/settings";
 import { getPneumaInstance } from "@/lib/ai/llmClient";
+import { logPneumaLatency } from "@/lib/telemetry/pneumaLatencyLogger";
 
 /**
  * GET /api/pneuma/state
@@ -10,16 +11,24 @@ import { getPneumaInstance } from "@/lib/ai/llmClient";
  */
 
 export async function GET() {
+  const start = performance.now();
   const { llm } = await readSettings();
 
   if (llm.provider !== "pneuma") {
+    const latency_ms = Math.round(performance.now() - start);
+    logPneumaLatency({
+      route: "/api/pneuma/state",
+      context: null,
+      latency_ms,
+      status_code: 200,
+    }).catch(console.error);
     return NextResponse.json({
       isActive: false,
       phi: 0,
       moodRegime: "unknown",
       memoryNodes: 0,
       cycleCount: 0,
-      pipelineTimeMs: 0,
+      pipelineTimeMs: latency_ms,
     });
   }
 
@@ -31,13 +40,20 @@ export async function GET() {
   }
 
   if (!pneuma || !pneuma.isInitialized) {
+    const latency_ms = Math.round(performance.now() - start);
+    logPneumaLatency({
+      route: "/api/pneuma/state",
+      context: null,
+      latency_ms,
+      status_code: 200,
+    }).catch(console.error);
     return NextResponse.json({
       isActive: true,
       phi: 0,
       moodRegime: "exploratory-curious",
       memoryNodes: 0,
       cycleCount: 0,
-      pipelineTimeMs: 0,
+      pipelineTimeMs: latency_ms,
     });
   }
 
@@ -46,22 +62,37 @@ export async function GET() {
     const moodRegime = pneuma.getMoodRegime();
     const memoryGraph = pneuma.getMemoryGraph();
 
+    const latency_ms = Math.round(performance.now() - start);
+    logPneumaLatency({
+      route: "/api/pneuma/state",
+      context: null,
+      latency_ms,
+      status_code: 200,
+    }).catch(console.error);
+
     return NextResponse.json({
       isActive: true,
       phi: phiRouter.getLatestPhi()?.value ?? 0,
-      moodRegime: moodRegime.currentRegime ?? "exploratory-curious",
+      moodRegime: moodRegime.regimeLabels?.[moodRegime.currentRegime] ?? "exploratory-curious",
       memoryNodes: memoryGraph.size ?? 0,
       cycleCount: pneuma.getCycleCount(),
-      pipelineTimeMs: 0,
+      pipelineTimeMs: latency_ms,
     });
   } catch {
+    const latency_ms = Math.round(performance.now() - start);
+    logPneumaLatency({
+      route: "/api/pneuma/state",
+      context: null,
+      latency_ms,
+      status_code: 200,
+    }).catch(console.error);
     return NextResponse.json({
       isActive: true,
       phi: 0,
       moodRegime: "exploratory-curious",
       memoryNodes: 0,
       cycleCount: pneuma.getCycleCount?.() ?? 0,
-      pipelineTimeMs: 0,
+      pipelineTimeMs: latency_ms,
     });
   }
 }

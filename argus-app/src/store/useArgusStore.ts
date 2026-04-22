@@ -5,6 +5,7 @@ import type {
   AnalyticsLayerKey,
   CameraReadout,
   ClickedCoordinates,
+  CorroborationAlert,
   FeedHealth,
   FeedKey,
   LayerKey,
@@ -14,6 +15,15 @@ import type {
   VisualMode,
   VisualParams,
 } from "@/types/intel";
+
+import type { BreakingNewsCard } from "@/lib/analysis/breakingNews";
+import type { NewsCluster } from "@/lib/analysis/newsClustering";
+
+export type AcledEvent = { event_type: string; country: string; location: string; fatalities: number; actor1: string; event_date: string; latitude: number; longitude: number };
+export type PolymarketEvent = { question: string; probability: number; volume: number; category: string; slug: string };
+export type GdacsEvent = { type: string; severity: string; country: string; title: string; populationExposed: number; date: string; lat: number; lon: number };
+export type FaaDelay = { airport: string; delayType: string; reason: string; avgDelay: string };
+export type FaaNotam = { id: string; location: string; type: string; description: string };
 
 export interface SearchResult {
   id: string;
@@ -36,7 +46,14 @@ type ArgusStore = {
     threats: number;
     gdelt: number;
     anomalies: number;
+    weather: number;
+    vessels: number;
   };
+  ciiScores: Record<string, { score: number; signals: Record<string, number>; updatedAt: number }>;
+  setCiiScores: (scores: Record<string, { score: number; signals: Record<string, number>; updatedAt: number }>) => void;
+  alerts: CorroborationAlert[];
+  addAlert: (alert: CorroborationAlert) => void;
+  updateAlert: (id: string, patch: Partial<CorroborationAlert>) => void;
   feedHealth: Record<FeedKey, FeedHealth>;
   activePoiId: string | null;
   camera: CameraReadout;
@@ -59,7 +76,9 @@ type ArgusStore = {
       | "outages"
       | "threats"
       | "gdelt"
-      | "anomalies",
+      | "anomalies"
+      | "weather"
+      | "vessels",
     value: number,
   ) => void;
   setFeedHealthy: (key: FeedKey) => void;
@@ -104,12 +123,30 @@ type ArgusStore = {
   setClickedCoordinates: (coords: ClickedCoordinates | null) => void;
   dayNight: boolean;
   toggleDayNight: () => void;
+  // New feed data
+  acledEvents: AcledEvent[];
+  setAcledEvents: (events: AcledEvent[]) => void;
+  polymarketEvents: PolymarketEvent[];
+  setPolymarketEvents: (events: PolymarketEvent[]) => void;
+  gdacsEvents: GdacsEvent[];
+  setGdacsEvents: (events: GdacsEvent[]) => void;
+  faaDelays: FaaDelay[];
+  setFaaDelays: (delays: FaaDelay[]) => void;
+  faaNotams: FaaNotam[];
+  setFaaNotams: (notams: FaaNotam[]) => void;
+  breakingNews: BreakingNewsCard[];
+  setBreakingNews: (news: BreakingNewsCard[]) => void;
+  newsClusters: NewsCluster<{ title: string; score: number }>[];
+  setNewsClusters: (clusters: NewsCluster<{ title: string; score: number }>[]) => void;
 };
 
 const emptyFeed = (): FeedHealth => ({
   status: "idle",
   lastSuccessAt: null,
   lastError: null,
+  nextRefreshAt: null,
+  consecutiveFailures: 0,
+  circuitState: "closed",
 });
 
 export const useArgusStore = create<ArgusStore>((set) => ({
@@ -124,6 +161,9 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     threats: true,
     gdelt: true,
     anomalies: true,
+    weather: false,
+    vessels: true,
+    instability: false,
   },
   counts: {
     flights: 0,
@@ -136,6 +176,8 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     threats: 0,
     gdelt: 0,
     anomalies: 0,
+    weather: 0,
+    vessels: 0,
   },
   feedHealth: {
     opensky: emptyFeed(),
@@ -149,6 +191,11 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     gdelt: emptyFeed(),
     threatradar: emptyFeed(),
     phantom: emptyFeed(),
+    news: emptyFeed(),
+    acled: emptyFeed(),
+    polymarket: emptyFeed(),
+    gdacs: emptyFeed(),
+    faa: emptyFeed(),
   },
   activePoiId: null,
   camera: {
@@ -205,27 +252,37 @@ export const useArgusStore = create<ArgusStore>((set) => ({
       },
     })),
   setFeedHealthy: (key) =>
-    set((state) => ({
+    set((s) => ({
       feedHealth: {
-        ...state.feedHealth,
+        ...s.feedHealth,
         [key]: {
           status: "ok",
           lastSuccessAt: Date.now(),
           lastError: null,
+          nextRefreshAt: s.feedHealth[key]?.nextRefreshAt ?? null,
+          consecutiveFailures: 0,
+          circuitState: "closed",
         },
       },
     })),
   setFeedError: (key, message) =>
-    set((state) => ({
-      feedHealth: {
-        ...state.feedHealth,
-        [key]: {
-          ...state.feedHealth[key],
-          status: "error",
-          lastError: message,
+    set((s) => {
+      const prev = s.feedHealth[key];
+      const failures = (prev?.consecutiveFailures ?? 0) + 1;
+      return {
+        feedHealth: {
+          ...s.feedHealth,
+          [key]: {
+            status: failures >= 2 ? "cooldown" : "error",
+            lastSuccessAt: prev?.lastSuccessAt ?? null,
+            lastError: message,
+            nextRefreshAt: prev?.nextRefreshAt ?? null,
+            consecutiveFailures: failures,
+            circuitState: failures >= 2 ? "open" : prev?.circuitState ?? "closed",
+          },
         },
-      },
-    })),
+      };
+    }),
   setCamera: (camera) => set({ camera }),
   setActivePoiId: (poiId) => set({ activePoiId: poiId }),
   setVisualMode: (mode) => set({ visualMode: mode }),
@@ -274,4 +331,24 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setPlaybackCurrentTime: (time) => set({ playbackCurrentTime: time }),
   dayNight: false,
   toggleDayNight: () => set((state) => ({ dayNight: !state.dayNight })),
+  // New feed data
+  acledEvents: [],
+  setAcledEvents: (events) => set({ acledEvents: events }),
+  polymarketEvents: [],
+  setPolymarketEvents: (events) => set({ polymarketEvents: events }),
+  gdacsEvents: [],
+  setGdacsEvents: (events) => set({ gdacsEvents: events }),
+  faaDelays: [],
+  setFaaDelays: (delays) => set({ faaDelays: delays }),
+  faaNotams: [],
+  setFaaNotams: (notams) => set({ faaNotams: notams }),
+  breakingNews: [],
+  setBreakingNews: (news) => set({ breakingNews: news }),
+  newsClusters: [],
+  setNewsClusters: (clusters) => set({ newsClusters: clusters }),
+  ciiScores: {},
+  setCiiScores: (scores) => set({ ciiScores: scores }),
+  alerts: [],
+  addAlert: (alert) => set((s) => ({ alerts: [alert, ...s.alerts].slice(0, 100) })),
+  updateAlert: (id, patch) => set((s) => ({ alerts: s.alerts.map((a) => (a.id === id ? { ...a, ...patch } : a)) })),
 }));

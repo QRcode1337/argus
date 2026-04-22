@@ -256,88 +256,20 @@ router.get("/tfl-cctv", async (_req, res) => {
   });
 });
 
+
+const redis = require("../redis");
+
 router.get("/news", async (_req, res) => {
-  const sources = parseNewsSources();
-  const maxItems = Math.max(10, Math.min(500, Number(process.env.NEWS_MAX_ITEMS ?? 100)));
-
-  const feedResults = await Promise.all(
-    sources.map(async (source) => {
-      try {
-        const response = await fetch(source.url, {
-          cache: "no-store",
-          headers: {
-            Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9",
-            "User-Agent": "ArgusNewsBot/1.0",
-          },
-        });
-        if (!response.ok) return { source, items: [] };
-        const xml = await response.text();
-        return { source, items: parseFeed(xml, source.name) };
-      } catch {
-        return { source, items: [] };
-      }
-    }),
-  );
-
-  const weightBySource = new Map(feedResults.map((entry) => [entry.source.name, entry.source.weight]));
-  const deduped = [];
-  const seenUrls = new Set();
-  const seenSignatures = new Set();
-
-  for (const item of feedResults.flatMap((entry) => entry.items)) {
-    const url = canonicalizeUrl(item.url);
-    if (!url || seenUrls.has(url)) continue;
-    const sig = titleSignature(item.title);
-    if (sig && seenSignatures.has(sig)) continue;
-
-    const tags = classifyTags(`${item.title} ${item.summary}`);
-    const region = classifyRegion(`${item.title} ${item.summary}`);
-    const score = computeScore(item, weightBySource.get(item.source) ?? 0.75, tags);
-    deduped.push({
-      ...item,
-      id: createHash("sha1").update(`${item.title}|${url}`).digest("hex").slice(0, 12),
-      url,
-      tags,
-      region,
-      score,
-    });
-    seenUrls.add(url);
-    if (sig) seenSignatures.add(sig);
-  }
-
-  const items = deduped
-    .sort((a, b) => b.score - a.score || b.publishedAt.localeCompare(a.publishedAt))
-    .slice(0, maxItems);
-
-  const buckets = {
-    WORLDCOM: [...items],
-    CENTCOM: [],
-    NORTHCOM: [],
-    SOUTHCOM: [],
-    EUCOM: [],
-    AFRICOM: [],
-    INDOPACOM: [],
-  };
-  for (const item of items) {
-    if (item.region !== "WORLDCOM" && buckets[item.region]) {
-      buckets[item.region].push(item);
+  try {
+    const data = await redis.get("argus:news");
+    if (data) {
+      return res.json(JSON.parse(data));
     }
+    return res.json({ items: [], meta: { sourcesChecked: 0, fetchedAt: new Date().toISOString(), dedupedCount: 0 }, regions: {} });
+  } catch (error) {
+    console.error("Error reading news from Redis:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
-
-  const regions = {};
-  for (const region of COMMAND_REGIONS) {
-    regions[region] = buildRegionSummary(region, buckets[region].slice(0, 15));
-  }
-
-  return res.json({
-    items,
-    meta: {
-      sourcesChecked: sources.length,
-      fetchedAt: new Date().toISOString(),
-      dedupedCount: items.length,
-    },
-    regions,
-  });
 });
 
 module.exports = router;

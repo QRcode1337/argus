@@ -35,14 +35,20 @@ export function FlatMapView({ onSelectIntel, onSelectCoordinates }: FlatMapViewP
   const zoomRef = useRef(1);
   const panRef = useRef({ x: 0, y: 0 });
   const draggingRef = useRef(false);
-  const lastMouseRef = useRef({ x: 0, y: 0 });
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<Element, unknown> | null>(null);
 
-  const applyTransform = useCallback(() => {
+  const applyTransform = useCallback((transform?: d3.ZoomTransform) => {
     const el = wrapperRef.current;
     if (!el) return;
-    const { x, y } = panRef.current;
-    const z = zoomRef.current;
-    el.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
+    if (transform) {
+      zoomRef.current = transform.k;
+      panRef.current = { x: transform.x, y: transform.y };
+      el.style.transform = `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`;
+    } else {
+      const { x, y } = panRef.current;
+      const z = zoomRef.current;
+      el.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
+    }
   }, []);
 
   // GDELT polling
@@ -193,55 +199,38 @@ export function FlatMapView({ onSelectIntel, onSelectCoordinates }: FlatMapViewP
     return () => { cancelled = true; };
   }, [onSelectIntel]);
 
-  // Zoom via mouse wheel
+  // D3 zoom/pan
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.3 : 0.3;
-      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomRef.current + delta));
-      zoomRef.current = next;
-      applyTransform();
-    };
+    const zoom = d3.zoom<HTMLDivElement, unknown>()
+      .scaleExtent([MIN_ZOOM, MAX_ZOOM])
+      .on("start", () => {
+        draggingRef.current = true;
+        if (containerRef.current) containerRef.current.style.cursor = "grabbing";
+      })
+      .on("zoom", (event) => {
+        applyTransform(event.transform);
+      })
+      .on("end", () => {
+        draggingRef.current = false;
+        if (containerRef.current) containerRef.current.style.cursor = "grab";
+      });
 
-    container.addEventListener("wheel", onWheel, { passive: false });
-    return () => container.removeEventListener("wheel", onWheel);
-  }, [applyTransform]);
+    zoomBehaviorRef.current = zoom as any;
 
-  // Pan via mouse drag
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const sel = d3.select(container);
+    sel.call(zoom);
 
-    const onDown = (e: MouseEvent) => {
-      draggingRef.current = true;
-      lastMouseRef.current = { x: e.clientX, y: e.clientY };
-    };
-
-    const onMove = (e: MouseEvent) => {
-      if (!draggingRef.current) return;
-      const dx = e.clientX - lastMouseRef.current.x;
-      const dy = e.clientY - lastMouseRef.current.y;
-      lastMouseRef.current = { x: e.clientX, y: e.clientY };
-      panRef.current.x += dx;
-      panRef.current.y += dy;
-      applyTransform();
-    };
-
-    const onUp = () => {
-      draggingRef.current = false;
-    };
-
-    container.addEventListener("mousedown", onDown);
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    // Initialize with current values
+    sel.call(
+      zoom.transform,
+      d3.zoomIdentity.translate(panRef.current.x, panRef.current.y).scale(zoomRef.current)
+    );
 
     return () => {
-      container.removeEventListener("mousedown", onDown);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      sel.on(".zoom", null);
     };
   }, [applyTransform]);
 
@@ -263,13 +252,17 @@ export function FlatMapView({ onSelectIntel, onSelectCoordinates }: FlatMapViewP
 
     // Ensure target is visible and centered; keep some zoom for context.
     const targetZoom = Math.max(zoomRef.current, 2.2);
-    zoomRef.current = targetZoom;
-    panRef.current = {
-      x: bounds.width / 2 - x * targetZoom,
-      y: bounds.height / 2 - y * targetZoom,
-    };
-    applyTransform();
-  }, [applyTransform, clickedCoordinates]);
+    
+    if (zoomBehaviorRef.current) {
+      d3.select(container)
+        .transition()
+        .duration(750)
+        .call(
+          zoomBehaviorRef.current.transform as any,
+          d3.zoomIdentity.translate(bounds.width / 2 - x * targetZoom, bounds.height / 2 - y * targetZoom).scale(targetZoom)
+        );
+    }
+  }, [clickedCoordinates]);
 
   const handleEventClick = useCallback((event: GdeltEvent) => {
     const quadLabel = QUAD_CLASS_LABELS[event.quadClass] ?? "Unknown";
@@ -321,7 +314,7 @@ export function FlatMapView({ onSelectIntel, onSelectCoordinates }: FlatMapViewP
     >
       <div
         ref={wrapperRef}
-        className="h-full w-full origin-center"
+        className="h-full w-full origin-center touch-none"
         style={{ transformOrigin: "center center" }}
       >
         <svg

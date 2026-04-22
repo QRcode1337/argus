@@ -3,7 +3,24 @@ import { reportFeedHealth } from "@/lib/feedHealth";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_BOUNDS = [[[[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]]];
+// Focused bounding boxes for strategic maritime regions.
+// NO global box — a global box floods the stream with random vessels worldwide
+// and you hit the message cap before getting meaningful density in key areas.
+// AISStream sends messages matching ANY box, so each region gets dedicated coverage.
+const DEFAULT_BOUNDS = [
+  [[23, 48], [30, 60]],               // Persian Gulf & Strait of Hormuz
+  [[10, 40], [16, 46]],               // Bab el-Mandeb & Gulf of Aden
+  [[12, 32], [32, 44]],               // Red Sea & Suez Canal (full length)
+  [[30, 24], [42, 37]],               // Eastern Mediterranean
+  [[-5, 98], [8, 106]],               // Strait of Malacca
+  [[20, 118], [28, 123]],             // Taiwan Strait & South China Sea
+  [[48, -8], [62, 12]],               // North Sea & English Channel
+  [[33, -10], [48, 5]],               // Western Mediterranean & Gibraltar
+  [[25, -82], [32, -78]],             // Straits of Florida
+  [[8, 76], [22, 90]],                // Bay of Bengal & Indian Ocean approaches
+  [[-8, 38], [12, 52]],               // East African coast / Mozambique Channel
+  [[30, 125], [45, 145]],             // East China Sea & Sea of Japan
+];
 
 type AisVessel = {
   mmsi: number;
@@ -59,9 +76,10 @@ type WsConstructor = new (
 ) => WsLike;
 
 let cache: AisCache | null = null;
+const CACHE_TTL_MS = 45_000; // Serve cached data for 45s to avoid hammering the WebSocket
 
-const REQUEST_TIMEOUT_MS = Number(process.env.AISSTREAM_TIMEOUT_MS ?? 12000);
-const MAX_MESSAGES = Number(process.env.AISSTREAM_MAX_MESSAGES ?? 200);
+const REQUEST_TIMEOUT_MS = Number(process.env.AISSTREAM_TIMEOUT_MS ?? 40000);
+const MAX_MESSAGES = Number(process.env.AISSTREAM_MAX_MESSAGES ?? 2000);
 
 function rawDataToString(data: unknown): string {
   if (typeof data === "string") return data;
@@ -110,6 +128,7 @@ async function fetchSnapshotFromWs(apiKey: string): Promise<AisPayload> {
 
   return new Promise((resolve, reject) => {
     const vessels = new Map<number, AisVessel>();
+    let upstreamError: string | null = null;
 
     const ws = new WebSocket("wss://stream.aisstream.io/v0/stream", {
       handshakeTimeout: REQUEST_TIMEOUT_MS,
@@ -144,6 +163,12 @@ async function fetchSnapshotFromWs(apiKey: string): Promise<AisPayload> {
     ws.on("message", (data: unknown) => {
       try {
         const parsed = JSON.parse(rawDataToString(data));
+        if (parsed && typeof parsed === "object" && typeof (parsed as { error?: unknown }).error === "string") {
+          upstreamError = (parsed as { error: string }).error;
+          try { ws.close(); } catch {}
+          finish(() => reject(new Error(upstreamError ?? "AISStream upstream error")));
+          return;
+        }
         const vessel = normalizeAisMessage(parsed);
         if (vessel) vessels.set(vessel.mmsi, vessel);
 
@@ -163,7 +188,7 @@ async function fetchSnapshotFromWs(apiKey: string): Promise<AisPayload> {
     ws.on("close", () => {
       finish(() => {
         if (vessels.size > 0) resolve({ vessels: Array.from(vessels.values()) });
-        else reject(new Error("AISStream connection closed without data"));
+        else reject(new Error(upstreamError ?? "AISStream connection closed without data"));
       });
     });
   });
@@ -173,6 +198,11 @@ export async function GET() {
   const apiKey = process.env.AISSTREAM_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "AISSTREAM_API_KEY not configured" }, { status: 500 });
+  }
+
+  // Return cached data if still fresh
+  if (cache && Date.now() - new Date(cache.cachedAt).getTime() < CACHE_TTL_MS) {
+    return NextResponse.json({ ...cache.data, _cached: true });
   }
 
   try {

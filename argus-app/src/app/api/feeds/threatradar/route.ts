@@ -6,9 +6,13 @@ const BASE = "https://radar.offseq.com/api/v1";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const limit = searchParams.get("limit") ?? "10";
+  const apiKey = process.env.THREATRADAR_API_KEY;
   try {
     const res = await fetch(`${BASE}/threats?limit=${limit}`, {
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
       next: { revalidate: 300 },
     });
     if (!res.ok) throw new Error(`ThreatRadar: ${res.status}`);

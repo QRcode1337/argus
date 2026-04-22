@@ -3,17 +3,16 @@ services:
     image: nginx:1.27-alpine
     container_name: argus_nginx
     depends_on:
-      - argus-app
-      - argus-api
-      - titiler
+    - argus-app
+    - argus-api
+    - titiler
     ports:
-      - "80:80"
+    - 80:80
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
-      - argus_network
+    - argus_network
     restart: unless-stopped
-
   argus-app:
     build:
       context: ./argus-app
@@ -26,58 +25,64 @@ services:
         NEXT_PUBLIC_PHANTOM_ENDPOINT: http://phantom:7700
     container_name: argus_app
     expose:
-      - "3000"
+    - '3000'
     environment:
-      - NODE_ENV=production
-      - NEXT_TELEMETRY_DISABLED=1
-      - NEXT_PUBLIC_CESIUM_ION_TOKEN=${CESIUM_ION_TOKEN}
-      - NEXT_PUBLIC_TITILER_URL=/tiles
-      - CLOUDFLARE_RADAR_TOKEN=${CLOUDFLARE_RADAR_TOKEN}
-      - OTX_API_KEY=${OTX_API_KEY}
-      - FRED_API_KEY=${FRED_API_KEY}
-      - FRED_SERIES_ID=${FRED_SERIES_ID:-DFF}
-      - AISSTREAM_API_KEY=${AISSTREAM_API_KEY}
-      - AISSTREAM_ENDPOINT=${AISSTREAM_ENDPOINT:-https://api.aisstream.io/v0/vessels}
-      - OPENSKY_CLIENT_ID=${OPENSKY_CLIENT_ID}
-      - OPENSKY_CLIENT_SECRET=${OPENSKY_CLIENT_SECRET}
-      - GLITCHTIP_APP_DSN=${GLITCHTIP_APP_DSN}
-      - NEXT_PUBLIC_GLITCHTIP_DSN=${NEXT_PUBLIC_GLITCHTIP_DSN}
-      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
-      - NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-0.05}
-      - NEXT_PUBLIC_PHANTOM_ENDPOINT=http://phantom:7700
+    - NODE_ENV=production
+    - NEXT_TELEMETRY_DISABLED=1
+    - NEXT_PUBLIC_CESIUM_ION_TOKEN=${CESIUM_ION_TOKEN}
+    - NEXT_PUBLIC_TITILER_URL=/tiles
+    - CLOUDFLARE_RADAR_TOKEN=${CLOUDFLARE_RADAR_TOKEN}
+    - OTX_API_KEY=${OTX_API_KEY}
+    - FRED_API_KEY=${FRED_API_KEY}
+    - FRED_SERIES_ID=${FRED_SERIES_ID:-DFF}
+    - AISSTREAM_API_KEY=${AISSTREAM_API_KEY}
+    - AISSTREAM_ENDPOINT=${AISSTREAM_ENDPOINT:-https://api.aisstream.io/v0/vessels}
+    - OPENSKY_CLIENT_ID=${OPENSKY_CLIENT_ID}
+    - OPENSKY_CLIENT_SECRET=${OPENSKY_CLIENT_SECRET}
+    - GLITCHTIP_APP_DSN=${GLITCHTIP_APP_DSN}
+    - NEXT_PUBLIC_GLITCHTIP_DSN=${NEXT_PUBLIC_GLITCHTIP_DSN}
+    - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+    - NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-0.05}
+    - NEXT_PUBLIC_PHANTOM_ENDPOINT=http://phantom:7700
+    - GRADIENT_MODEL_ACCESS_KEY=${GRADIENT_MODEL_ACCESS_KEY}
+    - GRADIENT_ENDPOINT_ACCESS_KEY=${GRADIENT_ENDPOINT_ACCESS_KEY}
+    - GRADIENT_BASE_URL=${GRADIENT_BASE_URL}
+    - THREATRADAR_API_KEY=${THREATRADAR_API_KEY}
+    volumes:
+    - ./data:/app/data
     depends_on:
-      - argus-api
-      - phantom
+    - argus-api
+    - phantom
     networks:
-      - argus_network
+    - argus_network
     restart: unless-stopped
-
   argus-api:
     build:
       context: ./argus-api
       dockerfile: Dockerfile
     container_name: argus_api
     expose:
-      - "3001"
+    - '3001'
     environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - DATABASE_URL=postgresql://argus:argus_dev@postgis:5432/argus
-      - REDIS_URL=redis://redis:6379
-      - GLITCHTIP_API_DSN=${GLITCHTIP_API_DSN}
-      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
-      - TILES_DIR=/data/tiles
-      - TITILER_BASE_PATH=/tiles
-      - EVENTS_STREAM_PATH=/api/events/stream
+    - NODE_ENV=production
+    - PORT=3001
+    - DATABASE_URL=postgresql://argus:argus_dev@pgbouncer:6432/argus
+    - REDIS_URL=redis://redis:6379
+    - GLITCHTIP_API_DSN=${GLITCHTIP_API_DSN}
+    - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+    - TILES_DIR=/data/tiles
+    - TITILER_BASE_PATH=/tiles
+    - EVENTS_STREAM_PATH=/api/events/stream
     volumes:
-      - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/tiles:/data/tiles:ro
+    - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/tiles:/data/tiles:ro
     depends_on:
       postgis:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
     networks:
-      - argus_network
+    - argus_network
     restart: unless-stopped
-
   postgis:
     image: timescale/timescaledb-ha:pg16-all
     container_name: argus_postgis
@@ -86,31 +91,31 @@ services:
       POSTGRES_USER: argus
       POSTGRES_PASSWORD: argus_dev
     volumes:
-      - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/pgdata:/home/postgres/pgdata
-      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/pgdata:/home/postgres/pgdata
+    - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U argus -d argus"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U argus -d argus
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - argus_network
+    - argus_network
     restart: unless-stopped
-
   titiler:
     image: ghcr.io/developmentseed/titiler:latest
     container_name: argus_titiler
     environment:
-      - PORT=80
-      - WORKERS_PER_CORE=1
-      - WEB_CONCURRENCY=2
-      - GDAL_CACHEMAX=128
+    - PORT=80
+    - WORKERS_PER_CORE=1
+    - WEB_CONCURRENCY=2
+    - GDAL_CACHEMAX=128
     volumes:
-      - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/tiles:/data/tiles:ro
+    - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/tiles:/data/tiles:ro
     networks:
-      - argus_network
+    - argus_network
     restart: unless-stopped
-
   ingestor:
     build:
       context: ./ingestor
@@ -119,42 +124,57 @@ services:
     depends_on:
       postgis:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
     environment:
-      - DATABASE_URL=postgresql://argus:argus_dev@postgis:5432/argus
-      - REDIS_URL=redis://redis:6379
-      - TILES_DIR=/data/tiles
-      - GFS_CRON=0 */6 * * *
-      - LOG_LEVEL=INFO
+    - DATABASE_URL=postgresql://argus:argus_dev@pgbouncer:6432/argus
+    - REDIS_URL=redis://redis:6379
+    - TILES_DIR=/data/tiles
+    - GFS_CRON=0 */6 * * *
+    - LOG_LEVEL=INFO
     volumes:
-      - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/tiles:/data/tiles
+    - ${ARGUS_DATA_ROOT:-/mnt/volume-nyc3-01}/tiles:/data/tiles
     networks:
-      - argus_network
+    - argus_network
     restart: unless-stopped
-
   phantom:
     build: ./phantom
     container_name: argus_phantom
     expose:
-      - "7700"
+    - '7700'
     environment:
-      - PHANTOM_ADDR=0.0.0.0:7700
-      - RUST_LOG=phantom=info
+    - PHANTOM_ADDR=0.0.0.0:7700
+    - RUST_LOG=phantom=info
     networks:
-      - argus_network
+    - argus_network
     restart: unless-stopped
-
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: argus_cloudflared
     command: tunnel --no-autoupdate run
     volumes:
-      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
-      - ./cloudflared/credentials.json:/etc/cloudflared/credentials.json:ro
+    - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+    - ./cloudflared/credentials.json:/etc/cloudflared/credentials.json:ro
     depends_on:
-      - nginx
+    - nginx
     networks:
-      - argus_network
+    - argus_network
     restart: unless-stopped
-
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: argus_pgbouncer
+    environment:
+    - DATABASE_URL=postgresql://argus:argus_dev@postgis:5432/argus
+    - MAX_CLIENT_CONN=1000
+    - DEFAULT_POOL_SIZE=20
+    - POOL_MODE=transaction
+    ports:
+    - 6432:6432
+    depends_on:
+      postgis:
+        condition: service_healthy
+    networks:
+    - argus_network
+    restart: unless-stopped
 networks:
-  argus_network:
+  argus_network: null

@@ -90,12 +90,18 @@ export function computeSatellitePositions(
       }
 
       const geodetic = eciToGeodetic(propagated.position, gmst);
+      const lat = degreesLat(geodetic.latitude);
+      const lon = degreesLong(geodetic.longitude);
+      const alt = geodetic.height;
+      if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(alt)) {
+        return null;
+      }
       return {
         id: record.id,
         name: record.name,
-        latitude: degreesLat(geodetic.latitude),
-        longitude: degreesLong(geodetic.longitude),
-        altitudeKm: geodetic.height,
+        latitude: lat,
+        longitude: lon,
+        altitudeKm: alt,
       };
     })
     .filter((sat): sat is SatellitePosition => sat !== null);
@@ -121,11 +127,13 @@ export function computeOrbitTrack(
 
     const geodetic = eciToGeodetic(positionAndVelocity.position, gstime(t));
 
-    points.push([
-      toDegrees(geodetic.longitude),
-      toDegrees(geodetic.latitude),
-      geodetic.height * 1000,
-    ]);
+    const lon = toDegrees(geodetic.longitude);
+    const lat = toDegrees(geodetic.latitude);
+    const alt = geodetic.height * 1000;
+    if (!Number.isFinite(lon) || !Number.isFinite(lat) || !Number.isFinite(alt)) {
+      continue;
+    }
+    points.push([lon, lat, alt]);
   }
 
   return points;

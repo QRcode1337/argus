@@ -7,8 +7,12 @@ export async function GET(req: Request) {
   const q = searchParams.get("q") ?? "";
   if (!q) return NextResponse.json({ error: "q param required" }, { status: 400 });
   try {
+    const apiKey = process.env.THREATRADAR_API_KEY;
     const res = await fetch(`${BASE}/threats/search?q=${encodeURIComponent(q)}`, {
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
     });
     if (!res.ok) throw new Error(`Search: ${res.status}`);
     const data = await res.json();
