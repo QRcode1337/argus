@@ -103,14 +103,16 @@ export function normalizeAdsbLolAircraft(aircraft: AdsbLolAircraft[]): TrackedFl
       const altitudeMeters = ac.alt_baro !== undefined
         ? toAltMeters(ac.alt_baro)
         : toAltMeters(ac.alt_geom);
+      const latitude = ac.lat as number;
+      const longitude = ac.lon as number;
 
       const callsign = (ac.flight ?? "").replace(/\s+/g, "").toUpperCase() || ac.hex.toUpperCase();
       const category = classifyFlight(callsign, ac.t || ac.type);
       return {
         id: ac.hex.toLowerCase(),
         callsign,
-        longitude: ac.lon,
-        latitude: ac.lat,
+        longitude,
+        latitude,
         altitudeMeters,
         trueTrack: ac.track ?? 0,
         velocity: (ac.gs ?? 0) * 0.514444,
