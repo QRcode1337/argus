@@ -39,6 +39,7 @@ type ArgusStore = {
   layers: Record<LayerKey, boolean>;
   counts: {
     flights: number;
+    adsblol: number;
     military: number;
     satellites: number;
     satelliteLinks: number;

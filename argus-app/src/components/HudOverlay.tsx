@@ -1649,6 +1649,7 @@ export function HudOverlay({
                     {analyticsIntelDefs.map((layer) => {
                       const valueMap: Record<LayerKey, number> = {
                         flights: counts.flights,
+                        adsblol: counts.adsblol,
                         military: counts.military,
                         satellites: counts.satellites,
                         satelliteLinks: counts.satelliteLinks,
