@@ -1,19 +1,33 @@
+---
 name: deploy
-description: Build, commit, push, and verify the Argus app deployment
+description: Build, commit, push, rebuild the droplet container, and smoke-test the live endpoints
 user_invocable: true
-
 ---
 
 # Deploy Skill
 
-Run the full deployment pipeline for Argus.
+Full deployment pipeline for Argus. Runs on the droplet itself — no SSH needed.
 
 ## Steps
 
-1. Run `npx tsc --noEmit` in `argus-app/` to check for type errors. Stop if errors found.
-2. Run `npx next build` in `argus-app/` to verify production build. Stop if build fails.
-3. Show `git status` and `git diff --stat` to summarize changes.
-4. Stage relevant files (never stage .env files with secrets).
-5. Create a commit with a descriptive message.
-6. Push to origin/master.
-7. Report success and remind user to check Vercel deployment status.
+1. **Type-check.** `cd argus-app && npx tsc --noEmit`. Stop if errors.
+2. **Production build.** `npx next build` in `argus-app/`. Stop if build fails.
+3. **Stage + commit + push.**
+   - Show `git status` and `git diff --stat`.
+   - Stage only the files relevant to this change set, by name (never `git add -A`, never stage `.env*` or `data/settings.json`).
+   - Commit with a descriptive message ending with the standard `Co-Authored-By` line.
+   - `git push origin master`. If the push is rejected, `git pull --rebase origin master` (stashing any unrelated dirty files like `data/settings.json` first) and retry.
+4. **Rebuild the droplet container.**
+   `docker compose up -d --no-deps --build --force-recreate argus-app`
+   `--no-deps` prevents unrelated sibling services from being touched and avoids the orphan-container conflict that bites when phantom/api are also recreated.
+5. **Verify the new image is actually serving.**
+   `docker inspect -f '{{.Image}} created={{.Created}}' argus_app` — confirm the timestamp matches the build that just finished.
+6. **Smoke-test the live endpoints.** Invoke `/verify-deploy` (or curl inline). Always hit `/api/feeds/health` plus the route(s) touched by this change. Quote HTTP code + first ~200 bytes. Any 5xx = failure; do not declare success.
+7. **Report.** Commit sha, files changed, image sha, smoke-test results. Note Vercel auto-deploys separately from the GitHub push.
+
+## Rules
+
+- Do not skip step 6 — verify-before-victory is mandatory.
+- Do not stage `data/settings.json` — it is intentionally local on the droplet.
+- Do not run `docker system prune` or destructive volume ops as part of deploy.
+- If smoke tests fail, diagnose and iterate; do not claim success.
