@@ -68,6 +68,11 @@ const safeText = (value: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
+const safeIsoDate = (s: string): string => {
+  const d = new Date(s);
+  return Number.isFinite(d.getTime()) ? d.toISOString() : new Date().toISOString();
+};
+
 const extractTag = (block: string, tags: string[]): string => {
   for (const tag of tags) {
     const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i");
@@ -231,7 +236,7 @@ export async function GET() {
     title: entry.title,
     link: entry.link,
     source: entry.source,
-    pubDate: new Date(entry.pubDate).toISOString(),
+    pubDate: safeIsoDate(entry.pubDate),
     snippet: entry.description.slice(0, 200),
   }));
 

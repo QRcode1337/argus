@@ -113,6 +113,11 @@ const canonicalizeUrl = (value: string): string => {
   }
 };
 
+const safeIsoDate = (s: string): string => {
+  const d = new Date(s);
+  return Number.isFinite(d.getTime()) ? d.toISOString() : new Date().toISOString();
+};
+
 const extractTag = (block: string, tags: string[]): string => {
   for (const tag of tags) {
     const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i");
@@ -142,11 +147,10 @@ const parseRssItems = (xml: string, source: string): ParsedEntry[] => {
     const url = canonicalizeUrl(extractTag(block, ["link", "guid"]));
     if (!title || !url) continue;
 
-    const publishedAt =
-      extractTag(block, ["pubDate", "published", "updated"]) || new Date().toISOString();
+    const publishedAt = extractTag(block, ["pubDate", "published", "updated"]);
     const summary = extractTag(block, ["description", "content:encoded", "summary"]).slice(0, 320);
 
-    entries.push({ source, title, url, publishedAt: new Date(publishedAt).toISOString(), summary });
+    entries.push({ source, title, url, publishedAt: safeIsoDate(publishedAt), summary });
   }
 
   return entries;
@@ -161,10 +165,9 @@ const parseAtomItems = (xml: string, source: string): ParsedEntry[] => {
     const url = canonicalizeUrl(extractAtomLink(block));
     if (!title || !url) continue;
 
-    const publishedAt =
-      extractTag(block, ["updated", "published"]) || new Date().toISOString();
+    const publishedAt = extractTag(block, ["updated", "published"]);
     const summary = extractTag(block, ["summary", "content"]).slice(0, 320);
-    entries.push({ source, title, url, publishedAt: new Date(publishedAt).toISOString(), summary });
+    entries.push({ source, title, url, publishedAt: safeIsoDate(publishedAt), summary });
   }
 
   return entries;

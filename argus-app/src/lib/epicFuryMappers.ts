@@ -3,6 +3,14 @@ import type { MilitaryFlight, EarthquakeFeature } from "@/types/intel";
 import type { AisVessel } from "@/types/vessel";
 import { isInEpicFuryTheater, type EpicFuryIncident, type Severity } from "@/store/useEpicFuryStore";
 
+// GDELT v2 DATEADDED is YYYYMMDDHHMMSS in UTC, which Date.parse does not recognize.
+const parseGdeltDateAdded = (ts: string): number => {
+  if (!/^\d{14}$/.test(ts)) return Date.now();
+  const iso = `${ts.slice(0, 4)}-${ts.slice(4, 6)}-${ts.slice(6, 8)}T${ts.slice(8, 10)}:${ts.slice(10, 12)}:${ts.slice(12, 14)}Z`;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : Date.now();
+};
+
 export function mapGdeltIncidents(events: GdeltEvent[]): EpicFuryIncident[] {
   return events
     .filter(
@@ -21,7 +29,7 @@ export function mapGdeltIncidents(events: GdeltEvent[]): EpicFuryIncident[] {
         id: e.id,
         lat: e.latitude,
         lon: e.longitude,
-        timestamp: Date.parse(e.dateAdded) || Date.now(),
+        timestamp: parseGdeltDateAdded(e.dateAdded),
         title: e.actionGeoName || "Unknown Location",
         severity,
         detail: `${e.actor1Name || "?"} → ${e.actor2Name || "?"} | ${e.eventCode}`,
