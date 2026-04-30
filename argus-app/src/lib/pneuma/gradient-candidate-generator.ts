@@ -321,9 +321,9 @@ export class GradientCandidateGenerator {
           },
           body: JSON.stringify({
             ...(this.model ? { model: this.model } : {}),
+            // Gradient agent endpoints reject role:"system" — merge into user.
             messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userInput },
+              { role: 'user', content: `${systemPrompt}\n\n${userInput}` },
             ],
             max_tokens: 512,
           }),

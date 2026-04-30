@@ -126,13 +126,15 @@ export async function queryLlm(prompt: string, systemPrompt?: string): Promise<L
       return { text: "", error: "PNEUMA and Ollama fallback both failed" };
     }
 
-    // OpenAI-compatible
+    // OpenAI-compatible. Note: DigitalOcean Gradient agent endpoints reject
+    // role:"system" — agent instructions are configured on the agent itself.
+    // Merge systemPrompt into the user content so this branch works for both
+    // vanilla OpenAI-compatible servers and Gradient agents.
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (llm.apiKey) headers["Authorization"] = `Bearer ${llm.apiKey}`;
 
-    const messages = [];
-    if (systemPrompt) messages.push({ role: "system", content: systemPrompt });
-    messages.push({ role: "user", content: prompt });
+    const userContent = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
+    const messages = [{ role: "user", content: userContent }];
 
     const res = await fetch(`${llm.endpoint}/v1/chat/completions`, {
       method: "POST",
