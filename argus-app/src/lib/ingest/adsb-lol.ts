@@ -107,7 +107,7 @@ export function normalizeAdsbLolAircraft(aircraft: AdsbLolAircraft[]): TrackedFl
       const longitude = ac.lon as number;
 
       const callsign = (ac.flight ?? "").replace(/\s+/g, "").toUpperCase() || ac.hex.toUpperCase();
-      const category = classifyFlight(callsign, ac.t || ac.type);
+      const category = classifyFlight(callsign, ac.t ?? ac.type ?? null);
       return {
         id: ac.hex.toLowerCase(),
         callsign,
