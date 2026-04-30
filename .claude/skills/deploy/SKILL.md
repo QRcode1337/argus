@@ -23,7 +23,7 @@ Full deployment pipeline for Argus. Runs on the droplet itself — no SSH needed
 5. **Verify the new image is actually serving.**
    `docker inspect -f '{{.Image}} created={{.Created}}' argus_app` — confirm the timestamp matches the build that just finished.
 6. **Smoke-test the live endpoints.** Invoke `/verify-deploy` (or curl inline). Always hit `/api/feeds/health` plus the route(s) touched by this change. Quote HTTP code + first ~200 bytes. Any 5xx = failure; do not declare success.
-7. **Report.** Commit sha, files changed, image sha, smoke-test results. Note Vercel auto-deploys separately from the GitHub push.
+7. **Report.** Commit sha, files changed, image sha, smoke-test results. The droplet rebuild + smoke test IS the deploy — do not tell the user to "check Vercel"; Vercel auto-builds but isn't on the serving path.
 
 ## Rules
 

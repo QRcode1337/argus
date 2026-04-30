@@ -9,10 +9,11 @@
 ## Deployment (READ BEFORE ANY DEPLOY ACTION)
 
 - **You are already on the production droplet.** No SSH. Run `docker` commands directly.
-- **Primary backend = Docker on this DigitalOcean droplet.** A `git push` does NOT redeploy the droplet — you must rebuild the container:
+- **The backend IS the Docker stack on this droplet, fronted by Cloudflare Tunnel** — that's the entire serving path for `argusweb.bond`. The `argus_cloudflared` container exposes nginx → argus-app/argus-api/phantom/titiler to the public internet.
+- A `git push` does NOT redeploy the backend — you must rebuild the container:
   `docker compose up -d --no-deps --build --force-recreate argus-app`
-- **Vercel auto-deploys from GitHub master**, but it is the **secondary** target. Pushing to master triggers Vercel automatically; the droplet still needs its own rebuild.
-- **Live domain:** `argusweb.bond` via Cloudflare Tunnel (`argus_cloudflared` container). `argusweb.space` is suspended; ignore it.
+- **Vercel auto-builds from GitHub master but is NOT the backend.** It produces a build at a Vercel-hosted preview URL that no live traffic uses. Treat Vercel as a side-effect of pushing, not a deploy target. Don't rely on it; don't tell the user to "check Vercel".
+- **`argusweb.space` is suspended; ignore it.** Active domain is `argusweb.bond`.
 - **`data/settings.json` is volume-mounted and intentionally not committed** (contains live LLM apiKey). Edit directly — no rebuild needed for settings changes.
 - **Default flow after any code change**: build + commit + push + droplet rebuild + verify, all without asking. Use `/deploy`. Skip only if user says "don't commit" or is mid-iteration.
 
