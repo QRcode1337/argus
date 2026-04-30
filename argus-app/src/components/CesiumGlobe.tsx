@@ -34,6 +34,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ARGUS_CONFIG, CAMERA_PRESETS } from "@/lib/config";
 import { FlightLayer } from "@/lib/cesium/layers/flightLayer";
+import { normalizeAdsbLolAircraft } from "@/lib/ingest/adsb-lol";
 import { MilitaryLayer } from "@/lib/cesium/layers/militaryLayer";
 import { RasterLayer } from "@/lib/cesium/layers/rasterLayer";
 import { BasesLayer } from "@/lib/cesium/layers/basesLayer";
@@ -80,6 +81,7 @@ import type {
   SceneMode,
   SelectedIntel,
   SatelliteRecord,
+  TrackedFlight,
 } from "@/types/intel";
 
 import { HudOverlay } from "./HudOverlay";
@@ -642,6 +644,60 @@ const generateCirclePositions = (center: Cartesian3, radius: number, segments = 
   return positions;
 };
 
+type AdsbLolAllResponse = {
+  aircraft?: Parameters<typeof normalizeAdsbLolAircraft>[0];
+};
+
+const preferNumber = (primary: number, fallback: number): number => {
+  if (Number.isFinite(primary) && primary !== 0) return primary;
+  return fallback;
+};
+
+const preferCategory = (
+  primary: TrackedFlight["category"],
+  fallback: TrackedFlight["category"],
+): TrackedFlight["category"] => {
+  if (primary !== "unknown") return primary;
+  return fallback;
+};
+
+const mergeFlightRecords = (base: TrackedFlight, enrichment: TrackedFlight): TrackedFlight => ({
+  ...base,
+  callsign:
+    base.callsign === base.id.toUpperCase() && enrichment.callsign !== enrichment.id.toUpperCase()
+      ? enrichment.callsign
+      : base.callsign,
+  altitudeMeters: preferNumber(enrichment.altitudeMeters, base.altitudeMeters),
+  trueTrack: preferNumber(enrichment.trueTrack, base.trueTrack),
+  velocity: preferNumber(enrichment.velocity, base.velocity),
+  originCountry: base.originCountry === "Unknown" ? enrichment.originCountry : base.originCountry,
+  squawk: base.squawk ?? enrichment.squawk,
+  category: preferCategory(base.category, enrichment.category),
+});
+
+const buildUnifiedAirPicture = (
+  openSkyFlights: TrackedFlight[],
+  adsbLolFlights: TrackedFlight[],
+): { mergedFlights: TrackedFlight[]; adsbLolOnlyFlights: TrackedFlight[] } => {
+  const merged = new Map(openSkyFlights.map((flight) => [flight.id, flight]));
+  const adsbLolOnlyFlights: TrackedFlight[] = [];
+
+  for (const flight of adsbLolFlights) {
+    const existing = merged.get(flight.id);
+    if (existing) {
+      merged.set(flight.id, mergeFlightRecords(existing, flight));
+      continue;
+    }
+    adsbLolOnlyFlights.push(flight);
+    merged.set(flight.id, flight);
+  }
+
+  return {
+    mergedFlights: Array.from(merged.values()),
+    adsbLolOnlyFlights,
+  };
+};
+
 export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Viewer | null>(null);
@@ -664,6 +720,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const pickerRef = useRef<ScreenSpaceEventHandler | null>(null);
   const platformModeRef = useRef<PlatformMode>("live");
   const satRecordsRef = useRef<SatelliteRecord[]>([]);
+  const openSkyFlightsRef = useRef<TrackedFlight[]>([]);
+  const adsbLolFlightsRef = useRef<TrackedFlight[]>([]);
   const hoveredEntityRef = useRef<Entity | null>(null);
   const hoveredOriginalSizeRef = useRef<number | null>(null);
   const hoveredOriginalScaleRef = useRef<number | null>(null);
@@ -771,6 +829,34 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const setIsPlaying = useArgusStore((s) => s.setIsPlaying);
   const clickedCoordinates = useArgusStore((s) => s.clickedCoordinates);
   const setClickedCoordinates = useArgusStore((s) => s.setClickedCoordinates);
+  const setAdsbLolData = useArgusStore((s) => s.setAdsbLolData);
+
+  const syncFlightLayer = useCallback(() => {
+    const flightLayer = flightLayerRef.current;
+    if (!flightLayer) return;
+
+    const currentLayers = useArgusStore.getState().layers;
+    const { mergedFlights: unifiedFlights, adsbLolOnlyFlights } = buildUnifiedAirPicture(
+      openSkyFlightsRef.current,
+      adsbLolFlightsRef.current,
+    );
+
+    const visibleFlights: TrackedFlight[] = [];
+    if (currentLayers.flights) {
+      visibleFlights.push(...unifiedFlights);
+    }
+    if (currentLayers.adsblol) {
+      visibleFlights.push(...adsbLolOnlyFlights);
+    }
+
+    const dedupedVisibleFlights = Array.from(
+      new Map(visibleFlights.map((flight) => [flight.id, flight])).values(),
+    );
+    flightLayer.upsertFlights(dedupedVisibleFlights);
+    flightLayer.setVisible(currentLayers.flights || currentLayers.adsblol);
+    setCount("flights", openSkyFlightsRef.current.length);
+    setCount("adsblol", adsbLolOnlyFlights.length);
+  }, [setCount]);
 
   const flyToPoi = useCallback((poiId: string) => {
     const viewer = viewerRef.current;
@@ -1327,17 +1413,21 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         try {
           const flights = await fetchOpenSkyFlights(ARGUS_CONFIG.endpoints.openSky);
           const bounded = flights.slice(0, ARGUS_CONFIG.limits.maxFlights);
-          const count = flightLayer.upsertFlights(bounded);
-          setCount("flights", count);
+          openSkyFlightsRef.current = bounded;
+          syncFlightLayer();
           setFeedHealthy("opensky");
-          flightAlertsRef.current = analyzeFlights(bounded);
-          recordFlights(bounded);
+          const { mergedFlights } = buildUnifiedAirPicture(
+            openSkyFlightsRef.current,
+            adsbLolFlightsRef.current,
+          );
+          flightAlertsRef.current = analyzeFlights(mergedFlights);
+          recordFlights(mergedFlights);
 
           // Phantom anomaly detection (non-blocking, via server proxy)
           fetch("/api/phantom/flight", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ flights: bounded.map((f) => ({
+            body: JSON.stringify({ flights: mergedFlights.map((f) => ({
               flight_id: f.id, callsign: f.callsign,
               lat: f.latitude, lon: f.longitude,
               altitude: f.altitudeMeters, velocity: f.velocity,
@@ -1369,6 +1459,39 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setFeedError(
             "opensky",
             error instanceof Error ? error.message : "Failed to fetch OpenSky",
+          );
+          throw error;
+        }
+      },
+    });
+
+    poller.add({
+      id: "adsb-lol",
+      intervalMs: ARGUS_CONFIG.pollMs.adsblol,
+      run: async () => {
+        if (platformModeRef.current !== "live") return;
+        try {
+          const res = await fetch(ARGUS_CONFIG.endpoints.adsbLolAll, {
+            cache: "no-store",
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (!res.ok) {
+            throw new Error(`ADSB.lol error: ${res.status}`);
+          }
+
+          const data = (await res.json()) as AdsbLolAllResponse;
+          const normalized = normalizeAdsbLolAircraft(data.aircraft ?? []);
+          adsbLolFlightsRef.current = normalized;
+          setAdsbLolData(normalized);
+          syncFlightLayer();
+          flightAlertsRef.current = analyzeFlights(
+            buildUnifiedAirPicture(openSkyFlightsRef.current, adsbLolFlightsRef.current).mergedFlights,
+          );
+          setFeedHealthy("adsblol");
+        } catch (error) {
+          setFeedError(
+            "adsblol",
+            error instanceof Error ? error.message : "Failed to fetch ADSB.lol",
           );
           throw error;
         }
@@ -1779,7 +1902,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       visualModeRef.current = null;
       pickerRef.current = null;
     };
-  }, [pushIncidents, setCamera, setClickedCoordinates, setCount, setFeedError, setFeedHealthy]);
+  }, [pushIncidents, setAdsbLolData, setCamera, setClickedCoordinates, setCount, setFeedError, setFeedHealthy, syncFlightLayer]);
 
   // DVR playback data loop
   const playbackModeState = useArgusStore((s) => s.platformMode);
@@ -2123,7 +2246,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       setIsPlaying(false);
 
       const { layers } = useArgusStore.getState();
-      flightLayerRef.current?.setVisible(layers.flights);
+      syncFlightLayer();
       militaryLayerRef.current?.setVisible(layers.military);
       satLayerRef.current?.setVisible(layers.satellites);
       satLayerRef.current?.setLinkVisible(layers.satellites && layers.satelliteLinks);
@@ -2137,7 +2260,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       vesselLayerRef.current?.setVisible(layers.vessels);
       ciiLayerRef.current?.setVisible(layers.instability);
     }
-  }, [layers.gdelt, layers.outages, layers.threats, layers.anomalies, layers.vessels, layers.instability, platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange]);
+  }, [layers.adsblol, layers.gdelt, layers.outages, layers.threats, layers.anomalies, layers.vessels, layers.instability, platformMode, setIsPlaying, setPlaybackCurrentTime, setPlaybackTime, setPlaybackTimeRange, syncFlightLayer]);
 
   // Fetch analytics tile URLs once on mount, store in refs
   const gfsTileUrlRef = useRef<string | null>(null);
@@ -2209,7 +2332,11 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       return;
     }
 
-    flightLayerRef.current?.setVisible(layers.flights);
+    if (platformMode !== "live") {
+      return;
+    }
+
+    syncFlightLayer();
     militaryLayerRef.current?.setVisible(layers.military);
     satLayerRef.current?.setVisible(layers.satellites);
     satLayerRef.current?.setLinkVisible(layers.satellites && layers.satelliteLinks);
@@ -2223,6 +2350,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     weatherLayerRef.current?.setVisible(layers.weather);
   }, [
     platformMode,
+    layers.adsblol,
     layers.bases,
     layers.flights,
     layers.gdelt,
@@ -2235,6 +2363,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     layers.anomalies,
     layers.vessels,
     layers.weather,
+    syncFlightLayer,
   ]);
 
   // Globe ↔ Map scene mode toggle

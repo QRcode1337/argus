@@ -18,6 +18,8 @@ import type {
 
 import type { BreakingNewsCard } from "@/lib/analysis/breakingNews";
 import type { NewsCluster } from "@/lib/analysis/newsClustering";
+import type { ThreatRadarThreat } from "@/lib/ingest/threatradar";
+import type { TrackedFlight } from "@/types/intel";
 
 export type AcledEvent = { event_type: string; country: string; location: string; fatalities: number; actor1: string; event_date: string; latitude: number; longitude: number };
 export type PolymarketEvent = { question: string; probability: number; volume: number; category: string; slug: string };
@@ -69,6 +71,7 @@ type ArgusStore = {
     key:
       | "flights"
       | "military"
+      | "adsblol"
       | "satellites"
       | "satelliteLinks"
       | "seismic"
@@ -136,8 +139,12 @@ type ArgusStore = {
   setFaaNotams: (notams: FaaNotam[]) => void;
   breakingNews: BreakingNewsCard[];
   setBreakingNews: (news: BreakingNewsCard[]) => void;
+  threatradarData: ThreatRadarThreat[];
+  setThreatradarData: (threats: ThreatRadarThreat[]) => void;
   newsClusters: NewsCluster<{ title: string; score: number }>[];
   setNewsClusters: (clusters: NewsCluster<{ title: string; score: number }>[]) => void;
+  adsbLolData: TrackedFlight[];
+  setAdsbLolData: (data: TrackedFlight[]) => void;
 };
 
 const emptyFeed = (): FeedHealth => ({
@@ -164,10 +171,12 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     weather: false,
     vessels: true,
     instability: false,
+    adsblol: false,
   },
   counts: {
     flights: 0,
     military: 0,
+    adsblol: 0,
     satellites: 0,
     satelliteLinks: 0,
     seismic: 0,
@@ -184,6 +193,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     celestrak: emptyFeed(),
     usgs: emptyFeed(),
     adsb: emptyFeed(),
+    adsblol: emptyFeed(),
     cfradar: emptyFeed(),
     otx: emptyFeed(),
     fred: emptyFeed(),
@@ -344,8 +354,12 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setFaaNotams: (notams) => set({ faaNotams: notams }),
   breakingNews: [],
   setBreakingNews: (news) => set({ breakingNews: news }),
+  threatradarData: [],
+  setThreatradarData: (threats) => set({ threatradarData: threats }),
   newsClusters: [],
   setNewsClusters: (clusters) => set({ newsClusters: clusters }),
+  adsbLolData: [],
+  setAdsbLolData: (data) => set({ adsbLolData: data }),
   ciiScores: {},
   setCiiScores: (scores) => set({ ciiScores: scores }),
   alerts: [],

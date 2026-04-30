@@ -25,6 +25,7 @@ export const ARGUS_CONFIG = {
     polymarket: "/api/feeds/polymarket",
     gdacs: "/api/feeds/gdacs",
     faa: "/api/feeds/faa",
+    adsbLolAll: "/api/feeds/adsb-lol-all",
   },
   pollMs: {
     openSky: 10_000,
@@ -44,6 +45,7 @@ export const ARGUS_CONFIG = {
     polymarket: 5 * 60_000,
     gdacs: 10 * 60_000,
     faa: 10 * 60_000,
+    adsblol: 60_000,
   },
   limits: {
     maxFlights: 7000,
@@ -58,6 +60,7 @@ export const ARGUS_CONFIG = {
 export const FEED_EXPECTED_INTERVAL: Record<string, number> = {
   opensky: ARGUS_CONFIG.pollMs.openSky,
   adsb: ARGUS_CONFIG.pollMs.adsbMilitary,
+  adsblol: ARGUS_CONFIG.pollMs.adsblol,
   celestrak: ARGUS_CONFIG.pollMs.satellites,
   usgs: ARGUS_CONFIG.pollMs.usgs,
   cfradar: ARGUS_CONFIG.pollMs.cloudflareRadar,

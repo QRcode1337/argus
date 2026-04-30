@@ -65,6 +65,7 @@ type SliderDef = {
 
 const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "flights", label: "Live Flights", feed: "OpenSky" },
+  { key: "adsblol", label: "ADSB.lol Extras", feed: "ADSB.lol" },
   { key: "military", label: "Military Flights", feed: "ADS-B" },
   { key: "bases", label: "Military Bases", feed: "Static Intel" },
   { key: "seismic", label: "Earthquakes (24h)", feed: "USGS" },
