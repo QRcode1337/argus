@@ -26,6 +26,7 @@ export const ARGUS_CONFIG = {
     gdacs: "/api/feeds/gdacs",
     faa: "/api/feeds/faa",
     adsbLolAll: "/api/feeds/adsb-lol-all",
+    firms: "/api/feeds/firms",
   },
   pollMs: {
     openSky: 10_000,
@@ -46,6 +47,7 @@ export const ARGUS_CONFIG = {
     gdacs: 10 * 60_000,
     faa: 10 * 60_000,
     adsblol: 60_000,
+    firms: 15 * 60_000,
   },
   limits: {
     maxFlights: 7000,
@@ -75,6 +77,7 @@ export const FEED_EXPECTED_INTERVAL: Record<string, number> = {
   polymarket: 5 * 60_000,
   gdacs: 10 * 60_000,
   faa: 10 * 60_000,
+  firms: ARGUS_CONFIG.pollMs.firms,
 };
 
 export function computeFreshness(feedKey: string, lastSuccessAt: number | null): FeedFreshness {

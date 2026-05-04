@@ -51,6 +51,7 @@ type ArgusStore = {
     anomalies: number;
     weather: number;
     vessels: number;
+    firms: number;
   };
   ciiScores: Record<string, { score: number; signals: Record<string, number>; updatedAt: number }>;
   setCiiScores: (scores: Record<string, { score: number; signals: Record<string, number>; updatedAt: number }>) => void;
@@ -82,7 +83,8 @@ type ArgusStore = {
       | "gdelt"
       | "anomalies"
       | "weather"
-      | "vessels",
+      | "vessels"
+      | "firms",
     value: number,
   ) => void;
   setFeedHealthy: (key: FeedKey) => void;
@@ -173,6 +175,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     vessels: true,
     instability: false,
     adsblol: false,
+    firms: false,
   },
   counts: {
     flights: 0,
@@ -188,6 +191,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     anomalies: 0,
     weather: 0,
     vessels: 0,
+    firms: 0,
   },
   feedHealth: {
     opensky: emptyFeed(),
@@ -207,6 +211,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
     polymarket: emptyFeed(),
     gdacs: emptyFeed(),
     faa: emptyFeed(),
+    firms: emptyFeed(),
   },
   activePoiId: null,
   camera: {

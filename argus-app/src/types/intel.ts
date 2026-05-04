@@ -12,9 +12,10 @@ export type LayerKey =
   | "weather"
   | "vessels"
   | "instability"
-  | "adsblol";
+  | "adsblol"
+  | "firms";
 export type SceneMode = "globe_sat" | "globe_street" | "globe_map" | "flat_map";
-export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "adsblol" | "cfradar" | "otx" | "fred" | "ais" | "gdelt" | "threatradar" | "phantom" | "acled" | "polymarket" | "gdacs" | "faa" | "news";
+export type FeedKey = "opensky" | "celestrak" | "usgs" | "adsb" | "adsblol" | "cfradar" | "otx" | "fred" | "ais" | "gdelt" | "threatradar" | "phantom" | "acled" | "polymarket" | "gdacs" | "faa" | "news" | "firms";
 export type VisualMode = "normal" | "nvg" | "flir" | "crt";
 export type PlatformMode = "live" | "playback" | "analytics" | "epic-fury";
 export type AnalyticsLayerKey = "gfs_weather" | "sentinel_imagery";
@@ -178,6 +179,26 @@ export interface PlaybackSatelliteSnapshot {
   longitude: number;
   latitude: number;
   altitudeKm: number;
+}
+
+export type FirmsConfidence = "low" | "nominal" | "high";
+
+export interface ThermalAnomaly {
+  id: string;
+  latitude: number;
+  longitude: number;
+  brightness: number;
+  brightnessT31: number | null;
+  scan: number | null;
+  track: number | null;
+  acquiredAt: number;
+  satellite: string;
+  instrument: string;
+  confidence: FirmsConfidence;
+  confidenceRaw: string;
+  frp: number | null;
+  daynight: "D" | "N" | null;
+  version: string | null;
 }
 
 export interface EarthquakeFeature {

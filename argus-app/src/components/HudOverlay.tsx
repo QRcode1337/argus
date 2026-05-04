@@ -27,6 +27,7 @@ import {
 } from "@/data/anomalyAtlas";
 import { QUAD_CLASS_LABELS, QUAD_CLASS_COLORS, type GdeltEvent, type GdeltQuadClass } from "@/types/gdelt";
 import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
+import { processBreakingNews } from "@/lib/analysis/breakingNews";
 
 type HudOverlayProps = {
   onFlyToPoi: (poiId: string) => void;
@@ -77,6 +78,7 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "anomalies", label: "Chaos Anomalies", feed: "Phantom" },
   { key: "weather", label: "Weather Radar", feed: "RainViewer" },
   { key: "vessels", label: "AIS Vessels", feed: "AISStream" },
+  { key: "firms", label: "Thermal Anomalies (FIRMS)", feed: "NASA FIRMS" },
   { key: "instability", label: "Instability Index", feed: "CII" },
 ];
 
@@ -299,6 +301,7 @@ export function HudOverlay({
   const faaNotams = useArgusStore((s) => s.faaNotams);
   const alerts = useArgusStore((s) => s.alerts);
   const breakingNews = useArgusStore((s) => s.breakingNews);
+  const threatradarData = useArgusStore((s) => s.threatradarData);
 
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [workspace, setWorkspace] = useState<WorkspaceId>("news");
@@ -413,6 +416,9 @@ export function HudOverlay({
           dedupedCount: payload.meta.dedupedCount,
           fetchedAt: payload.meta.fetchedAt,
         });
+        // Process breaking news for the intel workspace
+        const newsCards = processBreakingNews(payload.items);
+        useArgusStore.getState().setBreakingNews(newsCards);
         setNewsError(null);
       } catch (error) {
         if (cancelled) return;
@@ -964,7 +970,7 @@ export function HudOverlay({
               </div>
 
               {selectedIntel.analysisSummary ? (
-                <div className="mt-2 rounded-xl border border-[#5b4a1f] bg-[#2a2415] p-3 font-mono text-[11px] leading-relaxed text-[#f3d98b]">
+                <div className="mt-2 max-h-[240px] overflow-y-auto rounded-xl border border-[#5b4a1f] bg-[#2a2415] p-3 font-mono text-[11px] leading-relaxed text-[#f3d98b] whitespace-pre-wrap">
                   {selectedIntel.analysisSummary}
                 </div>
               ) : null}
@@ -1252,26 +1258,67 @@ export function HudOverlay({
           )}
 
           {/* CORROBORATION ALERTS */}
-          {workspace === "intel" && alerts.filter((a) => a.stage >= 3).length > 0 && (
-            <div className="space-y-1 px-2">
-              {alerts.filter((a) => a.stage >= 3).slice(0, 10).map((alert) => {
-                const bgColor = alert.stage === 5 ? "bg-red-900/40 border-red-500" : alert.stage === 4 ? "bg-orange-900/30 border-orange-500" : "bg-yellow-900/20 border-yellow-500";
-                const stageLabel = alert.stage === 5 ? "STRATEGIC" : alert.stage === 4 ? "HIGH CONFIDENCE" : "CORROBORATED";
-                return (
-                  <div key={alert.id} className={`rounded border-l-2 ${bgColor} border border-[#3c3836] px-2 py-1.5 font-mono text-[10px]`}>
-                    <div className="flex items-center justify-between">
-                      <span className={alert.stage === 5 ? "font-bold text-red-400" : alert.stage === 4 ? "font-bold text-orange-400" : "text-yellow-400"}>{stageLabel}</span>
-                      <span className="text-[#a89984]">{alert.region}</span>
-                    </div>
-                    <div className="mt-0.5 text-[#d4be98]">{alert.summary}</div>
-                    <div className="mt-0.5 flex flex-wrap gap-1">
-                      {alert.domains.map((d) => (<span key={d} className="rounded bg-[#3c3836] px-1 text-[8px] text-[#a89984]">{d}</span>))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {workspace === "intel" && alerts.filter((a) => a.stage >= 3).length > 0 && (() => {
+            const byStage = { strategic: [] as typeof alerts, highConfidence: [] as typeof alerts, corroborated: [] as typeof alerts };
+            for (const a of alerts) {
+              if (a.stage === 5) byStage.strategic.push(a);
+              else if (a.stage === 4) byStage.highConfidence.push(a);
+              else if (a.stage === 3) byStage.corroborated.push(a);
+            }
+            const slice = (arr: typeof alerts) => arr.slice(0, 10);
+            return (
+              <CollapsibleSection title="Corroborations" badge={`${alerts.filter((a) => a.stage >= 3).length}`}>
+                {byStage.strategic.length > 0 && (
+                  <CollapsibleSection title="◆ Strategic" badge={`${slice(byStage.strategic).length}`} defaultOpen>
+                    {slice(byStage.strategic).map((alert) => (
+                      <div key={alert.id} className="rounded border-l-4 border-red-500 bg-red-900/40 border border-[#3c3836] px-2 py-1.5 font-mono text-[10px] mb-1 last:mb-0">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-red-400">STRATEGIC</span>
+                          <span className="text-[#a89984]">{alert.region}</span>
+                        </div>
+                        <div className="mt-0.5 text-[#d4be98]">{alert.summary}</div>
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          {alert.domains.map((d) => (<span key={d} className="rounded bg-[#3c3836] px-1 text-[8px] text-[#a89984]">{d}</span>))}
+                        </div>
+                      </div>
+                    ))}
+                  </CollapsibleSection>
+                )}
+                {byStage.highConfidence.length > 0 && (
+                  <CollapsibleSection title="◆ High Confidence" badge={`${slice(byStage.highConfidence).length}`} defaultOpen>
+                    {slice(byStage.highConfidence).map((alert) => (
+                      <div key={alert.id} className="rounded border-l-4 border-orange-500 bg-orange-900/30 border border-[#3c3836] px-2 py-1.5 font-mono text-[10px] mb-1 last:mb-0">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-orange-400">HIGH CONFIDENCE</span>
+                          <span className="text-[#a89984]">{alert.region}</span>
+                        </div>
+                        <div className="mt-0.5 text-[#d4be98]">{alert.summary}</div>
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          {alert.domains.map((d) => (<span key={d} className="rounded bg-[#3c3836] px-1 text-[8px] text-[#a89984]">{d}</span>))}
+                        </div>
+                      </div>
+                    ))}
+                  </CollapsibleSection>
+                )}
+                {byStage.corroborated.length > 0 && (
+                  <CollapsibleSection title="◆ Corroborated" badge={`${slice(byStage.corroborated).length}`}>
+                    {slice(byStage.corroborated).map((alert) => (
+                      <div key={alert.id} className="rounded border-l-4 border-yellow-500 bg-yellow-900/20 border border-[#3c3836] px-2 py-1.5 font-mono text-[10px] mb-1 last:mb-0">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-yellow-400">CORROBORATED</span>
+                          <span className="text-[#a89984]">{alert.region}</span>
+                        </div>
+                        <div className="mt-0.5 text-[#d4be98]">{alert.summary}</div>
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          {alert.domains.map((d) => (<span key={d} className="rounded bg-[#3c3836] px-1 text-[8px] text-[#a89984]">{d}</span>))}
+                        </div>
+                      </div>
+                    ))}
+                  </CollapsibleSection>
+                )}
+              </CollapsibleSection>
+            );
+          })()}
 
           {/* BREAKING NEWS */}
           {workspace === "intel" && breakingNews.length > 0 && (
@@ -1559,6 +1606,7 @@ export function HudOverlay({
                     anomalies: counts.anomalies,
                     weather: counts.weather,
                     vessels: counts.vessels,
+                    firms: counts.firms,
                     instability: 0,
                   };
                   const value = valueMap[layer.key];
@@ -1661,6 +1709,7 @@ export function HudOverlay({
                         anomalies: counts.anomalies,
                         weather: counts.weather,
                         vessels: counts.vessels,
+                        firms: counts.firms,
                         instability: 0,
                       };
                       const value = valueMap[layer.key];
@@ -1775,6 +1824,38 @@ export function HudOverlay({
               </div>
             </CollapsibleSection>
           ) : null}
+
+          {/* ThreatRadar */}
+          <CollapsibleSection title="ThreatRadar" badge={threatradarData.length > 0 ? `${threatradarData.length}` : null}>
+            <div className="max-h-[300px] space-y-1 overflow-y-auto pr-0.5">
+              {threatradarData.length === 0 ? (
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">Awaiting ThreatRadar data...</div>
+              ) : threatradarData.slice(0, 30).map((threat, i) => {
+                const sevColor = threat.severity === "critical" ? "text-[#fb4934]" : threat.severity === "high" ? "text-[#fe8019]" : threat.severity === "medium" ? "text-[#fabd2f]" : threat.severity === "low" ? "text-[#83a598]" : "text-[#a89984]";
+                const sevBorder = threat.severity === "critical" ? "border-l-[#fb4934]" : threat.severity === "high" ? "border-l-[#fe8019]" : threat.severity === "medium" ? "border-l-[#fabd2f]" : threat.severity === "low" ? "border-l-[#83a598]" : "border-l-[#a89984]";
+                return (
+                  <div key={`tr-${i}`} className={`rounded-md border border-[#3c3836] border-l-2 ${sevBorder} bg-[#1d2021] px-2 py-1.5`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`font-mono text-[8px] uppercase tracking-[0.1em] ${sevColor}`}>{threat.severity}</span>
+                      {threat.cve && <span className="rounded bg-[#3c3836] px-1 font-mono text-[8px] text-[#fb4934]">{threat.cve}</span>}
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10px] text-[#d4be98]">{threat.title}</div>
+                    <div className="mt-0.5 flex items-center justify-between">
+                      <span className="font-mono text-[8px] text-[#a89984]">{threat.source}</span>
+                      <span className="font-mono text-[8px] text-[#4e6a7a]">{threat.publishedAt.slice(0, 10)}</span>
+                    </div>
+                    {threat.tags.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-0.5">
+                        {threat.tags.slice(0, 3).map((tag) => (
+                          <span key={tag} className="rounded bg-[#3c3836] px-1.5 font-mono text-[7px] text-[#83a598]">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleSection>
 
           {/* Conflict Events (ACLED) */}
           <CollapsibleSection title="Conflict Events" badge={acledEvents.length > 0 ? `${acledEvents.length}` : null}>
