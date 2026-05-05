@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
+import { reportFeedHealth } from "@/lib/feedHealth";
 
 export const dynamic = "force-dynamic";
+
+type AdsbLolPayload = {
+  aircraft: unknown[];
+  sourceCount: number;
+  totalCount: number;
+  timestamp: string;
+};
+
+let cache: { data: AdsbLolPayload; cachedAt: number } | null = null;
+const CACHE_TTL_MS = 30_000;
 
 interface AdsbLolAircraft {
   hex: string;
@@ -191,31 +202,42 @@ async function pollAll(): Promise<{ hex: string; ac: AdsbLolAircraft[]; source: 
 }
 
 export async function GET() {
+  if (cache && Date.now() - cache.cachedAt < CACHE_TTL_MS) {
+    return NextResponse.json({ ...cache.data, _cached: true });
+  }
+
   try {
     const results = await pollAll();
 
-    // Flatten into a single deduplicated array
-    const allAircraft: Record<string, AdsbLolAircraft> = {};
+    // Flatten into a single deduplicated array, tagging each aircraft with its source.
+    const allAircraft: Record<string, AdsbLolAircraft & { _source?: string }> = {};
     for (const r of results) {
       for (const ac of r.ac) {
         if (!allAircraft[ac.hex]) {
-          allAircraft[ac.hex] = { ...ac, ...r }; // Merge source info
+          allAircraft[ac.hex] = { ...ac, _source: r.source };
         }
       }
     }
 
     const aircraftArray = Object.values(allAircraft);
 
-    return NextResponse.json({
+    const payload: AdsbLolPayload = {
       aircraft: aircraftArray,
       sourceCount: results.length,
       totalCount: aircraftArray.length,
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    cache = { data: payload, cachedAt: Date.now() };
+    reportFeedHealth("adsb-lol-all", "ok");
+    return NextResponse.json(payload);
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "adsb.lol poll failed" },
-      { status: 502 },
-    );
+    const message = err instanceof Error ? err.message : "adsb.lol poll failed";
+    if (cache) {
+      reportFeedHealth("adsb-lol-all", "degraded", message);
+      return NextResponse.json({ ...cache.data, _stale: true });
+    }
+    reportFeedHealth("adsb-lol-all", "error", message);
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }

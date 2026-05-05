@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { reportFeedHealth } from "@/lib/feedHealth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,12 @@ export async function GET() {
 
     const body = await response.text();
 
+    if (response.ok) {
+      reportFeedHealth("adsb-military", "ok");
+    } else {
+      reportFeedHealth("adsb-military", "degraded", `upstream ${response.status}`);
+    }
+
     return new NextResponse(body, {
       status: response.status,
       headers: {
@@ -28,9 +35,8 @@ export async function GET() {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "ADS-B proxy failed" },
-      { status: 502 },
-    );
+    const message = error instanceof Error ? error.message : "ADS-B proxy failed";
+    reportFeedHealth("adsb-military", "error", message);
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }
