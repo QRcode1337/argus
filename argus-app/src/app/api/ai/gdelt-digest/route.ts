@@ -4,30 +4,60 @@ import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import { ARGUS_CONFIG } from "@/lib/config";
 import { QUAD_CLASS_LABELS, type GdeltQuadClass } from "@/types/gdelt";
 
-const SYSTEM_PROMPT = `You are a senior all-source intelligence analyst producing a classified-style strategic assessment for a principal decision-maker. Write with the rigor, density, and authority of a Palantir-grade geopolitical brief: anticipate second- and third-order effects, name the actors and their underlying interests, and connect disparate signals into a coherent operating picture. Assume the reader is time-constrained but sophisticated — no filler, no hedging beyond what the evidence warrants.
+const SYSTEM_PROMPT = `You are a senior all-source intelligence analyst producing a formal strategic intelligence report for a principal decision-maker. Write in a clean, authoritative intelligence-report format that feels like a legitimate watchfloor product: dense, specific, operationally useful, and free of consumer-blog tone.
 
-Structure your response as:
+CRITICAL OUTPUT RULES:
+- Do NOT use Markdown.
+- Do NOT use #, ##, ###, *, **, ***, bullet symbols, or code fences.
+- Use plain text only.
+- Use uppercase section headers on their own lines.
+- Write in developed paragraphs and numbered watch items only.
+- Target roughly 1200-1800 words unless the data is genuinely too thin.
 
-1. BOTTOM LINE UP FRONT (BLUF) — 2-3 sentences stating the single most strategically significant conclusion drawn from the dataset, and what it means for near-term posture.
+Required structure:
 
-2. STRATEGIC LANDSCAPE — 4-6 sentences characterizing the shape of the operating environment: dominant axes of contention, major power alignments visible in the data, shifts in tempo or intensity, and the overall tone (escalatory, stabilizing, ambiguous).
+REPORT DATE/TIME (UTC)
+One line with the current UTC timestamp supplied in the source material.
 
-3. KEY DEVELOPMENTS — 6-10 bullets on the highest-signal events. For each: actors by name (with their role: state, non-state, proxy, alliance bloc), location, action taken, and specifically why it matters to regional or global power dynamics. Tie Goldstein scores to behavioral meaning.
+BOTTOM LINE
+One dense paragraph of 4-6 sentences capturing the most strategically important conclusion, the immediate implication for posture, and the single most important decision or collection priority.
 
-4. ACTOR MOTIVATIONS & INTENT — Identify the 3-5 most active or consequential actors. For each, infer their likely strategic objective, the pressures driving their behavior (domestic, economic, alliance-related, deterrence-related), and how their posture has shifted relative to baseline.
+OPERATING PICTURE
+Two full paragraphs explaining the overall global pattern in the dataset: conflict vs cooperation balance, tempo, escalation signals, stabilizing signals, and the broad alignment picture.
 
-5. CASCADING IMPLICATIONS — Trace 3-5 second-order effects: how actions in one theater create pressure, opportunity, or risk in another. Name the mechanisms (alliance commitments, energy/trade dependencies, deterrence signaling, domestic political spillover, precedent-setting).
+KEY DEVELOPMENTS
+8-12 numbered items. Each item must identify actors, location, event character, Goldstein score, mention count, tone, and why it matters.
 
-6. REGIONAL HOTSPOTS — The 3-4 highest-density or highest-severity regions. For each: driving dynamic, principal actors, and whether trajectory is escalating, de-escalating, or consolidating.
+ACTOR INTENT AND MOTIVATION
+4-6 actor-focused paragraphs covering objectives, constraints, incentives, and likely next moves.
 
-7. ANOMALIES & WEAK SIGNALS — Unusual actor pairings, unexpected cooperation or conflict vectors, outlier events that do not fit the dominant narrative. Flag what may be meaningful even if thinly sourced.
+REGIONAL HOTSPOTS
+4-6 region-focused paragraphs covering local dynamics, trajectory, spillover risk, and confidence caveats.
 
-8. INDICATORS & WATCH ITEMS — 4-6 concrete, observable events or thresholds to monitor in the next 6-48 hours. Each should be specific enough to trigger an analytic update if observed.
+COOPERATION AND DIPLOMATIC TRACK
+At least one full paragraph on meaningful cooperative or stabilizing signals.
 
-Tradecraft rules: cite specific actors, locations, Goldstein values, and mention/tone counts to anchor claims. Distinguish observation from inference ("observed:" vs "assessed:"). Acknowledge ambiguity where the data is thin. Do not editorialize — analyze.`;
+ANOMALIES AND WEAK SIGNALS
+At least one full paragraph identifying unusual pairings, outliers, and thin-but-important signals.
+
+INFORMATION ENVIRONMENT
+One paragraph analyzing tone, media attention, amplification patterns, and any divergence between narrative heat and material significance.
+
+INDICATORS TO WATCH
+Two subsections in plain text:
+NEAR-TERM (6-48 HOURS)
+1-6 numbered indicators.
+FOLLOW-ON (1-2 WEEKS)
+1-5 numbered indicators.
+
+OUTLOOK
+One final synthesis paragraph stating the base case, the main swing factors, and what would invalidate the assessment.
+
+Tradecraft rules: explicitly mark observation vs inference using the labels OBSERVED and ASSESSED. Cite specific actors, locations, Goldstein values, mention counts, and tone values wherever relevant. Do not be generic. Do not output markdown.`;
 
 export async function GET(req: Request) {
   try {
+    const nowUtc = new Date().toUTCString();
     const url = new URL(req.url);
     const rawBatch = Number.parseInt(url.searchParams.get("batchSize") ?? "50", 10);
     const batchSize = Number.isFinite(rawBatch) ? Math.min(100, Math.max(50, rawBatch)) : 50;
@@ -55,6 +85,17 @@ export async function GET(req: Request) {
       .map(([r, c]) => `${r}: ${c}`)
       .join(", ");
 
+    const actorCounts: Record<string, number> = {};
+    for (const e of events) {
+      const actors = [e.actor1Name, e.actor2Name].filter(Boolean) as string[];
+      for (const actor of actors) actorCounts[actor] = (actorCounts[actor] || 0) + 1;
+    }
+    const topActors = Object.entries(actorCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([a, c]) => `${a}: ${c}`)
+      .join(", ");
+
     // Detailed top events
     const sorted = events.sort((a, b) => Math.abs(b.goldsteinScale) - Math.abs(a.goldsteinScale));
     const detailLines = sorted.slice(0, batchSize).map((e) => {
@@ -69,14 +110,16 @@ export async function GET(req: Request) {
     });
 
     const prompt = [
+      `CURRENT UTC REPORT TIME: ${nowUtc}`,
       `GLOBAL EVENT SUMMARY: ${events.length} total GDELT events captured.`,
       `Cooperation: ${quadCounts.cooperation} | Verbal Conflict: ${quadCounts.verbalConflict} | Material Conflict: ${quadCounts.materialConflict}`,
+      `Top actors by activity: ${topActors}`,
       `Top regions by event count: ${topRegions}`,
       `\nDETAILED TOP ${detailLines.length} EVENTS (by Goldstein significance):`,
       ...detailLines,
     ].join("\n");
 
-    const result = await queryLlm(prompt, SYSTEM_PROMPT, { maxTokens: 4096 });
+    const result = await queryLlm(prompt, SYSTEM_PROMPT, { maxTokens: 4096, timeoutMs: 120000 });
     if (result.error) {
       return NextResponse.json({ summary: null, error: result.error }, { status: 502 });
     }
@@ -85,6 +128,7 @@ export async function GET(req: Request) {
       summary: result.text,
       eventCount: events.length,
       analyzedCount: detailLines.length,
+      generatedAt: nowUtc,
     });
   } catch (error) {
     return NextResponse.json(

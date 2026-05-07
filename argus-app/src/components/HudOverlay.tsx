@@ -64,6 +64,56 @@ type SliderDef = {
   onChange: (value: number) => void;
 };
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderDigestHtml(content: string): string {
+  const normalized = escapeHtml(content).replace(/\r\n/g, "\n");
+
+  const blocks = normalized
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+      if (!lines.length) return "";
+
+      const first = lines[0]
+        .replace(/^#{1,6}\s*/, "")
+        .replace(/^\*+\s*/, "")
+        .replace(/\*+$/, "")
+        .trim();
+
+      const isHeader = lines.length === 1 && /^[A-Z0-9/()\- ,:&]{4,}$/.test(first);
+      if (isHeader) {
+        return `<h3 class=\"mt-6 border-t border-[#3c3836] pt-4 font-mono text-[12px] uppercase tracking-[0.22em] text-[#f0c674]\">${first}</h3>`;
+      }
+
+      const numbered = lines.every((line) => /^\d+[.)]\s+/.test(line));
+      if (numbered) {
+        const items = lines
+          .map((line) => `<li class=\"ml-5 list-decimal pl-1\">${line.replace(/^\d+[.)]\s+/, "")}</li>`)
+          .join("");
+        return `<ol class=\"space-y-3 font-serif text-[15px] leading-7 text-[#d7dbe0]\">${items}</ol>`;
+      }
+
+      const text = lines.join(" ")
+        .replace(/\*\*(.+?)\*\*/g, "<strong class=\"font-semibold text-[#f3e7c2]\">$1</strong>")
+        .replace(/\*(.+?)\*/g, "<em>$1</em>");
+
+      return `<p class=\"font-serif text-[15px] leading-8 text-[#d7dbe0]\">${text}</p>`;
+    })
+    .join("");
+
+  return blocks || `<p class=\"font-serif text-[15px] leading-8 text-[#d7dbe0]\">${normalized}</p>`;
+}
+
 const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "flights", label: "Live Flights", feed: "OpenSky" },
   { key: "adsblol", label: "ADSB.lol Extras", feed: "ADSB.lol" },
@@ -751,11 +801,11 @@ export function HudOverlay({
       if (data.summary) {
         setShowPneumaPanel(false);
         setGdeltDigestDocument({
-          title: "GDELT Strategic Digest",
+          title: "GDELT STRATEGIC DIGEST",
           content: data.summary,
           analyzedCount: data.analyzedCount,
           eventCount: data.eventCount,
-          generatedAt: new Date().toUTCString(),
+          generatedAt: data.generatedAt ?? new Date().toUTCString(),
         });
       } else {
         setGdeltDigestError(data.error ?? "No summary returned — check LLM configuration in Settings");
@@ -3051,12 +3101,13 @@ export function HudOverlay({
                     {gdeltDigestDocument.title}
                   </div>
                   <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[#83a598]">
-                    Produced Intelligence Brief
+                    Watchfloor Strategic Assessment
                   </div>
                 </div>
-                <div className="whitespace-pre-wrap font-serif text-[16px] leading-8 text-[#d7dbe0]">
-                  {gdeltDigestDocument.content}
-                </div>
+                <div
+                  className="space-y-4"
+                  dangerouslySetInnerHTML={{ __html: renderDigestHtml(gdeltDigestDocument.content) }}
+                />
               </div>
             </div>
           </div>

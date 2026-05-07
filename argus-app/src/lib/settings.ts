@@ -19,6 +19,12 @@ export async function readSettings(): Promise<AppSettings> {
     );
     const llm = { ...DEFAULT_SETTINGS.llm, ...savedLlm } as AppSettings["llm"];
 
+    if (/generativelanguage\.googleapis\.com/i.test(llm.endpoint)) {
+      llm.apiKey = process.env.GEMINI_API_KEY ?? llm.apiKey;
+    } else if (/do-ai\.run|gradient/i.test(llm.endpoint)) {
+      llm.apiKey = process.env.GRADIENT_ENDPOINT_ACCESS_KEY ?? process.env.GRADIENT_MODEL_ACCESS_KEY ?? llm.apiKey;
+    }
+
     // Migrate unknown/stale providers to the default before they 502
     if (!VALID_PROVIDERS.has(llm.provider)) {
       console.warn(
