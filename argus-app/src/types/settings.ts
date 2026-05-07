@@ -25,6 +25,16 @@ function defaultLlmSettings(): LlmSettings {
       apiKey: gradientKey,
     };
   }
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const geminiBase = process.env.GEMINI_BASE_URL;
+  if (geminiKey) {
+    return {
+      provider: "openai_compatible",
+      endpoint: geminiBase || "https://generativelanguage.googleapis.com/v1beta/openai",
+      model: "gemini-3-flash-preview",
+      apiKey: geminiKey,
+    };
+  }
   return {
     provider: "ollama",
     endpoint: "http://localhost:11434",

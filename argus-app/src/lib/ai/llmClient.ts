@@ -8,6 +8,33 @@ interface LlmResponse {
 
 interface QueryLlmOptions {
   maxTokens?: number;
+  timeoutMs?: number;
+}
+
+function getEffectiveApiKey(apiKey?: string, endpoint?: string): string | undefined {
+  if (endpoint && /generativelanguage\.googleapis\.com/i.test(endpoint)) {
+    return process.env.GEMINI_API_KEY || apiKey || process.env.OPENAI_COMPATIBLE_API_KEY;
+  }
+  if (endpoint && /do-ai\.run|gradient/i.test(endpoint)) {
+    return process.env.GRADIENT_ENDPOINT_ACCESS_KEY || process.env.GRADIENT_MODEL_ACCESS_KEY || apiKey;
+  }
+  return apiKey || process.env.OPENAI_COMPATIBLE_API_KEY || process.env.GEMINI_API_KEY;
+}
+
+function resolveOpenAiCompatibleUrl(endpoint: string): string {
+  const base = endpoint.trim().replace(/\/+$/, "");
+
+  if (/\/chat\/completions$/i.test(base) || /\/v1\/chat\/completions$/i.test(base)) {
+    return base;
+  }
+
+  if (/generativelanguage\.googleapis\.com/i.test(base)) {
+    if (/\/openai$/i.test(base)) return `${base}/chat/completions`;
+    if (/\/v1beta$/i.test(base) || /\/v1$/i.test(base)) return `${base}/openai/chat/completions`;
+    return `${base}/v1beta/openai/chat/completions`;
+  }
+
+  return `${base}/v1/chat/completions`;
 }
 
 // Singleton PNEUMA instance — initialized once, reused across requests
@@ -58,17 +85,25 @@ export async function queryLlm(
   options: QueryLlmOptions = {},
 ): Promise<LlmResponse> {
   const { llm } = await readSettings();
+
   const maxTokens = Number.isFinite(options.maxTokens)
     ? Math.max(256, Math.floor(options.maxTokens as number))
     : 2048;
 
+  const timeoutMs = Number.isFinite(options.timeoutMs)
+    ? Math.max(10_000, Math.floor(options.timeoutMs as number))
+    : llm.provider === "ollama"
+      ? 300_000
+      : 60_000;
+
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     if (llm.provider === "ollama") {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (llm.apiKey) headers["Authorization"] = `Bearer ${llm.apiKey}`;
+      const apiKey = getEffectiveApiKey(llm.apiKey, llm.endpoint);
+      if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
       const res = await fetch(`${llm.endpoint}/api/generate`, {
         method: "POST",
@@ -81,7 +116,10 @@ export async function queryLlm(
         }),
         signal: controller.signal,
       });
-      if (!res.ok) return { text: "", error: `Ollama error: ${res.status}` };
+      if (!res.ok) {
+        const body = await res.text();
+        return { text: "", error: `Ollama error: ${res.status} ${body.slice(0, 300)}` };
+      }
       const data = await res.json();
       return { text: data.response ?? "" };
     }
@@ -120,7 +158,8 @@ export async function queryLlm(
       if (llm.endpoint) {
         try {
           const headers: Record<string, string> = { "Content-Type": "application/json" };
-          if (llm.apiKey) headers["Authorization"] = `Bearer ${llm.apiKey}`;
+          const apiKey = getEffectiveApiKey(llm.apiKey, llm.endpoint);
+          if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
           const res = await fetch(`${llm.endpoint}/api/generate`, {
             method: "POST",
@@ -150,18 +189,22 @@ export async function queryLlm(
     // Merge systemPrompt into the user content so this branch works for both
     // vanilla OpenAI-compatible servers and Gradient agents.
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (llm.apiKey) headers["Authorization"] = `Bearer ${llm.apiKey}`;
+    const apiKey = getEffectiveApiKey(llm.apiKey, llm.endpoint);
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
     const userContent = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
     const messages = [{ role: "user", content: userContent }];
 
-    const res = await fetch(`${llm.endpoint}/v1/chat/completions`, {
+    const res = await fetch(resolveOpenAiCompatibleUrl(llm.endpoint), {
       method: "POST",
       headers,
       body: JSON.stringify({ model: llm.model, messages, max_tokens: maxTokens }),
       signal: controller.signal,
     });
-    if (!res.ok) return { text: "", error: `LLM error: ${res.status}` };
+    if (!res.ok) {
+      const body = await res.text();
+      return { text: "", error: `LLM error: ${res.status} ${body.slice(0, 300)}` };
+    }
     const data = await res.json();
     return { text: data.choices?.[0]?.message?.content ?? "" };
   } catch (e: unknown) {
