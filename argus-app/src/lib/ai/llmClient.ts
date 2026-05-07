@@ -67,13 +67,17 @@ export async function queryLlm(
 
   try {
     if (llm.provider === "ollama") {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (llm.apiKey) headers["Authorization"] = `Bearer ${llm.apiKey}`;
+
       const res = await fetch(`${llm.endpoint}/api/generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           model: llm.model,
           prompt: systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt,
           stream: false,
+          options: { num_predict: maxTokens },
         }),
         signal: controller.signal,
       });
@@ -115,13 +119,17 @@ export async function queryLlm(
       // Ollama fallback for PNEUMA provider
       if (llm.endpoint) {
         try {
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          if (llm.apiKey) headers["Authorization"] = `Bearer ${llm.apiKey}`;
+
           const res = await fetch(`${llm.endpoint}/api/generate`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify({
               model: llm.model || "llama3",
               prompt: systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt,
               stream: false,
+              options: { num_predict: maxTokens },
             }),
             signal: controller.signal,
           });
