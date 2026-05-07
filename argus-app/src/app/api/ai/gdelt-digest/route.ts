@@ -76,7 +76,7 @@ export async function GET(req: Request) {
       ...detailLines,
     ].join("\n");
 
-    const result = await queryLlm(prompt, SYSTEM_PROMPT);
+    const result = await queryLlm(prompt, SYSTEM_PROMPT, { maxTokens: 4096 });
     if (result.error) {
       return NextResponse.json({ summary: null, error: result.error }, { status: 502 });
     }

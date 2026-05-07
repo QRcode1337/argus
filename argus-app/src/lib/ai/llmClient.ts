@@ -6,6 +6,10 @@ interface LlmResponse {
   pneumaState?: any; // ProcessResult when using pneuma provider
 }
 
+interface QueryLlmOptions {
+  maxTokens?: number;
+}
+
 // Singleton PNEUMA instance — initialized once, reused across requests
 let pneumaInstance: any = null;
 
@@ -48,8 +52,15 @@ function hashEmbedding(text: string): Float64Array {
   return embedding;
 }
 
-export async function queryLlm(prompt: string, systemPrompt?: string): Promise<LlmResponse> {
+export async function queryLlm(
+  prompt: string,
+  systemPrompt?: string,
+  options: QueryLlmOptions = {},
+): Promise<LlmResponse> {
   const { llm } = await readSettings();
+  const maxTokens = Number.isFinite(options.maxTokens)
+    ? Math.max(256, Math.floor(options.maxTokens as number))
+    : 2048;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000);
@@ -139,7 +150,7 @@ export async function queryLlm(prompt: string, systemPrompt?: string): Promise<L
     const res = await fetch(`${llm.endpoint}/v1/chat/completions`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ model: llm.model, messages, max_tokens: 2048 }),
+      body: JSON.stringify({ model: llm.model, messages, max_tokens: maxTokens }),
       signal: controller.signal,
     });
     if (!res.ok) return { text: "", error: `LLM error: ${res.status}` };
