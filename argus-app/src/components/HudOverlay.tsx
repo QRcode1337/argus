@@ -400,6 +400,8 @@ export function HudOverlay({
     analyzedCount?: number;
     eventCount?: number;
     generatedAt: string;
+    degraded?: boolean;
+    llmError?: string | null;
   } | null>(null);
   const [hypotheses, setHypotheses] = useState([
     { id: 1, text: "Submarine cable cut in Atlantic linked to observed vessel patterns.", score: 0 },
@@ -806,6 +808,8 @@ export function HudOverlay({
           analyzedCount: data.analyzedCount,
           eventCount: data.eventCount,
           generatedAt: data.generatedAt ?? new Date().toUTCString(),
+          degraded: Boolean(data.degraded),
+          llmError: data.llmError ?? null,
         });
       } else {
         setGdeltDigestError(data.error ?? "No summary returned — check LLM configuration in Settings");
@@ -825,6 +829,8 @@ export function HudOverlay({
       `Generated: ${gdeltDigestDocument.generatedAt}`,
       `Events Analyzed: ${gdeltDigestDocument.analyzedCount ?? "?"} of ${gdeltDigestDocument.eventCount ?? "?"}`,
       `Region Filter: ${newsRegionFilter}`,
+      `Mode: ${gdeltDigestDocument.degraded ? "Fallback digest" : "LLM digest"}`,
+      ...(gdeltDigestDocument.degraded && gdeltDigestDocument.llmError ? [`LLM Error: ${gdeltDigestDocument.llmError}`] : []),
       "",
       gdeltDigestDocument.content,
       "",
@@ -3091,6 +3097,12 @@ export function HudOverlay({
               <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-3 py-2">
                 <div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#a89984]">Source</div>
                 <div className="mt-1 font-mono text-[11px] text-[#d5c4a1]">GDELT Global Event Database</div>
+                <div className={`mt-2 inline-flex rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em] ${gdeltDigestDocument.degraded
+                  ? "border-[#fabd2f] bg-[#3a2d12] text-[#fabd2f]"
+                  : "border-[#83a598] bg-[#1f2c2a] text-[#b8e0d2]"
+                }`} title={gdeltDigestDocument.degraded && gdeltDigestDocument.llmError ? gdeltDigestDocument.llmError : undefined}>
+                  {gdeltDigestDocument.degraded ? "Fallback digest active" : "LLM digest active"}
+                </div>
               </div>
             </div>
 
@@ -3100,8 +3112,17 @@ export function HudOverlay({
                   <div className="font-serif text-[30px] leading-tight text-[#f3e7c2]">
                     {gdeltDigestDocument.title}
                   </div>
-                  <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[#83a598]">
-                    Watchfloor Strategic Assessment
+                  <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em]">
+                    <span className="text-[#83a598]">Watchfloor Strategic Assessment</span>
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[9px] tracking-[0.18em] ${gdeltDigestDocument.degraded
+                        ? "border-[#fabd2f] bg-[#3a2d12] text-[#fabd2f]"
+                        : "border-[#83a598] bg-[#1f2c2a] text-[#b8e0d2]"
+                      }`}
+                      title={gdeltDigestDocument.degraded && gdeltDigestDocument.llmError ? gdeltDigestDocument.llmError : undefined}
+                    >
+                      {gdeltDigestDocument.degraded ? "Fallback Digest" : "LLM Digest"}
+                    </span>
                   </div>
                 </div>
                 <div
