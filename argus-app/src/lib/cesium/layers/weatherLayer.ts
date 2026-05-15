@@ -62,8 +62,14 @@ export class WeatherLayer {
   }
 
   setVisible(visible: boolean): void {
-    if (this.layer) {
-      this.layer.show = visible;
+    if (visible) {
+      // Re-adding the layer fresh prevents the "ZOOM LEVEL NOT SUPPORTED" tile cache issue
+      // that occurs when toggling `layer.show = true/false` while Cesium retains stale tile state
+      this.loadLatestRadar();
+    } else if (this.layer) {
+      // Fully remove the layer and its provider when hiding — don't just hide it
+      this.viewer.imageryLayers.remove(this.layer, true);
+      this.layer = null;
     }
   }
 

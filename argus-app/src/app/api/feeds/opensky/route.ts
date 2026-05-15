@@ -33,6 +33,19 @@ interface AdsbLolAircraft {
   dbFlags?: number;
 }
 
+const ADSB_LOL_REGIONAL_FALLBACK_POINTS = [
+  { lat: 39.0, lon: -98.0, radius: 350 },
+  { lat: 37.5, lon: -122.0, radius: 250 },
+  { lat: 40.8, lon: -74.0, radius: 250 },
+  { lat: 50.0, lon: 10.0, radius: 300 },
+  { lat: 25.0, lon: 55.0, radius: 250 },
+  { lat: 22.0, lon: 78.0, radius: 250 },
+  { lat: 20.0, lon: 115.0, radius: 250 },
+  { lat: 35.0, lon: 135.0, radius: 220 },
+  { lat: -23.5, lon: -46.6, radius: 250 },
+  { lat: -33.9, lon: 151.2, radius: 250 },
+] as const;
+
 /** Convert adsb.lol format → OpenSky states format */
 function adsbLolToOpenSky(aircraft: AdsbLolAircraft[]): object {
   const now = Math.floor(Date.now() / 1000);
@@ -48,23 +61,23 @@ function adsbLolToOpenSky(aircraft: AdsbLolAircraft[]): object {
       const onGround = ac.alt_baro === "ground";
 
       return [
-        ac.hex ?? "unknown",                   // 0: icao24
-        ac.flight?.trim() ?? null,             // 1: callsign
-        "",                                     // 2: origin_country
-        now,                                    // 3: time_position
-        now,                                    // 4: last_contact
-        ac.lon,                                // 5: longitude
-        ac.lat,                                // 6: latitude
-        altBaro,                               // 7: baro_altitude (meters)
-        onGround,                              // 8: on_ground
-        velocity,                              // 9: velocity (m/s)
-        ac.track ?? null,                      // 10: true_track
-        vertRate,                              // 11: vertical_rate (m/s)
-        null,                                  // 12: sensors
-        altGeo,                                // 13: geo_altitude (meters)
-        ac.squawk ?? null,                     // 14: squawk
-        false,                                 // 15: spi
-        0,                                     // 16: position_source
+        ac.hex ?? "unknown",
+        ac.flight?.trim() ?? null,
+        "",
+        now,
+        now,
+        ac.lon,
+        ac.lat,
+        altBaro,
+        onGround,
+        velocity,
+        ac.track ?? null,
+        vertRate,
+        null,
+        altGeo,
+        ac.squawk ?? null,
+        false,
+        0,
       ];
     });
 
@@ -122,6 +135,33 @@ async function getOpenSkyAccessToken(): Promise<string | null> {
   return cachedAccessToken;
 }
 
+async function fetchAdsbLolRegionalFallback(): Promise<AdsbLolAircraft[]> {
+  const responses = await Promise.all(
+    ADSB_LOL_REGIONAL_FALLBACK_POINTS.map(async ({ lat, lon, radius }) => {
+      try {
+        const response = await fetch(`https://api.adsb.lol/v2/point/${lat}/${lon}/${radius}`, {
+          cache: "no-store",
+          signal: AbortSignal.timeout(8_000),
+        });
+
+        if (!response.ok) return [] as AdsbLolAircraft[];
+        const payload = (await response.json()) as { ac?: AdsbLolAircraft[] };
+        return payload.ac ?? [];
+      } catch {
+        return [] as AdsbLolAircraft[];
+      }
+    }),
+  );
+
+  const deduped = new Map<string, AdsbLolAircraft>();
+  for (const aircraft of responses.flat()) {
+    if (!aircraft.hex || aircraft.lat == null || aircraft.lon == null) continue;
+    deduped.set(aircraft.hex.toLowerCase(), aircraft);
+  }
+
+  return Array.from(deduped.values());
+}
+
 export async function GET() {
   const now = Date.now();
   if (cachedBody && now - cachedAt < CACHE_TTL_MS) {
@@ -131,7 +171,6 @@ export async function GET() {
     });
   }
 
-  // Try OpenSky first
   const openSkyUrl =
     process.env.OPENSKY_ENDPOINT ?? "https://opensky-network.org/api/states/all";
 
@@ -161,6 +200,25 @@ export async function GET() {
     // OpenSky unreachable or rate-limited, fall through
   }
 
+  try {
+    const fallbackAircraft = await fetchAdsbLolRegionalFallback();
+    if (fallbackAircraft.length > 0) {
+      const body = JSON.stringify(adsbLolToOpenSky(fallbackAircraft));
+      cachedBody = body;
+      cachedAt = now;
+      return new NextResponse(body, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Cache": "MISS",
+          "X-Source": "fallback-regional",
+        },
+      });
+    }
+  } catch {
+    // regional fallback failed; try explicit fallback below
+  }
+
   const fallbackUrl = process.env.OPENSKY_FALLBACK_ENDPOINT?.trim();
   if (fallbackUrl) {
     try {
@@ -170,8 +228,8 @@ export async function GET() {
       });
 
       if (response.ok) {
-        const data = (await response.json()) as { ac: AdsbLolAircraft[] };
-        const converted = adsbLolToOpenSky(data.ac ?? []);
+        const data = (await response.json()) as { ac?: AdsbLolAircraft[]; aircraft?: AdsbLolAircraft[] };
+        const converted = adsbLolToOpenSky(data.ac ?? data.aircraft ?? []);
         const body = JSON.stringify(converted);
         cachedBody = body;
         cachedAt = now;

@@ -69,7 +69,7 @@ services:
     environment:
     - NODE_ENV=production
     - PORT=3001
-    - DATABASE_URL=postgresql://argus:argus_dev@pgbouncer:6432/argus
+    - DATABASE_URL=postgresql://argus:argus_dev@pgbouncer:5432/argus
     - REDIS_URL=redis://redis:6379
     - GLITCHTIP_API_DSN=${GLITCHTIP_API_DSN}
     - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
@@ -130,7 +130,7 @@ services:
       pgbouncer:
         condition: service_started
     environment:
-    - DATABASE_URL=postgresql://argus:argus_dev@pgbouncer:6432/argus
+    - DATABASE_URL=postgresql://argus:argus_dev@pgbouncer:5432/argus
     - REDIS_URL=redis://redis:6379
     - TILES_DIR=/data/tiles
     - GFS_CRON=0 */6 * * *

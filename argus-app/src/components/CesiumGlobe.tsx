@@ -1510,6 +1510,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       intervalMs: ARGUS_CONFIG.pollMs.adsblol,
       run: async () => {
         if (platformModeRef.current !== "live") return;
+        if (!useArgusStore.getState().layers.adsblol) return;
         try {
           const res = await fetch(ARGUS_CONFIG.endpoints.adsbLolAll, {
             cache: "no-store",
