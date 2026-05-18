@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SITE_BASE="https://argusweb.space"
+SITE_BASE="https://www.argusweb.bond"
 API_HEALTH="${SITE_BASE}/api/health"
 
 REPO_URL="$(git -C /home/volta/argus config --get remote.origin.url || true)"
