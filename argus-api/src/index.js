@@ -1,6 +1,8 @@
 const cors = require("cors");
 const dotenv = require("dotenv");
 const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
 const Sentry = require("@sentry/node");
 
 const analyticsRoutes = require("./routes/analytics");
@@ -20,9 +22,17 @@ if (glitchtipDsn) {
   });
 }
 
-const app = express();
 const port = Number(process.env.PORT || 3001);
 const corsOrigins = process.env.CORS_ORIGIN?.split(",").map((origin) => origin.trim());
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: corsOrigins && corsOrigins.length > 0 ? { origin: corsOrigins } : true,
+});
+
+// Expose io to routes if needed, otherwise hold here for anomalies
+app.set("io", io);
 
 app.disable("x-powered-by");
 app.use(express.json());
@@ -52,6 +62,6 @@ app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });
 });
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`argus-api listening on port ${port}`);
 });
