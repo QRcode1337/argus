@@ -266,6 +266,12 @@ async function fetchNews() {
   console.log(`News fetched and cached in Redis. ${items.length} items.`);
 }
 
-cron.schedule("*/10 * * * *", fetchNews);
-// Run immediately on startup
-setTimeout(fetchNews, 1000);
+function startNewsCron() {
+  cron.schedule("*/10 * * * *", fetchNews);
+  setTimeout(fetchNews, 1000);
+}
+
+module.exports = {
+  fetchNews,
+  startNewsCron,
+};
