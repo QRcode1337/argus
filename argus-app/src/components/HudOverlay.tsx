@@ -201,7 +201,7 @@ const primaryWorkspaceIds = ["intel", "news", "feeds", "gdelt", "anomalies"] as 
 const secondaryWorkspaceIds = ["signal", "status", "settings"] as const;
 
 type WorkspaceId = (typeof workspaceDefs)[number]["id"];
-type MobileTabId = "brief" | "news" | "ops";
+type MobileTabId = "brief" | "news" | "ops" | "intel";
 type TimeRange = "1h" | "6h" | "24h" | "48h" | "7d" | "ALL";
 
 const timeRangeHours: Record<Exclude<TimeRange, "ALL">, number> = {
@@ -214,6 +214,7 @@ const timeRangeHours: Record<Exclude<TimeRange, "ALL">, number> = {
 
 const mobileTabDefs = [
   { id: "brief" as const, label: "Brief", icon: "◆" },
+  { id: "intel" as const, label: "Intel", icon: "◎" },
   { id: "news" as const, label: "News", icon: "◫" },
   { id: "ops" as const, label: "Ops", icon: "⚙" },
 ];
@@ -441,6 +442,13 @@ export function HudOverlay({
       setWorkspace("intel");
     }
   }, [epicFuryActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-open Intel tab on mobile when an entity is selected
+  useEffect(() => {
+    if (selectedIntel && window.innerWidth < 768) {
+      setMobileTab("intel");
+    }
+  }, [selectedIntel]);
 
   // Fetch Epic Fury regional data
   useEffect(() => {
@@ -1007,9 +1015,13 @@ export function HudOverlay({
               </div>
             ))}
             {(selectedIntel?.name ?? activePoiLabel) ? (
-              <div className="max-w-[12rem] truncate rounded-full border border-[#3c3836] bg-[#1d2021] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.16em] text-[#7298a8]">
+              <button
+                type="button"
+                onClick={() => setMobileTab("intel")}
+                className="max-w-[12rem] truncate rounded-full border border-[#3c3836] bg-[#1d2021] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.16em] text-[#7298a8] transition hover:border-[#83a598]"
+              >
                 Target <span className="text-[#d5c4a1] normal-case tracking-normal">{selectedIntel?.name ?? activePoiLabel}</span>
-              </div>
+              </button>
             ) : null}
           </div>
 
@@ -2588,7 +2600,7 @@ export function HudOverlay({
             <div className="pointer-events-auto fixed bottom-[calc(var(--safe-bottom)+4.15rem)] left-1/2 z-50 max-h-[56vh] w-[calc(100%-1rem)] max-w-md -translate-x-1/2 overflow-y-auto rounded-[1.35rem] border border-[#3c3836] bg-[#1d2021f2] shadow-[0_-18px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#3c3836] bg-[#1d2021f2] px-4 py-2.5 backdrop-blur-xl">
                 <span className="font-mono text-[10px] uppercase tracking-[0.33em] text-[#fabd2f]">
-                  {mobileTab === "brief" ? "Mission Brief" : mobileTab === "news" ? "News Feed" : "Operations"}
+                  {mobileTab === "brief" ? "Mission Brief" : mobileTab === "intel" ? "Target Intel" : mobileTab === "news" ? "News Feed" : "Operations"}
                 </span>
                 <button
                   type="button"
@@ -2792,6 +2804,104 @@ export function HudOverlay({
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {mobileTab === "intel" && (
+                  <div className="space-y-3">
+                    {selectedIntel ? (
+                      <>
+                        <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono">
+                          <div className="text-[14px] text-[#ebdbb2]">{selectedIntel.name}</div>
+                          <div className="mt-1 text-[9px] uppercase tracking-[0.18em] text-[#a89984]">
+                            {selectedIntel.kind} · {selectedIntel.importance === "important" ? "Priority Target" : "Standard Target"}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
+                          {selectedIntel.quickFacts.map((fact) => (
+                            <div key={`mq-${fact.label}`}>
+                              {fact.label}: {fact.value}
+                            </div>
+                          ))}
+                        </div>
+
+                        {selectedIntel.analysisSummary ? (
+                          <div className="rounded-xl border border-[#5b4a1f] bg-[#2a2415] p-3 font-mono text-[11px] leading-relaxed text-[#f3d98b] whitespace-pre-wrap">
+                            {selectedIntel.analysisSummary}
+                          </div>
+                        ) : null}
+
+                        {(selectedIntel.importance === "important" || showFullIntel) && selectedIntel.fullFacts.length > 0 ? (
+                          <div className="max-h-[140px] overflow-auto rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[11px] text-[#7fb4c5]">
+                            {selectedIntel.fullFacts.map((fact) => (
+                              <div key={`mf-${fact.label}`}>
+                                {fact.label}: {fact.value}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {selectedIntel.imageUrl ? (
+                          <img
+                            src={selectedIntel.imageUrl}
+                            alt={selectedIntel.name}
+                            className="h-28 w-full rounded border border-[#504945] object-cover"
+                          />
+                        ) : null}
+
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" onClick={onFlyToEntity} className={actionButtonClass}>
+                            Fly To
+                          </button>
+                          {selectedIntel.externalUrl ? (
+                            <a href={selectedIntel.externalUrl} target="_blank" rel="noopener noreferrer" className={actionButtonClass}>
+                              {selectedIntel.externalLabel ?? "External"}
+                            </a>
+                          ) : null}
+                          {(selectedIntel.kind === "flight" || selectedIntel.kind === "military" || selectedIntel.kind === "satellite") && (
+                            <button
+                              type="button"
+                              onClick={() => trackedEntityId === selectedIntel.id ? onTrackEntity(null) : onTrackEntity(selectedIntel.id)}
+                              className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition ${
+                                trackedEntityId === selectedIntel.id
+                                  ? "border-[#83a598] bg-[#504945] text-[#d5c4a1]"
+                                  : "border-[#504945] bg-[#282828] text-[#d5c4a1] hover:border-[#83a598]"
+                              }`}
+                            >
+                              {trackedEntityId === selectedIntel.id ? "Untrack" : "Track"}
+                            </button>
+                          )}
+                        </div>
+
+                        {selectedIntel.importance !== "important" ? (
+                          <button type="button" onClick={onToggleFullIntel} className="w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#83a598]">
+                            {showFullIntel ? "Hide Full Intel" : "Full Intel"}
+                          </button>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() => requestAiSummary(selectedIntel)}
+                          disabled={aiSummaryLoading}
+                          className="w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#83a598] transition hover:border-[#83a598] disabled:opacity-50"
+                        >
+                          {aiSummaryLoading ? "Generating..." : "AI Summary"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { onCloseIntel(); setMobileTab(null); }}
+                          className="w-full rounded-lg border border-[#504945] bg-[#282828] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#a89984] hover:border-[#fb4934]"
+                        >
+                          Clear Target
+                        </button>
+                      </>
+                    ) : (
+                      <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-4 text-center font-mono text-[11px] leading-relaxed text-[#7fb4c5]">
+                        Tap a flight, vessel, event, or map point to view target intel.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3060,7 +3170,7 @@ export function HudOverlay({
                   key={tab.id}
                   type="button"
                   onClick={() => setMobileTab(mobileTab === tab.id ? null : tab.id)}
-                  className={`flex h-10 flex-1 items-center justify-center gap-1 rounded-xl border px-2 font-mono text-[8px] uppercase tracking-[0.14em] transition ${
+                  className={`relative flex h-10 flex-1 items-center justify-center gap-1 rounded-xl border px-2 font-mono text-[8px] uppercase tracking-[0.14em] transition ${
                     mobileTab === tab.id
                       ? "border-[#83a598] bg-[#2d3432] text-[#d5c4a1]"
                       : "border-[#3c3836] bg-[#1d2021] text-[#4e6a7a]"
@@ -3068,6 +3178,9 @@ export function HudOverlay({
                 >
                   <span className="text-[13px]">{tab.icon}</span>
                   <span>{tab.label}</span>
+                  {tab.id === "intel" && selectedIntel && mobileTab !== "intel" && (
+                    <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#fabd2f]" />
+                  )}
                 </button>
               ))}
             </div>
