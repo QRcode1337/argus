@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { io } from "socket.io-client";
 import { ARGUS_CONFIG, CAMERA_PRESETS, computeFreshness } from "@/lib/config";
 import { LIVE_FEEDS } from "@/data/liveFeeds";
 import type { IntelBriefing, AlertSeverity, IntelAlert, ThreatLevel } from "@/lib/intel/analysisEngine";
 import { fetchNewsFeed, type NewsItem, type RegionDigest } from "@/lib/ingest/news";
 import { useArgusStore } from "@/store/useArgusStore";
+import type { AnomalyEvent } from "@/store/useArgusStore";
 import type { ClickedCoordinates, FeedHealth, LayerKey, PlatformMode, PlaybackSpeed, SceneMode, SelectedIntel, VisualMode } from "@/types/intel";
 import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
 
@@ -333,7 +336,31 @@ export function HudOverlay({
     setSceneMode,
     dayNight,
     toggleDayNight,
-  } = useArgusStore();
+  } = useArgusStore(
+    useShallow((s) => ({
+      layers: s.layers,
+      toggleLayer: s.toggleLayer,
+      counts: s.counts,
+      camera: s.camera,
+      feedHealth: s.feedHealth,
+      activePoiId: s.activePoiId,
+      setActivePoiId: s.setActivePoiId,
+      visualMode: s.visualMode,
+      visualIntensity: s.visualIntensity,
+      visualParams: s.visualParams,
+      setVisualMode: s.setVisualMode,
+      setVisualIntensity: s.setVisualIntensity,
+      setVisualParam: s.setVisualParam,
+      platformMode: s.platformMode,
+      setPlatformMode: s.setPlatformMode,
+      analyticsLayers: s.analyticsLayers,
+      toggleAnalyticsLayer: s.toggleAnalyticsLayer,
+      sceneMode: s.sceneMode,
+      setSceneMode: s.setSceneMode,
+      dayNight: s.dayNight,
+      toggleDayNight: s.toggleDayNight,
+    })),
+  );
   const epicFuryActive = platformMode === "epic-fury";
 
   const searchQuery = useArgusStore((s) => s.searchQuery);
@@ -448,10 +475,18 @@ export function HudOverlay({
   }, [workspace]);
 
   useEffect(() => {
-    const syncClock = () => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC"));
-    syncClock();
-    const timer = window.setInterval(syncClock, 1000);
-    return () => window.clearInterval(timer);
+    const clockTimer = setInterval(() => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC")), 1000);
+    
+    // Phantom Anomaly Listener
+    const socket = io();
+    socket.on("anomaly_alert", (alert: AnomalyEvent) => {
+      useArgusStore.getState().setAnomalyEvents([...useArgusStore.getState().anomalyEvents, alert]);
+    });
+
+    return () => { 
+      clearInterval(clockTimer);
+      socket.disconnect();
+    };
   }, []);
 
   useEffect(() => {

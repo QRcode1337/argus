@@ -30,7 +30,8 @@ import {
   Viewer,
   defined,
 } from "cesium";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { ARGUS_CONFIG, CAMERA_PRESETS } from "@/lib/config";
 import { FlightLayer } from "@/lib/cesium/layers/flightLayer";
@@ -77,6 +78,7 @@ import type { IntelAlert, PhantomAnomaly } from "@/lib/intel/analysisEngine";
 import { useArgusStore } from "@/store/useArgusStore";
 import type { SearchResult } from "@/store/useArgusStore";
 import type {
+  CameraReadout,
   IntelDatum,
   IntelImportance,
   PlatformMode,
@@ -783,7 +785,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     collisionEnabledRef.current = collisionEnabled;
   }, [collisionEnabled]);
 
-  const layers = useArgusStore((s) => s.layers);
+  const layers = useArgusStore(useShallow((s) => s.layers));
   const platformMode = useArgusStore((s) => s.platformMode);
   const epicFuryActive = platformMode === "epic-fury";
 
@@ -845,14 +847,14 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     }
   }, []);
 
-  const analyticsLayers = useArgusStore((s) => s.analyticsLayers);
+  const analyticsLayers = useArgusStore(useShallow((s) => s.analyticsLayers));
   const visualMode = useArgusStore((s) => s.visualMode);
   const visualIntensity = useArgusStore((s) => s.visualIntensity);
-  const visualParams = useArgusStore((s) => s.visualParams);
+  const visualParams = useArgusStore(useShallow((s) => s.visualParams));
   const setCount = useArgusStore((s) => s.setCount);
   const setFeedHealthy = useArgusStore((s) => s.setFeedHealthy);
   const setFeedError = useArgusStore((s) => s.setFeedError);
-  const setCamera = useArgusStore((s) => s.setCamera);
+  const setCameraStore = useArgusStore((s) => s.setCamera);
   const intelBriefing = useArgusStore((s) => s.intelBriefing);
   const setIntelBriefing = useArgusStore((s) => s.setIntelBriefing);
   const trackedEntityId = useArgusStore((s) => s.trackedEntityId);
@@ -868,6 +870,18 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const clickedCoordinates = useArgusStore((s) => s.clickedCoordinates);
   const setClickedCoordinates = useArgusStore((s) => s.setClickedCoordinates);
   const setAdsbLolData = useArgusStore((s) => s.setAdsbLolData);
+
+  // Throttle camera updates to max ~10fps to avoid flooding Zustand on every render frame
+  const cameraThrottleRef = useRef(0);
+  const setCamera = useCallback(
+    (cam: CameraReadout) => {
+      const now = performance.now();
+      if (now - cameraThrottleRef.current < 100) return;
+      cameraThrottleRef.current = now;
+      setCameraStore(cam);
+    },
+    [setCameraStore],
+  );
 
   const syncFlightLayer = useCallback(() => {
     const flightLayer = flightLayerRef.current;
@@ -1111,6 +1125,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       shouldAnimate: true,
     });
     const restoreErrorPanelSuppression = suppressCesiumErrorPanels(viewer);
+    const cleanupFns = [] as Array<() => void>;
+    cleanupFns.push(restoreErrorPanelSuppression);
     const cameraController = viewer.scene.screenSpaceCameraController;
     cameraController.enableCollisionDetection = collisionEnabledRef.current;
     cameraController.inertiaSpin = 0.82;
@@ -1158,9 +1174,31 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const threatLayer = new ThreatLayer(viewer);
     const gdeltLayer = new GdeltLayer(viewer);
     const anomalyLayer = new AnomalyLayer(viewer);
+    
+    // Wire anomaly store to layer
+    const unsubscribeAnomalies = useArgusStore.subscribe((state) => {
+      // Map AnomalyEvent (store) to PhantomAnomaly (layer expectation)
+      const mapped = state.anomalyEvents.map((a) => ({
+        entity_id: `${a.type}-${a.timestamp}`,
+        anomaly_type: a.type,
+        chaos_score: a.chaosScore,
+        severity: a.severity as "Low" | "Medium" | "High" | "Critical",
+        lat: a.lat,
+        lon: a.lon,
+        detail: `Chaos Score: ${a.chaosScore}`,
+        detected_at: a.timestamp
+      }));
+      anomalyLayer.update(mapped);
+    });
+    
     const vesselLayer = new VesselLayer(viewer);
     const weatherLayer = new WeatherLayer(viewer);
     void weatherLayer.init();
+
+    cleanupFns.push(() => {
+        unsubscribeAnomalies();
+        anomalyLayer.clear();
+    });
     const rasterLayer = new RasterLayer(viewer);
     const sentinelLayer = new RasterLayer(viewer);
     const visualController = new VisualModeController(viewer);
