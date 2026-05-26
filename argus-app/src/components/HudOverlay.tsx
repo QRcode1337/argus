@@ -98,6 +98,24 @@ function renderDigestHtml(content: string): string {
         return `<h3 class=\"mt-6 border-t border-[#3c3836] pt-4 font-mono text-[12px] uppercase tracking-[0.22em] text-[#f0c674]\">${first}</h3>`;
       }
 
+      const pipeRows = lines.filter((line) => line.includes("|"));
+      if (pipeRows.length >= 2 && pipeRows.length === lines.length) {
+        const rows = pipeRows
+          .map((line) => line.split("|").map((cell) => cell.trim()).filter(Boolean))
+          .filter((cells) => cells.length >= 2)
+          .map((cells) => {
+            const [label, value, detail] = cells;
+            return `<tr class=\"border-b border-[#3c3836]/60 last:border-b-0\">
+              <td class=\"px-3 py-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[#928374] align-top\">${label}</td>
+              <td class=\"px-3 py-2 font-mono text-[12px] text-[#ebdbb2] align-top\">${value}</td>
+              <td class=\"px-3 py-2 text-[13px] leading-6 text-[#7fb4c5] align-top\">${detail ?? ""}</td>
+            </tr>`;
+          })
+          .join("");
+
+        return `<div class=\"overflow-hidden rounded-xl border border-[#3c3836] bg-[#1d2021]/70\"><table class=\"w-full border-collapse\">${rows}</table></div>`;
+      }
+
       const numbered = lines.every((line) => /^\d+[.)]\s+/.test(line));
       if (numbered) {
         const items = lines
@@ -133,12 +151,6 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "vessels", label: "AIS Vessels", feed: "AISStream" },
   { key: "firms", label: "Thermal Anomalies (FIRMS)", feed: "NASA FIRMS" },
   { key: "instability", label: "Instability Index", feed: "CII" },
-];
-
-const analyticsIntelDefs: { key: LayerKey; label: string; feed: string }[] = [
-  { key: "outages", label: "Internet Outages", feed: "CF Radar" },
-  { key: "threats", label: "Cyber Threats", feed: "OTX" },
-  { key: "gdelt", label: "GDELT Events", feed: "GDELT" },
 ];
 
 const modeDefs: { key: VisualMode; label: string }[] = [
@@ -211,6 +223,24 @@ const timeRangeHours: Record<Exclude<TimeRange, "ALL">, number> = {
   "48h": 48,
   "7d": 168,
 };
+
+const MAJOR_AIRPORT_COORDS: Record<string, { lat: number; lon: number }> = {
+  KJFK: { lat: 40.6413, lon: -73.7781 },
+  KLAX: { lat: 33.9416, lon: -118.4085 },
+  EGLL: { lat: 51.47, lon: -0.4543 },
+  LFPG: { lat: 49.0097, lon: 2.5479 },
+  VHHH: { lat: 22.308, lon: 113.9185 },
+  RJTT: { lat: 35.5494, lon: 139.7798 },
+  EDDF: { lat: 50.0379, lon: 8.5622 },
+  OMDB: { lat: 25.2532, lon: 55.3657 },
+  LEMD: { lat: 40.4983, lon: -3.5676 },
+  YSSY: { lat: -33.9461, lon: 151.1772 },
+};
+
+const windowedRange = (timeRange: TimeRange) =>
+  timeRange === "ALL"
+    ? undefined
+    : { window: timeRange };
 
 const mobileTabDefs = [
   { id: "brief" as const, label: "Brief", icon: "◆" },
@@ -286,6 +316,46 @@ const actionButtonClass =
 
 const camBtnClass =
   "flex h-8 w-8 items-center justify-center rounded-lg border border-[#504945] bg-[#1d2021d9] font-mono text-[14px] text-[#d5c4a1] shadow-[0_0_12px_rgba(131,165,152,0.12)] backdrop-blur-md transition hover:border-[#83a598] hover:text-white active:bg-[#504945]";
+
+function isFeedExpectedActive(
+  feedKey: string,
+  layers: Record<LayerKey, boolean>,
+  platformMode: PlatformMode,
+): boolean {
+  if (platformMode !== "live") return false;
+
+  switch (feedKey) {
+    case "opensky":
+      return layers.flights;
+    case "adsb":
+      return layers.military;
+    case "adsblol":
+      return layers.adsblol;
+    case "celestrak":
+      return layers.satellites || layers.satelliteLinks;
+    case "usgs":
+      return layers.seismic;
+    case "cfradar":
+      return layers.outages;
+    case "threatradar":
+      return layers.threats;
+    case "phantom":
+      return layers.anomalies;
+    case "ais":
+      return layers.vessels;
+    case "gdelt":
+      return layers.gdelt;
+    case "acled":
+    case "polymarket":
+      return layers.instability;
+    case "faa":
+      return layers.flights;
+    case "firms":
+      return layers.firms;
+    default:
+      return true;
+  }
+}
 
 export function HudOverlay({
   onFlyToPoi,
@@ -476,11 +546,11 @@ export function HudOverlay({
   useEffect(() => {
     if (workspace !== "gdelt") return;
     let cancelled = false;
-    void fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt).then((events) => {
+    void fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt, windowedRange(timeRange)).then((events) => {
       if (!cancelled) setGdeltEvents(events);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [workspace]);
+  }, [workspace, timeRange]);
 
   useEffect(() => {
     const clockTimer = setInterval(() => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC")), 1000);
@@ -503,7 +573,7 @@ export function HudOverlay({
     const loadNews = async () => {
       setNewsLoading(true);
       try {
-        const payload = await fetchNewsFeed(ARGUS_CONFIG.endpoints.news);
+        const payload = await fetchNewsFeed(ARGUS_CONFIG.endpoints.news, windowedRange(timeRange));
         if (cancelled) return;
         setNewsItems(payload.items);
         setNewsRegions(payload.regions);
@@ -532,7 +602,7 @@ export function HudOverlay({
       cancelled = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [timeRange]);
 
   useEffect(() => {
     if (workspace !== "settings" || settingsLoaded) return;
@@ -551,12 +621,11 @@ export function HudOverlay({
   }, [workspace, settingsLoaded]);
 
   const analyticsLayerDefs: {
-    key: "gfs_weather" | "sentinel_imagery";
+    key: "sentinel_imagery";
     label: string;
     source: string;
     available: boolean;
   }[] = [
-    { key: "gfs_weather", label: "GFS Weather", source: "NOAA GFS", available: true },
     { key: "sentinel_imagery", label: "Sentinel Imagery", source: "EOX Sentinel-2", available: true },
   ];
 
@@ -567,15 +636,9 @@ export function HudOverlay({
   }, [newsItems]);
 
   const filteredNewsItems = useMemo(() => {
-    const now = Date.now();
     let next = newsItems.filter((item) =>
       newsRegionFilter === "WORLDCOM" ? true : item.region === newsRegionFilter,
     );
-
-    if (timeRange !== "ALL") {
-      const horizon = now - timeRangeHours[timeRange] * 3_600_000;
-      next = next.filter((item) => new Date(item.publishedAt).getTime() >= horizon);
-    }
 
     if (newsSourceFilter !== "ALL") {
       next = next.filter((item) => item.source === newsSourceFilter);
@@ -598,7 +661,7 @@ export function HudOverlay({
     }
 
     return next.sort((a, b) => b.score - a.score);
-  }, [newsItems, newsRegionFilter, newsSearch, newsSortMode, newsSourceFilter, timeRange]);
+  }, [newsItems, newsRegionFilter, newsSearch, newsSortMode, newsSourceFilter]);
 
   const activeRegionDigest = newsRegions?.[newsRegionFilter] ?? null;
   const recTimestamp = Math.max(
@@ -688,12 +751,18 @@ export function HudOverlay({
     counts.satelliteLinks +
     counts.bases;
 
-  const feedEntries = Object.entries(feedHealth) as [string, FeedHealth][];
-  const activeFeedCount = feedEntries.filter(([, fh]) => fh.status === "ok").length;
-  const feedTotal = feedEntries.length;
+  const feedEntries = Object.entries(feedHealth).map(([key, fh]) => ({
+    key,
+    fh,
+    monitored: isFeedExpectedActive(key, layers, platformMode),
+  }));
+  const monitoredFeedEntries = feedEntries.filter((entry) => entry.monitored);
+  const inactiveFeedCount = feedEntries.length - monitoredFeedEntries.length;
+  const activeFeedCount = monitoredFeedEntries.filter(({ fh }) => fh.status === "ok").length;
+  const feedTotal = monitoredFeedEntries.length;
 
-  const feedFreshnessCounts = feedEntries.reduce(
-    (acc, [key, fh]) => {
+  const feedFreshnessCounts = monitoredFeedEntries.reduce(
+    (acc, { key, fh }) => {
       const f = computeFreshness(key, fh.lastSuccessAt);
       acc[f]++;
       return acc;
@@ -702,7 +771,7 @@ export function HudOverlay({
   );
 
   const healthBadgeColor =
-    feedFreshnessCounts.critical > 0 || feedEntries.some(([, fh]) => fh.status === "error" || fh.status === "cooldown")
+    feedFreshnessCounts.critical > 0 || monitoredFeedEntries.some(({ fh }) => fh.status === "error" || fh.status === "cooldown")
       ? "text-red-400"
       : feedFreshnessCounts.stale > 0
         ? "text-yellow-400"
@@ -755,6 +824,85 @@ export function HudOverlay({
       ],
       analysisSummary: `Currently tracking ${counts.anomalies} anomalies across flight and seismic feeds. Toggle this layer to show or hide anomaly markers on the globe. Click individual markers for detailed analysis.`,
     });
+  };
+
+  const selectAcledIntel = (evt: typeof acledEvents[number], index: number) => {
+    onSelectIntel({
+      id: `acled-${index}`,
+      name: `${evt.event_type} — ${evt.location}, ${evt.country}`,
+      kind: "conflict",
+      importance: evt.fatalities > 0 ? "important" : "normal",
+      quickFacts: [
+        { label: "Type", value: evt.event_type },
+        { label: "Country", value: evt.country },
+        { label: "Location", value: evt.location },
+        { label: "Fatalities", value: String(evt.fatalities) },
+      ],
+      fullFacts: [
+        { label: "Actor", value: evt.actor1 || "Unknown" },
+        { label: "Date", value: evt.event_date || "Unknown" },
+        { label: "Latitude", value: evt.latitude.toFixed(4) },
+        { label: "Longitude", value: evt.longitude.toFixed(4) },
+      ],
+      coordinates: { lat: evt.latitude, lon: evt.longitude },
+      analysisSummary: `${evt.event_type} reported in ${evt.location}, ${evt.country}. Primary actor: ${evt.actor1 || "unknown"}. Fatalities: ${evt.fatalities}.`,
+    });
+    onFlyToCoordinates(evt.latitude, evt.longitude);
+  };
+
+  const selectFaaDelayIntel = (delay: typeof faaDelays[number], index: number) => {
+    const coords = MAJOR_AIRPORT_COORDS[delay.airport];
+    onSelectIntel({
+      id: `faa-delay-${index}`,
+      name: `FAA Delay — ${delay.airport}`,
+      kind: "aviation",
+      importance: "normal",
+      quickFacts: [
+        { label: "Airport", value: delay.airport },
+        { label: "Delay Type", value: delay.delayType || "Unknown" },
+        { label: "Average Delay", value: delay.avgDelay || "Unknown" },
+      ],
+      fullFacts: [
+        { label: "Reason", value: delay.reason || "No FAA reason provided" },
+        { label: "Source", value: "FAA NAS Status" },
+        ...(coords ? [
+          { label: "Latitude", value: coords.lat.toFixed(4) },
+          { label: "Longitude", value: coords.lon.toFixed(4) },
+        ] : []),
+      ],
+      coordinates: coords,
+      analysisSummary: `${delay.airport} is reporting ${delay.delayType || "delay"} conditions with average delay ${delay.avgDelay || "unknown"}. Reason: ${delay.reason || "not specified"}.`,
+    });
+    if (coords) {
+      onFlyToCoordinates(coords.lat, coords.lon);
+    }
+  };
+
+  const selectFaaNotamIntel = (notam: typeof faaNotams[number], index: number) => {
+    const coords = MAJOR_AIRPORT_COORDS[notam.location];
+    onSelectIntel({
+      id: `faa-notam-${index}`,
+      name: `${notam.type} — ${notam.location}`,
+      kind: "aviation",
+      importance: "important",
+      quickFacts: [
+        { label: "Type", value: notam.type || "NOTAM" },
+        { label: "Location", value: notam.location || "Unknown" },
+        { label: "Notice ID", value: notam.id || "Unknown" },
+      ],
+      fullFacts: [
+        { label: "Description", value: notam.description || "No description provided" },
+        ...(coords ? [
+          { label: "Latitude", value: coords.lat.toFixed(4) },
+          { label: "Longitude", value: coords.lon.toFixed(4) },
+        ] : []),
+      ],
+      coordinates: coords,
+      analysisSummary: `${notam.type || "NOTAM"} active for ${notam.location || "unknown location"}. ${notam.description || ""}`.trim(),
+    });
+    if (coords) {
+      onFlyToCoordinates(coords.lat, coords.lon);
+    }
   };
 
   const selectNewsIntel = (item: NewsItem) => {
@@ -841,12 +989,19 @@ export function HudOverlay({
     setGdeltDigestLoading(true);
     setGdeltDigestError(null);
     try {
-      const res = await fetch(`/api/ai/gdelt-digest?batchSize=${gdeltDigestBatchSize}`);
+      const params = new URLSearchParams({
+        llm: "1",
+        batchSize: String(gdeltDigestBatchSize),
+      });
+      if (timeRange !== "ALL") {
+        params.set("window", timeRange);
+      }
+      const res = await fetch(`/api/ai/gdelt-digest?${params.toString()}`);
       const data = await res.json();
       if (data.summary) {
         setShowPneumaPanel(false);
         setGdeltDigestDocument({
-          title: "GDELT STRATEGIC DIGEST",
+          title: `GDELT STRATEGIC DIGEST${timeRange === "ALL" ? "" : ` · ${timeRange}`}`,
           content: data.summary,
           analyzedCount: data.analyzedCount,
           eventCount: data.eventCount,
@@ -1207,7 +1362,7 @@ export function HudOverlay({
           {/* Sidebar header with hide button */}
           <div className="flex items-center justify-between border-b border-[#3c3836] px-3 py-2">
             <span className="font-mono text-[9px] uppercase tracking-[0.33em] text-[#a89984]">
-              {platformMode === "analytics" ? "Analytics" : platformMode === "playback" ? "Playback" : platformMode === "epic-fury" ? "Op Epic Fury" : "Live"} Panels
+              {platformMode === "playback" ? "Playback" : platformMode === "epic-fury" ? "Op Epic Fury" : "Live"} Panels
             </span>
             <button
               type="button"
@@ -1691,6 +1846,43 @@ export function HudOverlay({
             title="Intel Feeds"
             badge={`${compact(totalLiveCount)}`}
           >
+              <div className="mb-2 space-y-1.5">
+                {analyticsLayerDefs.map((layer) => (
+                  <button
+                    key={layer.key}
+                    type="button"
+                    onClick={() => layer.available && toggleAnalyticsLayer(layer.key)}
+                    className={`flex w-full items-center justify-between rounded-lg border px-2.5 py-1.5 text-left transition ${
+                      analyticsLayers[layer.key]
+                        ? "border-[#fabd2f] bg-[#2e2a1a]"
+                        : "border-[#3c3836] bg-[#1d2021] hover:border-[#2eb8d4]"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
+                      <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">
+                        {layer.source}
+                      </div>
+                    </div>
+                    <span
+                      className={`ml-2 shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
+                        analyticsLayers[layer.key]
+                          ? "border-[#fabd2f] bg-[#2e2a1a] text-[#fabd2f]"
+                          : "border-[#504945] bg-[#282828] text-[#a89984]"
+                      }`}
+                    >
+                      {analyticsLayers[layer.key] ? "On" : "Off"}
+                    </span>
+                  </button>
+                ))}
+
+                {analyticsStatus ? (
+                  <div className="rounded-lg border border-[#1f3f52] bg-[#282828] px-2 py-1.5 font-mono text-[9px] text-[#7fb4c5]">
+                    {analyticsStatus}
+                  </div>
+                ) : null}
+              </div>
+
               <div className="space-y-1">
                 {layerDefs
                   .filter((layer) => layer.key !== "outages" && layer.key !== "threats" && layer.key !== "gdelt")
@@ -1746,107 +1938,7 @@ export function HudOverlay({
               </div>
           </CollapsibleSection>
 
-          {platformMode === "analytics" && (
-          <CollapsibleSection
-            title="Analytics Raster"
-            badge="Raster"
-            defaultOpen
-          >
-              <div className="space-y-1.5">
-                {analyticsLayerDefs.map((layer) => (
-                  <button
-                    key={layer.key}
-                    type="button"
-                    onClick={() => layer.available && toggleAnalyticsLayer(layer.key)}
-                    className={`flex w-full items-center justify-between rounded-lg border px-2.5 py-1.5 text-left transition ${
-                      !layer.available
-                        ? "cursor-not-allowed border-[#3c3836] bg-[#1d2021] opacity-40"
-                        : analyticsLayers[layer.key]
-                          ? "border-[#fabd2f] bg-[#2e2a1a]"
-                          : "border-[#3c3836] bg-[#1d2021] hover:border-[#2eb8d4]"
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate font-mono text-[11px] text-[#ebdbb2]">{layer.label}</div>
-                      <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">
-                        {layer.source}{!layer.available ? " \u00B7 Phase 4" : ""}
-                      </div>
-                    </div>
-                    <span
-                      className={`ml-2 shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] ${
-                        !layer.available
-                          ? "border-[#504945] bg-[#282828] text-[#a89984]"
-                          : analyticsLayers[layer.key]
-                            ? "border-[#fabd2f] bg-[#2e2a1a] text-[#fabd2f]"
-                            : "border-[#504945] bg-[#282828] text-[#a89984]"
-                      }`}
-                    >
-                      {!layer.available ? "Soon" : analyticsLayers[layer.key] ? "On" : "Off"}
-                    </span>
-                  </button>
-                ))}
-
-                {analyticsStatus ? (
-                  <div className="rounded-lg border border-[#1f3f52] bg-[#282828] px-2 py-1.5 font-mono text-[9px] text-[#7fb4c5]">
-                    {analyticsStatus}
-                  </div>
-                ) : null}
-
-                <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
-                  <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#a89984]">
-                    Intel Analytics Layers
-                  </div>
-                  <div className="space-y-1">
-                    {analyticsIntelDefs.map((layer) => {
-                      const valueMap: Record<LayerKey, number> = {
-                        flights: counts.flights,
-                        adsblol: counts.adsblol,
-                        military: counts.military,
-                        satellites: counts.satellites,
-                        satelliteLinks: counts.satelliteLinks,
-                        seismic: counts.seismic,
-                        bases: counts.bases,
-                        outages: counts.outages,
-                        threats: counts.threats,
-                        gdelt: counts.gdelt,
-                        anomalies: counts.anomalies,
-                        weather: counts.weather,
-                        vessels: counts.vessels,
-                        firms: counts.firms,
-                        instability: 0,
-                      };
-                      const value = valueMap[layer.key];
-
-                      return (
-                        <button
-                          key={`analytics-${layer.key}`}
-                          type="button"
-                          onClick={() => {
-                            toggleLayer(layer.key);
-                            if (layer.key === "anomalies") openChaosInfoPanel();
-                          }}
-                          className="flex w-full items-center justify-between rounded border border-[#3c3836] bg-[#282828] px-2 py-1 text-left transition hover:border-[#83a598]"
-                        >
-                          <div className="min-w-0">
-                            <div className="truncate font-mono text-[10px] text-[#ebdbb2]">{layer.label}</div>
-                            <div className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#a89984]">{layer.feed}</div>
-                          </div>
-                          <div className="ml-2 flex items-center gap-2 font-mono text-[9px]">
-                            <span className="text-[#83a598]">{compact(value)}</span>
-                            <span className={layers[layer.key] ? "text-[#d5c4a1]" : "text-[#928374]"}>
-                              {layers[layer.key] ? "On" : "Off"}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-          </CollapsibleSection>
-          )}
-          {platformMode !== "analytics" ? (
-            <CollapsibleSection title="Live Feeds" badge={`${LIVE_FEEDS.length}`}>
+          <CollapsibleSection title="Live Feeds" badge={`${LIVE_FEEDS.length}`}>
               <div className="space-y-1">
                 {LIVE_FEEDS.map((feed) => (
                   <div
@@ -1925,8 +2017,7 @@ export function HudOverlay({
                   </div>
                 ))}
               </div>
-            </CollapsibleSection>
-          ) : null}
+          </CollapsibleSection>
 
           {/* ThreatRadar */}
           <CollapsibleSection title="ThreatRadar" badge={threatradarData.length > 0 ? `${threatradarData.length}` : null}>
@@ -1968,7 +2059,12 @@ export function HudOverlay({
               ) : acledEvents.slice(0, 30).map((evt, i) => {
                 const typeColor = evt.event_type.toLowerCase().includes("battle") ? "text-[#fb4934]" : evt.event_type.toLowerCase().includes("protest") ? "text-[#fabd2f]" : evt.event_type.toLowerCase().includes("riot") ? "text-[#fe8019]" : "text-[#83a598]";
                 return (
-                  <div key={`acled-${i}`} className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                  <button
+                    key={`acled-${i}`}
+                    type="button"
+                    onClick={() => selectAcledIntel(evt, i)}
+                    className="w-full rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
+                  >
                     <div className="flex items-center justify-between">
                       <span className={`font-mono text-[8px] uppercase tracking-[0.1em] ${typeColor}`}>{evt.event_type}</span>
                       {evt.fatalities > 0 && <span className="font-mono text-[8px] text-[#fb4934]">{evt.fatalities} fatal</span>}
@@ -1978,7 +2074,7 @@ export function HudOverlay({
                       <span className="font-mono text-[8px] text-[#a89984]">{evt.actor1}</span>
                       <span className="font-mono text-[8px] text-[#4e6a7a]">{evt.event_date}</span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -2039,23 +2135,33 @@ export function HudOverlay({
               ) : (
                 <>
                   {faaDelays.map((delay, i) => (
-                    <div key={`faa-d-${i}`} className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+                    <button
+                      key={`faa-d-${i}`}
+                      type="button"
+                      onClick={() => selectFaaDelayIntel(delay, i)}
+                      className="w-full rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
+                    >
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-[10px] font-bold text-[#fabd2f]">{delay.airport}</span>
                         <span className="font-mono text-[8px] text-[#a89984]">{delay.avgDelay}</span>
                       </div>
                       <div className="mt-0.5 font-mono text-[9px] text-[#d4be98]">{delay.delayType}</div>
                       <div className="mt-0.5 font-mono text-[8px] text-[#928374]">{delay.reason}</div>
-                    </div>
+                    </button>
                   ))}
                   {faaNotams.slice(0, 10).map((notam, i) => (
-                    <div key={`faa-n-${i}`} className="rounded-md border border-[#3c3836] border-l-2 border-l-[#fb4934] bg-[#1d2021] px-2 py-1.5">
+                    <button
+                      key={`faa-n-${i}`}
+                      type="button"
+                      onClick={() => selectFaaNotamIntel(notam, i)}
+                      className="w-full rounded-md border border-[#3c3836] border-l-2 border-l-[#fb4934] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
+                    >
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-[#fb4934]">TFR</span>
                         <span className="font-mono text-[8px] text-[#a89984]">{notam.location}</span>
                       </div>
                       <div className="mt-0.5 font-mono text-[9px] text-[#d4be98]">{notam.description}</div>
-                    </div>
+                    </button>
                   ))}
                 </>
               )}
@@ -2093,23 +2199,27 @@ export function HudOverlay({
                 <div className="mb-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Feed Health</div>
                 <div className="mb-1.5 text-[9px] text-[#a89984]">
                   {feedFreshnessCounts.fresh} fresh &middot; {feedFreshnessCounts.aging} aging &middot; {feedFreshnessCounts.stale} stale &middot; {feedFreshnessCounts.critical} critical
+                  {inactiveFeedCount > 0 ? ` · ${inactiveFeedCount} inactive` : ""}
                 </div>
                 {feedEntries
-                  .sort(([, a], [, b]) => {
+                  .sort((a, b) => {
                     const order: Record<string, number> = { error: 0, cooldown: 1, idle: 2, ok: 3 };
-                    const aOrd = order[a.status] ?? 2;
-                    const bOrd = order[b.status] ?? 2;
+                    const aOrd = a.monitored ? (order[a.fh.status] ?? 2) : 4;
+                    const bOrd = b.monitored ? (order[b.fh.status] ?? 2) : 4;
                     if (aOrd !== bOrd) return aOrd - bOrd;
-                    return (a.lastSuccessAt ?? 0) - (b.lastSuccessAt ?? 0);
+                    return (a.fh.lastSuccessAt ?? 0) - (b.fh.lastSuccessAt ?? 0);
                   })
-                  .map(([key, fh]) => {
-                    const freshness = computeFreshness(key, fh.lastSuccessAt);
+                  .map(({ key, fh, monitored }) => {
+                    const freshness = monitored ? computeFreshness(key, fh.lastSuccessAt) : null;
                     const dotColor =
-                      freshness === "fresh" ? "bg-green-400"
+                      !monitored ? "bg-[#665c54]"
+                      : freshness === "fresh" ? "bg-green-400"
                       : freshness === "aging" ? "bg-yellow-400"
                       : freshness === "stale" ? "bg-orange-400"
                       : "bg-red-400";
-                    const ago = fh.lastSuccessAt
+                    const ago = !monitored
+                      ? "inactive"
+                      : fh.lastSuccessAt
                       ? `${Math.round((Date.now() - fh.lastSuccessAt) / 1000)}s ago`
                       : "never";
                     return (
@@ -2120,12 +2230,12 @@ export function HudOverlay({
                         </div>
                         <div className="flex items-center gap-2 text-[#a89984]">
                           <span>{ago}</span>
-                          {fh.circuitState !== "closed" && (
+                          {monitored && fh.circuitState !== "closed" && (
                             <span className="rounded bg-red-900/50 px-1 text-[8px] text-red-300">
                               {fh.circuitState}
                             </span>
                           )}
-                          {fh.consecutiveFailures > 0 && (
+                          {monitored && fh.consecutiveFailures > 0 && (
                             <span className="text-red-400">({fh.consecutiveFailures}x)</span>
                           )}
                         </div>
@@ -2510,7 +2620,6 @@ export function HudOverlay({
             >
               <option value="live">Live</option>
               <option value="playback">Playback</option>
-              <option value="analytics">Analytics</option>
               <option value="epic-fury">Op Epic Fury</option>
             </select>
           </label>
@@ -3049,7 +3158,6 @@ export function HudOverlay({
                         >
                           <option value="live">Live</option>
                           <option value="playback">Playback</option>
-                          <option value="analytics">Analytics</option>
                         </select>
                       </label>
 
