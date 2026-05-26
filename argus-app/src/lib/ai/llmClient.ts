@@ -1,4 +1,5 @@
 import { readSettings } from "@/lib/settings";
+import type { LlmSettings } from "@/types/settings";
 
 interface LlmResponse {
   text: string;
@@ -9,6 +10,7 @@ interface LlmResponse {
 interface QueryLlmOptions {
   maxTokens?: number;
   timeoutMs?: number;
+  llmOverride?: Partial<LlmSettings>;
 }
 
 function getEffectiveApiKey(apiKey?: string, endpoint?: string): string | undefined {
@@ -24,7 +26,11 @@ function getEffectiveApiKey(apiKey?: string, endpoint?: string): string | undefi
 function resolveOpenAiCompatibleUrl(endpoint: string): string {
   const base = endpoint.trim().replace(/\/+$/, "");
 
-  if (/\/chat\/completions$/i.test(base) || /\/v1\/chat\/completions$/i.test(base)) {
+  if (
+    /\/chat\/completions$/i.test(base) ||
+    /\/v1\/chat\/completions$/i.test(base) ||
+    /\/api\/v1\/chat\/completions$/i.test(base)
+  ) {
     return base;
   }
 
@@ -32,6 +38,10 @@ function resolveOpenAiCompatibleUrl(endpoint: string): string {
     if (/\/openai$/i.test(base)) return `${base}/chat/completions`;
     if (/\/v1beta$/i.test(base) || /\/v1$/i.test(base)) return `${base}/openai/chat/completions`;
     return `${base}/v1beta/openai/chat/completions`;
+  }
+
+  if (/\/api\/v1$/i.test(base)) {
+    return `${base}/chat/completions`;
   }
 
   return `${base}/v1/chat/completions`;
@@ -84,7 +94,11 @@ export async function queryLlm(
   systemPrompt?: string,
   options: QueryLlmOptions = {},
 ): Promise<LlmResponse> {
-  const { llm } = await readSettings();
+  const { llm: savedLlm } = await readSettings();
+  const llm = {
+    ...savedLlm,
+    ...(options.llmOverride ?? {}),
+  } as LlmSettings;
 
   const maxTokens = Number.isFinite(options.maxTokens)
     ? Math.max(256, Math.floor(options.maxTokens as number))
