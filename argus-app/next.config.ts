@@ -5,6 +5,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(process.cwd()),
+  deploymentId: process.env.DEPLOYMENT_VERSION,
   // Turbopack disabled to prevent os error 60 file read timeouts with large Cesium assets
   serverExternalPackages: ["cesium"],
   webpack: (config) => {
