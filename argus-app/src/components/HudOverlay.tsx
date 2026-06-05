@@ -218,7 +218,8 @@ const primaryWorkspaceIds = ["intel", "athena", "news", "feeds", "gdelt", "anoma
 const secondaryWorkspaceIds = ["signal", "status", "settings"] as const;
 
 type WorkspaceId = (typeof workspaceDefs)[number]["id"];
-type MobileTabId = "brief" | "news" | "ops" | "intel";
+type MobileTabId = "brief" | "news" | "ops" | "intel" | "athena";
+type MobileAthenaFilter = "all" | "proposed" | "critical";
 type TimeRange = "1h" | "6h" | "24h" | "48h" | "7d" | "ALL";
 
 const timeRangeHours: Record<Exclude<TimeRange, "ALL">, number> = {
@@ -252,6 +253,7 @@ const mobileTabDefs = [
   { id: "intel" as const, label: "Intel", icon: "◎" },
   { id: "news" as const, label: "News", icon: "◫" },
   { id: "ops" as const, label: "Ops", icon: "⚙" },
+  { id: "athena" as const, label: "ATHENA", icon: "⚡" },
 ];
 
 function SliderControl({ label, value, onChange }: SliderDef) {
@@ -471,6 +473,7 @@ export function HudOverlay({
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [workspace, setWorkspace] = useState<WorkspaceId>("news");
   const [alertFilter, setAlertFilter] = useState<AlertSeverity | null>(null);
+  const [mobileAthenaFilter, setMobileAthenaFilter] = useState<MobileAthenaFilter>("all");
   const [enlargedStream, setEnlargedStream] = useState<{ src: string; title: string } | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTabId | null>(null);
   const [utcTimestamp, setUtcTimestamp] = useState("");
@@ -841,7 +844,25 @@ export function HudOverlay({
       (a, b) => priorityRank[b.priority] - priorityRank[a.priority] || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }, [athenaPackets]);
+  const filteredMobileAthenaPackets = useMemo(() => {
+    switch (mobileAthenaFilter) {
+      case "proposed":
+        return sortedAthenaPackets.filter((packet) => packet.status === "proposed");
+      case "critical":
+        return sortedAthenaPackets.filter(
+          (packet) =>
+            packet.status === "proposed" &&
+            (packet.priority === "critical" || packet.priority === "high"),
+        );
+      default:
+        return sortedAthenaPackets;
+    }
+  }, [mobileAthenaFilter, sortedAthenaPackets]);
   const topAthenaPacket = sortedAthenaPackets.find((packet) => packet.status === "proposed") ?? sortedAthenaPackets[0] ?? null;
+  const criticalAthenaCount = sortedAthenaPackets.filter(
+    (packet) => packet.status === "proposed" && (packet.priority === "critical" || packet.priority === "high"),
+  ).length;
+  const proposedAthenaCount = sortedAthenaPackets.filter((packet) => packet.status === "proposed").length;
   const activeViewLabel = sceneModeDefs.find((mode) => mode.key === sceneMode)?.label ?? sceneMode;
 
   const openChaosInfoPanel = () => {
@@ -1550,6 +1571,11 @@ export function HudOverlay({
                       onApprove={(nextPacket) => { void handleAthenaDecision(nextPacket, "approved"); }}
                       onDismiss={(nextPacket) => { void handleAthenaDecision(nextPacket, "dismissed"); }}
                       onExportJson={exportAthenaJson}
+                      onFlyTo={(p) => {
+                        if (p.region.lat != null && p.region.lon != null) {
+                          onFlyToCoordinates(p.region.lat, p.region.lon);
+                        }
+                      }}
                     />
                   ))
                 )}
@@ -1974,7 +2000,7 @@ export function HudOverlay({
                           <div className="truncate font-mono text-[10px] text-[#ebdbb2]">
                             {result.name}
                           </div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-2">
                             <span className={`font-mono text-[8px] uppercase tracking-[0.14em] ${kindColors[result.kind] ?? "text-[#a89984]"}`}>
                               {result.kind}
                             </span>
@@ -2384,7 +2410,7 @@ export function HudOverlay({
                       : "never";
                     return (
                       <div key={key} className="flex items-center justify-between py-0.5">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                           <span className={`inline-block h-1.5 w-1.5 rounded-full ${dotColor}`} />
                           <span>{key}</span>
                         </div>
@@ -2472,7 +2498,7 @@ export function HudOverlay({
                       <div className="flex items-start justify-between gap-1">
                         <span className="font-mono text-[9px] font-bold text-[#ebdbb2] line-clamp-2">{item.title}</span>
                       </div>
-                      <div className="mt-0.5 flex items-center gap-1.5">
+                      <div className="mt-0.5 flex items-center gap-2">
                         <span className="rounded border border-[#504945] bg-[#282828] px-1 py-0.5 font-mono text-[7px] uppercase tracking-[0.1em] text-[#fabd2f]">{item.source}</span>
                         <span className="font-mono text-[7px] text-[#928374]">{new Date(item.pubDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
@@ -2700,7 +2726,7 @@ export function HudOverlay({
                             <span className="truncate font-mono text-[10px] font-bold text-[#ebdbb2]">{site.name}</span>
                           </div>
                         </div>
-                        <div className="mt-0.5 flex items-center gap-1.5">
+                        <div className="mt-0.5 flex items-center gap-2">
                           <span
                             className="rounded border border-[#504945] bg-[#282828] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em]"
                             style={{ color: CATEGORY_COLORS[site.category] }}
@@ -2767,7 +2793,7 @@ export function HudOverlay({
           </label>
 
           <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#928374]">
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-2">
               Platform
               {platformMode === "live" && (
                 <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" title="Recording" />
@@ -2869,7 +2895,7 @@ export function HudOverlay({
             <div className="pointer-events-auto fixed bottom-[calc(var(--safe-bottom)+4.15rem)] left-1/2 z-50 max-h-[56vh] w-[calc(100%-1rem)] max-w-md -translate-x-1/2 overflow-y-auto rounded-[1.35rem] border border-[#3c3836] bg-[#1d2021f2] shadow-[0_-18px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#3c3836] bg-[#1d2021f2] px-4 py-2.5 backdrop-blur-xl">
                 <span className="font-mono text-[10px] uppercase tracking-[0.33em] text-[#fabd2f]">
-                  {mobileTab === "brief" ? "Mission Brief" : mobileTab === "intel" ? "Target Intel" : mobileTab === "news" ? "News Feed" : "Operations"}
+                  {mobileTab === "brief" ? "Mission Brief" : mobileTab === "intel" ? "Target Intel" : mobileTab === "news" ? "News Feed" : mobileTab === "athena" ? "ATHENA Actions" : "Operations"}
                 </span>
                 <button
                   type="button"
@@ -2926,6 +2952,11 @@ export function HudOverlay({
                         onApprove={(packet) => { void handleAthenaDecision(packet, "approved"); }}
                         onDismiss={(packet) => { void handleAthenaDecision(packet, "dismissed"); }}
                         onExportJson={exportAthenaJson}
+                        onFlyTo={(p) => {
+                          if (p.region.lat != null && p.region.lon != null) {
+                            onFlyToCoordinates(p.region.lat, p.region.lon);
+                          }
+                        }}
                       />
                     ) : null}
 
@@ -3438,30 +3469,104 @@ export function HudOverlay({
                     </CollapsibleSection>
                   </div>
                 )}
+                {mobileTab === "athena" && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between font-mono text-[11px] text-[#d5c4a1]">
+                      <div>
+                        {filteredMobileAthenaPackets.length} packets · {athenaPosture ?? "standby"}
+                      </div>
+                      {athenaWatchUntil && <div className="text-[#a89984]">Watch until {new Date(athenaWatchUntil).toLocaleTimeString()}</div>}
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                      {([
+                        {
+                          key: "all",
+                          label: "All",
+                          count: sortedAthenaPackets.length,
+                          activeClass: "border-[#83a598] bg-[#2d3432] text-[#d5c4a1]",
+                          idleClass: "border-[#504945] bg-[#282828] text-[#a89984]",
+                        },
+                        {
+                          key: "proposed",
+                          label: "Proposed",
+                          count: proposedAthenaCount,
+                          activeClass: "border-[#8ec07c] bg-[#1f2a20] text-[#8ec07c]",
+                          idleClass: "border-[#504945] bg-[#282828] text-[#a89984]",
+                        },
+                        {
+                          key: "critical",
+                          label: "Critical+",
+                          count: criticalAthenaCount,
+                          activeClass: "border-[#fb4934] bg-[#2a1f1f] text-[#fb4934]",
+                          idleClass: "border-[#504945] bg-[#282828] text-[#a89984]",
+                        },
+                      ] as const).map((filter) => (
+                        <button
+                          key={filter.key}
+                          type="button"
+                          onClick={() => setMobileAthenaFilter(filter.key)}
+                          className={`rounded border px-2 py-0.5 font-mono text-[8px] transition ${
+                            mobileAthenaFilter === filter.key ? filter.activeClass : filter.idleClass
+                          }`}
+                        >
+                          {filter.label} {filter.count}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="space-y-3 max-h-[42vh] overflow-auto pr-1">
+                      {filteredMobileAthenaPackets.length === 0 ? (
+                        <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#a89984]">ATHENA standing by. Packets from Phantom/GDELT will appear here.</div>
+                      ) : (
+                        filteredMobileAthenaPackets.slice(0, 15).map((packet) => (
+                          <AthenaActionCard
+                            key={packet.id}
+                            packet={packet}
+                            compact={false}
+                            mobile={true}
+                            onSimulate={(nextPacket) => { void handleAthenaDecision(nextPacket, "simulated"); }}
+                            onApprove={(nextPacket) => { void handleAthenaDecision(nextPacket, "approved"); }}
+                            onDismiss={(nextPacket) => { void handleAthenaDecision(nextPacket, "dismissed"); }}
+                            onExportJson={exportAthenaJson}
+                            onFlyTo={(p) => {
+                              if (p.region.lat != null && p.region.lon != null) {
+                                onFlyToCoordinates(p.region.lat, p.region.lon);
+                                setMobileTab(null);
+                              }
+                            }}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
               </div>
             </div>
           )}
 
           <div className="pointer-events-auto fixed bottom-[calc(var(--safe-bottom)+0.5rem)] left-1/2 z-50 w-[calc(100%-1rem)] max-w-[19.5rem] -translate-x-1/2 rounded-[1.25rem] border border-[#3c3836] bg-[#1d2021f2] p-1.5 shadow-[0_14px_40px_rgba(0,0,0,0.42)] backdrop-blur-xl">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               {mobileTabDefs.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setMobileTab(mobileTab === tab.id ? null : tab.id)}
-                  className={`relative flex h-10 flex-1 items-center justify-center gap-1 rounded-xl border px-2 font-mono text-[8px] uppercase tracking-[0.14em] transition ${
+                  className={`relative flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border px-3 font-mono text-[9px] uppercase tracking-[0.14em] transition ${
                     mobileTab === tab.id
                       ? "border-[#83a598] bg-[#2d3432] text-[#d5c4a1]"
                       : "border-[#3c3836] bg-[#1d2021] text-[#4e6a7a]"
                   }`}
                 >
-                  <span className="text-[13px]">{tab.icon}</span>
+                  <span className="text-[14px]">{tab.icon}</span>
                   <span>{tab.label}</span>
                   {tab.id === "brief" && topAthenaPacket && mobileTab !== "brief" && (
-                    <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#fabd2f]" />
+                    <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#fabd2f]" />
                   )}
                   {tab.id === "intel" && selectedIntel && mobileTab !== "intel" && (
-                    <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#fabd2f]" />
+                    <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#fabd2f]" />
+                  )}
+                  {tab.id === "athena" && sortedAthenaPackets.some((p) => p.status === "proposed" && (p.priority === "critical" || p.priority === "high")) && mobileTab !== "athena" && (
+                    <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#fb4934]" />
                   )}
                 </button>
               ))}
