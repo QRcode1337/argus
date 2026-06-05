@@ -7,6 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
+    "test": "node --test test/*.test.mjs",
     "setup-cesium": "node scripts/copy-cesium-assets.mjs"
   },
   "dependencies": {
