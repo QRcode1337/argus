@@ -25,12 +25,24 @@ export interface NewsFeedResponse {
     sourcesChecked: number;
     fetchedAt: string;
     dedupedCount: number;
+    window?: string;
   };
   regions: Record<CommandRegion, RegionDigest>;
 }
 
-export async function fetchNewsFeed(endpoint: string): Promise<NewsFeedResponse> {
-  const response = await fetch(endpoint, { cache: "no-store" });
+export async function fetchNewsFeed(
+  endpoint: string,
+  options?: { window?: "1h" | "6h" | "24h" | "48h" | "7d" | "ALL" },
+): Promise<NewsFeedResponse> {
+  const url = new URL(endpoint, typeof window === "undefined" ? "http://localhost" : window.location.origin);
+  if (options?.window && options.window !== "ALL") {
+    url.searchParams.set("window", options.window);
+  }
+
+  const response = await fetch(
+    typeof window === "undefined" && endpoint.startsWith("/") ? `${url.pathname}${url.search}` : url.toString(),
+    { cache: "no-store" },
+  );
   if (!response.ok) {
     throw new Error(`News feed returned ${response.status}`);
   }

@@ -1,5 +1,7 @@
 const express = require("express");
 const { createHash } = require("node:crypto");
+const { maybeGenerateAthenaForAnomaly, normalizeAnomalyIntake } = require("../services/athena/phantomBridge");
+const { ensureAthenaSchema } = require("../services/athena/schema");
 
 const router = express.Router();
 
@@ -254,6 +256,54 @@ router.get("/tfl-cctv", async (_req, res) => {
       Accept: "application/json",
     },
   });
+});
+
+// Phantom Engine Integration Bridge
+router.post("/anomalies/collect", async (req, res) => {
+  try {
+    const { event: anomalyAlert, payloadJson } = normalizeAnomalyIntake(req.body);
+
+    // In a production environment, this would forward to a local
+    // Unix socket or IPC channel communicating with the Phantom binary.
+    // For now, we use simulated data passed in the body.
+    console.log(`[Phantom Engine Intake] Type: ${anomalyAlert.type} | Received ${payloadJson.length} bytes.`);
+
+    // 1. Insert into Database
+    const db = require("../db");
+    await ensureAthenaSchema(db);
+    await db.query(
+      `INSERT INTO anomaly_events (event_type, lat, lon, chaos_score, severity, source_data, detected_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
+      [
+        anomalyAlert.type,
+        anomalyAlert.lat,
+        anomalyAlert.lon,
+        anomalyAlert.chaosScore,
+        anomalyAlert.severity,
+        payloadJson,
+        anomalyAlert.timestamp,
+      ]
+    );
+
+    // 2. Broadcast anomaly alert via Socket.io
+    const io = req.app.get("io");
+    io.emit("anomaly_alert", anomalyAlert);
+
+    // 3. Generate an approval-gated ATHENA Action Packet for high-signal anomalies.
+    await maybeGenerateAthenaForAnomaly({
+      event: anomalyAlert,
+      io,
+    });
+
+    res.json({
+      status: "accepted",
+      chaosScore: anomalyAlert.chaosScore,
+      engineStatus: "operational"
+    });
+  } catch (error) {
+    console.error("Phantom intake error:", error);
+    res.status(error.status || 500).json({ error: error.status ? error.message : "Phantom intake failure" });
+  }
 });
 
 

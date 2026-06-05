@@ -12,6 +12,7 @@ export const ARGUS_CONFIG = {
     aisstream: "/api/feeds/aisstream",
     news: "/api/feeds/news",
     gdelt: "/api/feeds/gdelt",
+    athena: process.env.NEXT_PUBLIC_ATHENA_ENDPOINT ?? "/api/athena/action-packets",
     iss: "/api/feeds/iss",
     threatRadar: "/api/feeds/threatradar",
     threatRadarSearch: "/api/feeds/threatradar/search",

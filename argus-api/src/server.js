@@ -6,6 +6,7 @@ const { Server } = require("socket.io");
 const Sentry = require("@sentry/node");
 
 const analyticsRoutes = require("./routes/analytics");
+const athenaRoutes = require("./routes/athena");
 const feedsRoutes = require("./routes/feeds");
 const recordRoutes = require("./routes/record");
 const playbackRoutes = require("./routes/playback");
@@ -54,6 +55,7 @@ function createServer(options = {}) {
   });
 
   app.use("/api/analytics", analyticsRoutes);
+  app.use("/api/athena", athenaRoutes);
   app.use("/api/feeds", feedsRoutes);
   app.use("/api/record", recordRoutes);
   app.use("/api/playback", playbackRoutes);

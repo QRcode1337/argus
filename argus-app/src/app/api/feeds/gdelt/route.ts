@@ -52,6 +52,13 @@ interface ParsedEvent {
 let cachedEvents: ParsedEvent[] = [];
 let cachedAt = 0;
 const CACHE_TTL_MS = 10 * 60_000; // 10 minutes
+const WINDOW_HOURS = {
+  "1h": 1,
+  "6h": 6,
+  "24h": 24,
+  "48h": 48,
+  "7d": 168,
+} as const;
 
 async function fetchLatestExportUrl(): Promise<string | null> {
   const res = await fetch(GDELT_LAST_UPDATE, { cache: "no-store" });
@@ -109,12 +116,39 @@ function parseTsv(tsv: string): ParsedEvent[] {
   return events;
 }
 
-export async function GET() {
+function parseDateAdded(value: string): number | null {
+  if (!/^\d{14}$/.test(value)) return null;
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6)) - 1;
+  const day = Number(value.slice(6, 8));
+  const hour = Number(value.slice(8, 10));
+  const minute = Number(value.slice(10, 12));
+  const second = Number(value.slice(12, 14));
+  const ts = Date.UTC(year, month, day, hour, minute, second);
+  return Number.isFinite(ts) ? ts : null;
+}
+
+function applyWindow(events: ParsedEvent[], windowParam: string | null): ParsedEvent[] {
+  if (!windowParam || windowParam === "ALL") return events;
+  if (!(windowParam in WINDOW_HOURS)) return events;
+
+  const horizon = Date.now() - WINDOW_HOURS[windowParam as keyof typeof WINDOW_HOURS] * 3_600_000;
+  return events.filter((event) => {
+    const ts = parseDateAdded(event.dateAdded);
+    return ts !== null && ts >= horizon;
+  });
+}
+
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const windowParam = searchParams.get("window");
+
     // Return cached if fresh
     if (cachedEvents.length > 0 && Date.now() - cachedAt < CACHE_TTL_MS) {
+      const filtered = applyWindow(cachedEvents, windowParam);
       return NextResponse.json(
-        { events: cachedEvents, cached: true, count: cachedEvents.length },
+        { events: filtered, cached: true, count: filtered.length, window: windowParam ?? "ALL" },
         {
           status: 200,
           headers: {
@@ -200,9 +234,10 @@ export async function GET() {
     const events = parseTsv(csvText);
     cachedEvents = events;
     cachedAt = Date.now();
+    const filtered = applyWindow(events, windowParam);
 
     return NextResponse.json(
-      { events, cached: false, count: events.length },
+      { events: filtered, cached: false, count: filtered.length, window: windowParam ?? "ALL" },
       {
         status: 200,
         headers: {

@@ -19,6 +19,7 @@ import type {
 import type { BreakingNewsCard } from "@/lib/analysis/breakingNews";
 import type { NewsCluster } from "@/lib/analysis/newsClustering";
 import type { ThreatRadarThreat } from "@/lib/ingest/threatradar";
+import type { AthenaActionPacket, AthenaPacketPriority } from "@/types/athena";
 import type { TrackedFlight } from "@/types/intel";
 
 export type AcledEvent = { event_type: string; country: string; location: string; fatalities: number; actor1: string; event_date: string; latitude: number; longitude: number };
@@ -26,6 +27,14 @@ export type PolymarketEvent = { question: string; probability: number; volume: n
 export type GdacsEvent = { type: string; severity: string; country: string; title: string; populationExposed: number; date: string; lat: number; lon: number };
 export type FaaDelay = { airport: string; delayType: string; reason: string; avgDelay: string };
 export type FaaNotam = { id: string; location: string; type: string; description: string };
+export type AnomalyEvent = {
+  type: string;
+  chaosScore: number;
+  lat: number;
+  lon: number;
+  severity: string;
+  timestamp: string;
+};
 
 export interface SearchResult {
   id: string;
@@ -58,6 +67,16 @@ type ArgusStore = {
   alerts: CorroborationAlert[];
   addAlert: (alert: CorroborationAlert) => void;
   updateAlert: (id: string, patch: Partial<CorroborationAlert>) => void;
+  athenaPackets: AthenaActionPacket[];
+  setAthenaPackets: (packets: AthenaActionPacket[]) => void;
+  addAthenaPacket: (packet: AthenaActionPacket) => void;
+  updateAthenaPacket: (id: string, patch: Partial<AthenaActionPacket>) => void;
+  athenaFocusRegion: string | null;
+  setAthenaFocusRegion: (region: string | null) => void;
+  athenaWatchUntil: number | null;
+  setAthenaWatchUntil: (timestamp: number | null) => void;
+  athenaPosture: AthenaPacketPriority | null;
+  setAthenaPosture: (posture: AthenaPacketPriority | null) => void;
   feedHealth: Record<FeedKey, FeedHealth>;
   activePoiId: string | null;
   camera: CameraReadout;
@@ -144,6 +163,8 @@ type ArgusStore = {
   setBreakingNews: (news: BreakingNewsCard[]) => void;
   threatradarData: ThreatRadarThreat[];
   setThreatradarData: (threats: ThreatRadarThreat[]) => void;
+  anomalyEvents: AnomalyEvent[];
+  setAnomalyEvents: (events: AnomalyEvent[]) => void;
   newsClusters: NewsCluster<{ title: string; score: number }>[];
   setNewsClusters: (clusters: NewsCluster<{ title: string; score: number }>[]) => void;
   adsbLolData: TrackedFlight[];
@@ -362,6 +383,8 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   setBreakingNews: (news) => set({ breakingNews: news }),
   threatradarData: [],
   setThreatradarData: (threats) => set({ threatradarData: threats }),
+  anomalyEvents: [],
+  setAnomalyEvents: (events) => set({ anomalyEvents: events }),
   newsClusters: [],
   setNewsClusters: (clusters) => set({ newsClusters: clusters }),
   adsbLolData: [],
@@ -371,4 +394,18 @@ export const useArgusStore = create<ArgusStore>((set) => ({
   alerts: [],
   addAlert: (alert) => set((s) => ({ alerts: [alert, ...s.alerts].slice(0, 100) })),
   updateAlert: (id, patch) => set((s) => ({ alerts: s.alerts.map((a) => (a.id === id ? { ...a, ...patch } : a)) })),
+  athenaPackets: [],
+  setAthenaPackets: (packets) => set({ athenaPackets: packets.slice(0, 100) }),
+  addAthenaPacket: (packet) => set((s) => ({
+    athenaPackets: [packet, ...s.athenaPackets.filter((candidate) => candidate.id !== packet.id)].slice(0, 100),
+  })),
+  updateAthenaPacket: (id, patch) => set((s) => ({
+    athenaPackets: s.athenaPackets.map((packet) => (packet.id === id ? { ...packet, ...patch } : packet)),
+  })),
+  athenaFocusRegion: null,
+  setAthenaFocusRegion: (region) => set({ athenaFocusRegion: region }),
+  athenaWatchUntil: null,
+  setAthenaWatchUntil: (timestamp) => set({ athenaWatchUntil: timestamp }),
+  athenaPosture: null,
+  setAthenaPosture: (posture) => set({ athenaPosture: posture }),
 }));

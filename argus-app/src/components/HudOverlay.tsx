@@ -6,13 +6,17 @@ import { io } from "socket.io-client";
 import { ARGUS_CONFIG, CAMERA_PRESETS, computeFreshness } from "@/lib/config";
 import { LIVE_FEEDS } from "@/data/liveFeeds";
 import type { IntelBriefing, AlertSeverity, IntelAlert, ThreatLevel } from "@/lib/intel/analysisEngine";
+import { decideAthenaPacket, fetchAthenaPackets } from "@/lib/ingest/athena";
 import { fetchNewsFeed, type NewsItem, type RegionDigest } from "@/lib/ingest/news";
+import { executeAthenaMachineActions } from "@/lib/athena/executeMachineActions";
 import { useArgusStore } from "@/store/useArgusStore";
 import type { AnomalyEvent } from "@/store/useArgusStore";
+import type { AthenaActionPacket, AthenaDecisionStatus } from "@/types/athena";
 import type { ClickedCoordinates, FeedHealth, LayerKey, PlatformMode, PlaybackSpeed, SceneMode, SelectedIntel, VisualMode } from "@/types/intel";
 import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
 
 import { VideoOverlay } from "./VideoOverlay";
+import { AthenaActionCard } from "./athena/AthenaActionCard";
 import PneumaHud from "./PneumaHud";
 import { SettingsModal } from "./SettingsModal";
 import {
@@ -200,6 +204,7 @@ const severityIcons: Record<AlertSeverity, string> = {
 
 const workspaceDefs = [
   { id: "intel", label: "Intel" },
+  { id: "athena", label: "ATHENA" },
   { id: "news", label: "News" },
   { id: "feeds", label: "Feeds" },
   { id: "gdelt", label: "GDELT" },
@@ -209,7 +214,7 @@ const workspaceDefs = [
   { id: "settings", label: "Settings" },
 ] as const;
 
-const primaryWorkspaceIds = ["intel", "news", "feeds", "gdelt", "anomalies"] as const;
+const primaryWorkspaceIds = ["intel", "athena", "news", "feeds", "gdelt", "anomalies"] as const;
 const secondaryWorkspaceIds = ["signal", "status", "settings"] as const;
 
 type WorkspaceId = (typeof workspaceDefs)[number]["id"];
@@ -388,6 +393,7 @@ export function HudOverlay({
   const {
     layers,
     toggleLayer,
+    setLayer,
     counts,
     camera,
     feedHealth,
@@ -411,6 +417,7 @@ export function HudOverlay({
     useShallow((s) => ({
       layers: s.layers,
       toggleLayer: s.toggleLayer,
+      setLayer: s.setLayer,
       counts: s.counts,
       camera: s.camera,
       feedHealth: s.feedHealth,
@@ -450,6 +457,16 @@ export function HudOverlay({
   const alerts = useArgusStore((s) => s.alerts);
   const breakingNews = useArgusStore((s) => s.breakingNews);
   const threatradarData = useArgusStore((s) => s.threatradarData);
+  const athenaPackets = useArgusStore((s) => s.athenaPackets);
+  const setAthenaPackets = useArgusStore((s) => s.setAthenaPackets);
+  const addAthenaPacket = useArgusStore((s) => s.addAthenaPacket);
+  const updateAthenaPacket = useArgusStore((s) => s.updateAthenaPacket);
+  const athenaFocusRegion = useArgusStore((s) => s.athenaFocusRegion);
+  const setAthenaFocusRegion = useArgusStore((s) => s.setAthenaFocusRegion);
+  const athenaWatchUntil = useArgusStore((s) => s.athenaWatchUntil);
+  const setAthenaWatchUntil = useArgusStore((s) => s.setAthenaWatchUntil);
+  const athenaPosture = useArgusStore((s) => s.athenaPosture);
+  const setAthenaPosture = useArgusStore((s) => s.setAthenaPosture);
 
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [workspace, setWorkspace] = useState<WorkspaceId>("news");
@@ -553,6 +570,29 @@ export function HudOverlay({
   }, [workspace, timeRange]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const loadAthenaPackets = async () => {
+      try {
+        const packets = await fetchAthenaPackets(ARGUS_CONFIG.endpoints.athena);
+        if (!cancelled) setAthenaPackets(packets);
+      } catch {
+        // ATHENA is advisory; keep the HUD operational if the backend route is unavailable.
+      }
+    };
+
+    void loadAthenaPackets();
+    const timer = setInterval(() => {
+      void loadAthenaPackets();
+    }, 60_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [setAthenaPackets]);
+
+  useEffect(() => {
     const clockTimer = setInterval(() => setUtcTimestamp(new Date().toUTCString().replace("GMT", "UTC")), 1000);
     
     // Phantom Anomaly Listener
@@ -560,12 +600,15 @@ export function HudOverlay({
     socket.on("anomaly_alert", (alert: AnomalyEvent) => {
       useArgusStore.getState().setAnomalyEvents([...useArgusStore.getState().anomalyEvents, alert]);
     });
+    socket.on("athena_action_packet", (packet: AthenaActionPacket) => {
+      addAthenaPacket(packet);
+    });
 
     return () => { 
       clearInterval(clockTimer);
       socket.disconnect();
     };
-  }, []);
+  }, [addAthenaPacket]);
 
   useEffect(() => {
     let cancelled = false;
@@ -786,6 +829,19 @@ export function HudOverlay({
   }, [intelBriefing, alertFilter]);
   const mobileAlertPreview = useMemo(() => mobileAlerts.slice(0, 5), [mobileAlerts]);
   const mobileHeadlinePreview = useMemo(() => filteredNewsItems.slice(0, 8), [filteredNewsItems]);
+  const sortedAthenaPackets = useMemo(() => {
+    const priorityRank: Record<AthenaActionPacket["priority"], number> = {
+      critical: 5,
+      high: 4,
+      elevated: 3,
+      watch: 2,
+      info: 1,
+    };
+    return [...athenaPackets].sort(
+      (a, b) => priorityRank[b.priority] - priorityRank[a.priority] || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [athenaPackets]);
+  const topAthenaPacket = sortedAthenaPackets.find((packet) => packet.status === "proposed") ?? sortedAthenaPackets[0] ?? null;
   const activeViewLabel = sceneModeDefs.find((mode) => mode.key === sceneMode)?.label ?? sceneMode;
 
   const openChaosInfoPanel = () => {
@@ -925,6 +981,66 @@ export function HudOverlay({
       externalUrl: item.url,
       externalLabel: "Open Source",
       analysisSummary: `${item.source} reports ${item.summary || item.title} Region: ${item.region}. Key tags: ${item.tags.join(", ") || "GENERAL"}. Intel score ${item.score.toFixed(1)}.`,
+    });
+  };
+
+  const runAthenaLocalActions = (packet: AthenaActionPacket) => {
+    executeAthenaMachineActions(packet, {
+      setLayer,
+      onFlyToCoordinates,
+      onPinRegion: setAthenaFocusRegion,
+      onSetWatchUntil: setAthenaWatchUntil,
+      onSetPosture: setAthenaPosture,
+    });
+  };
+
+  const handleAthenaDecision = async (packet: AthenaActionPacket, status: AthenaDecisionStatus) => {
+    try {
+      const updatedPacket = await decideAthenaPacket(ARGUS_CONFIG.endpoints.athena, packet.id, status);
+      updateAthenaPacket(packet.id, updatedPacket);
+      if (status === "approved" || status === "simulated") {
+        runAthenaLocalActions(updatedPacket);
+      }
+    } catch (error) {
+      onSelectIntel({
+        id: `athena-error-${packet.id}`,
+        name: "ATHENA decision failed",
+        kind: "athena",
+        importance: "important",
+        quickFacts: [
+          { label: "Packet", value: packet.id },
+          { label: "Requested", value: status.toUpperCase() },
+        ],
+        fullFacts: [
+          { label: "Error", value: error instanceof Error ? error.message : "Unknown ATHENA error" },
+        ],
+        analysisSummary: "ATHENA could not persist the requested decision. No external action was taken.",
+      });
+    }
+  };
+
+  const exportAthenaJson = (packet: AthenaActionPacket) => {
+    const json = JSON.stringify(packet, null, 2);
+    void navigator.clipboard?.writeText(json).catch(() => {});
+    onSelectIntel({
+      id: `athena-json-${packet.id}`,
+      name: `ATHENA Packet ${packet.priority.toUpperCase()}`,
+      kind: "athena",
+      importance: packet.priority === "critical" || packet.priority === "high" ? "important" : "normal",
+      quickFacts: [
+        { label: "Region", value: packet.region.label },
+        { label: "Status", value: packet.status.toUpperCase() },
+        { label: "Confidence", value: `${Math.round(packet.confidence * 100)}%` },
+      ],
+      fullFacts: [
+        { label: "Proposed Action", value: packet.proposedAction.description },
+        { label: "Trigger", value: packet.trigger.summary },
+        { label: "JSON", value: json },
+      ],
+      coordinates: packet.region.lat != null && packet.region.lon != null
+        ? { lat: packet.region.lat, lon: packet.region.lon }
+        : undefined,
+      analysisSummary: packet.explanation.join(" "),
     });
   };
 
@@ -1396,6 +1512,50 @@ export function HudOverlay({
               </div>
             ))}
           </div>
+
+          {workspace === "athena" && (
+            <section className="space-y-2 border-b border-[#3c3836] px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#fabd2f]">ATHENA Action Layer</div>
+                  <div className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.14em] text-[#83a598]">
+                    {athenaPackets.length} packet{athenaPackets.length === 1 ? "" : "s"} · {athenaPosture ?? "standby"}
+                  </div>
+                </div>
+                {athenaFocusRegion ? (
+                  <span className="rounded-md border border-[#504945] bg-[#282828] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.12em] text-[#d5c4a1]">
+                    {athenaFocusRegion}
+                  </span>
+                ) : null}
+              </div>
+
+              {athenaWatchUntil ? (
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#7fb4c5]">
+                  Watch window active until {new Date(athenaWatchUntil).toLocaleTimeString()}
+                </div>
+              ) : null}
+
+              <div className="max-h-[560px] space-y-2 overflow-y-auto pr-0.5">
+                {sortedAthenaPackets.length === 0 ? (
+                  <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] px-2.5 py-2 font-mono text-[10px] leading-relaxed text-[#928374]">
+                    ATHENA is standing by. High-signal Phantom anomalies and future GDELT clusters will appear here as approval-gated Action Packets.
+                  </div>
+                ) : (
+                  sortedAthenaPackets.slice(0, 20).map((packet) => (
+                    <AthenaActionCard
+                      key={packet.id}
+                      packet={packet}
+                      compact
+                      onSimulate={(nextPacket) => { void handleAthenaDecision(nextPacket, "simulated"); }}
+                      onApprove={(nextPacket) => { void handleAthenaDecision(nextPacket, "approved"); }}
+                      onDismiss={(nextPacket) => { void handleAthenaDecision(nextPacket, "dismissed"); }}
+                      onExportJson={exportAthenaJson}
+                    />
+                  ))
+                )}
+              </div>
+            </section>
+          )}
 
           {workspace === "news" && (
             <section className="space-y-2 border-b border-[#3c3836] px-3 py-2.5">
@@ -2758,6 +2918,17 @@ export function HudOverlay({
                       </div>
                     )}
 
+                    {topAthenaPacket ? (
+                      <AthenaActionCard
+                        packet={topAthenaPacket}
+                        compact
+                        onSimulate={(packet) => { void handleAthenaDecision(packet, "simulated"); }}
+                        onApprove={(packet) => { void handleAthenaDecision(packet, "approved"); }}
+                        onDismiss={(packet) => { void handleAthenaDecision(packet, "dismissed"); }}
+                        onExportJson={exportAthenaJson}
+                      />
+                    ) : null}
+
                     {selectedIntel ? (
                       <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] px-3 py-2.5">
                         <div className="flex items-start justify-between gap-2">
@@ -3286,6 +3457,9 @@ export function HudOverlay({
                 >
                   <span className="text-[13px]">{tab.icon}</span>
                   <span>{tab.label}</span>
+                  {tab.id === "brief" && topAthenaPacket && mobileTab !== "brief" && (
+                    <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#fabd2f]" />
+                  )}
                   {tab.id === "intel" && selectedIntel && mobileTab !== "intel" && (
                     <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#fabd2f]" />
                   )}
