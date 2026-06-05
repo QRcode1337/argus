@@ -19,6 +19,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "satellite.js": "^6.0.2",
+    "socket.io-client": "^4.8.3",
     "topojson-client": "^3.1.0",
     "ws": "^8.19.0",
     "zustand": "^5.0.11"

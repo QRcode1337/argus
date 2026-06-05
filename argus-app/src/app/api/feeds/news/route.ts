@@ -45,6 +45,13 @@ const DEFAULT_SOURCES: FeedSource[] = [
 
 const TIMEOUT_MS = 7_000;
 const DEFAULT_MAX_ITEMS = 100;
+const WINDOW_HOURS = {
+  "1h": 1,
+  "6h": 6,
+  "24h": 24,
+  "48h": 48,
+  "7d": 168,
+} as const;
 
 const TAG_KEYWORDS: Record<string, string[]> = {
   CYBER: ["cyber", "malware", "ransomware", "ddos", "phishing", "botnet", "hack", "exploit", "zero-day"],
@@ -303,9 +310,19 @@ async function fetchSourceFeed(source: FeedSource): Promise<ParsedEntry[]> {
   }
 }
 
-export async function GET() {
+function applyWindow(items: NewsItem[], windowParam: string | null): NewsItem[] {
+  if (!windowParam || windowParam === "ALL") return items;
+  if (!(windowParam in WINDOW_HOURS)) return items;
+
+  const horizon = Date.now() - WINDOW_HOURS[windowParam as keyof typeof WINDOW_HOURS] * 3_600_000;
+  return items.filter((item) => new Date(item.publishedAt).getTime() >= horizon);
+}
+
+export async function GET(req: Request) {
   const sources = parseSourcesFromEnv();
   const maxItems = Number(process.env.NEWS_MAX_ITEMS ?? DEFAULT_MAX_ITEMS);
+  const { searchParams } = new URL(req.url);
+  const windowParam = searchParams.get("window");
 
   const sourceResults = await Promise.all(
     sources.map(async (source) => ({
@@ -348,7 +365,9 @@ export async function GET() {
     deduped.push(item);
   }
 
-  const byScore = deduped
+  const windowed = applyWindow(deduped, windowParam);
+
+  const byScore = windowed
     .sort((a, b) => b.score - a.score || b.publishedAt.localeCompare(a.publishedAt))
     .slice(0, Math.max(10, Math.min(maxItems, 500)));
 
@@ -381,6 +400,7 @@ export async function GET() {
       sourcesChecked: sources.length,
       fetchedAt: new Date().toISOString(),
       dedupedCount: byScore.length,
+      window: windowParam ?? "ALL",
     },
     regions: regionSummaries,
   });
