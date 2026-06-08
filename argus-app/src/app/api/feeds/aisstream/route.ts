@@ -78,7 +78,7 @@ type WsConstructor = new (
 let cache: AisCache | null = null;
 const CACHE_TTL_MS = 45_000; // Serve cached data for 45s to avoid hammering the WebSocket
 
-const REQUEST_TIMEOUT_MS = Number(process.env.AISSTREAM_TIMEOUT_MS ?? 40000);
+const REQUEST_TIMEOUT_MS = Number(process.env.AISSTREAM_TIMEOUT_MS ?? 12000);
 const MAX_MESSAGES = Number(process.env.AISSTREAM_MAX_MESSAGES ?? 2000);
 
 function rawDataToString(data: unknown): string {
@@ -197,7 +197,9 @@ async function fetchSnapshotFromWs(apiKey: string): Promise<AisPayload> {
 export async function GET() {
   const apiKey = process.env.AISSTREAM_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "AISSTREAM_API_KEY not configured" }, { status: 500 });
+    const message = "AISSTREAM_API_KEY not configured";
+    reportFeedHealth("aisstream", "error", message);
+    return NextResponse.json({ vessels: [], _degraded: true, _source: "ais-empty", _reason: message });
   }
 
   // Return cached data if still fresh
