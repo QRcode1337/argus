@@ -3,10 +3,6 @@ const pool = require("../db");
 
 const router = Router();
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const DEFAULT_WINDOW = 30;
 
 /**
@@ -36,16 +32,16 @@ function parseTimeParams(req, res) {
   return { ts: parsed.toISOString(), window: windowSec };
 }
 
-/**
- * Time-window WHERE clause used by every playback query.
- * Expects $1 = ts (timestamptz) and $2 = window (text, seconds).
- */
+// Backward-looking window: at scrub time `ts`, return rows recorded at or before it,
+// within a lookback floored at 10 minutes so slower feeds still surface. Reads the raw
+// recorded_* tables directly — the recorded_*_1m continuous aggregates the original
+// queries referenced were never created. $1 = ts (timestamptz), $2 = window (seconds).
 const TIME_WINDOW_CLAUSE = `
-  WHERE bucket BETWEEN time_bucket('1 minute', $1::timestamptz - ($2 || ' seconds')::interval)
-                AND time_bucket('1 minute', $1::timestamptz + ($2 || ' seconds')::interval)`;
+  WHERE ts <= $1::timestamptz
+    AND ts >= $1::timestamptz - ((GREATEST($2::numeric, 600))::text || ' seconds')::interval`;
 
 // ---------------------------------------------------------------------------
-// GET /flights  ->  recorded_flights (deduplicated by icao24)
+// GET /flights  ->  recorded_flights (latest position per icao24 in window)
 // ---------------------------------------------------------------------------
 router.get("/flights", async (req, res, next) => {
   try {
@@ -65,9 +61,9 @@ router.get("/flights", async (req, res, next) => {
         on_ground     AS "onGround",
         origin_country AS "originCountry",
         squawk
-      FROM recorded_flights_1m
+      FROM recorded_flights
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY icao24, bucket DESC`;
+      ORDER BY icao24, ts DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ flights: rows });
@@ -77,7 +73,7 @@ router.get("/flights", async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /military  ->  recorded_military (deduplicated by icao24)
+// GET /military  ->  recorded_military (latest position per icao24 in window)
 // ---------------------------------------------------------------------------
 router.get("/military", async (req, res, next) => {
   try {
@@ -94,9 +90,9 @@ router.get("/military", async (req, res, next) => {
         velocity,
         heading       AS "trueTrack",
         aircraft_type AS type
-      FROM recorded_military_1m
+      FROM recorded_military
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY icao24, bucket DESC`;
+      ORDER BY icao24, ts DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ flights: rows });
@@ -106,7 +102,7 @@ router.get("/military", async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /satellites  ->  recorded_satellites (deduplicated by norad_id)
+// GET /satellites  ->  recorded_satellites (latest per norad_id in window)
 // ---------------------------------------------------------------------------
 router.get("/satellites", async (req, res, next) => {
   try {
@@ -122,9 +118,9 @@ router.get("/satellites", async (req, res, next) => {
         alt_km    AS "altitudeKm",
         tle_line1 AS tle1,
         tle_line2 AS tle2
-      FROM recorded_satellites_1m
+      FROM recorded_satellites
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY norad_id, bucket DESC`;
+      ORDER BY norad_id, ts DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ satellites: rows });
@@ -134,7 +130,7 @@ router.get("/satellites", async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /quakes  ->  recorded_quakes (deduplicated by event_id)
+// GET /quakes  ->  recorded_quakes (latest per event_id in window)
 // ---------------------------------------------------------------------------
 router.get("/quakes", async (req, res, next) => {
   try {
@@ -149,10 +145,10 @@ router.get("/quakes", async (req, res, next) => {
         depth_km  AS "depthKm",
         magnitude,
         place,
-        bucket    AS timestamp
-      FROM recorded_quakes_1m
+        ts        AS timestamp
+      FROM recorded_quakes
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY event_id, bucket DESC`;
+      ORDER BY event_id, ts DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ quakes: rows });
@@ -162,7 +158,7 @@ router.get("/quakes", async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /outages  ->  recorded_outages (deduplicated by location + cause)
+// GET /outages  ->  recorded_outages (latest per location+cause in window)
 // ---------------------------------------------------------------------------
 router.get("/outages", async (req, res, next) => {
   try {
@@ -177,9 +173,9 @@ router.get("/outages", async (req, res, next) => {
         start_date  AS "startDate",
         end_date    AS "endDate",
         asn_name    AS "asnName"
-      FROM recorded_outages_1m
+      FROM recorded_outages
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY location, cause, bucket DESC`;
+      ORDER BY location, cause, ts DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ outages: rows });
@@ -189,7 +185,7 @@ router.get("/outages", async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /threats  ->  recorded_threats (deduplicated by pulse_id)
+// GET /threats  ->  recorded_threats (latest per pulse_id in window)
 // ---------------------------------------------------------------------------
 router.get("/threats", async (req, res, next) => {
   try {
@@ -204,9 +200,9 @@ router.get("/threats", async (req, res, next) => {
         targeted_country  AS "targetedCountry",
         lon               AS longitude,
         lat               AS latitude
-      FROM recorded_threats_1m
+      FROM recorded_threats
       ${TIME_WINDOW_CLAUSE}
-      ORDER BY pulse_id, bucket DESC`;
+      ORDER BY pulse_id, ts DESC`;
 
     const { rows } = await pool.query(sql, [params.ts, String(params.window)]);
     res.json({ threats: rows });
@@ -222,20 +218,20 @@ router.get("/range", async (_req, res, next) => {
   try {
     const sql = `
       SELECT
-        MIN(bucket) AS earliest,
-        MAX(bucket) AS latest
+        MIN(ts) AS earliest,
+        MAX(ts) AS latest
       FROM (
-        SELECT bucket FROM recorded_flights_1m
+        SELECT ts FROM recorded_flights
         UNION ALL
-        SELECT bucket FROM recorded_military_1m
+        SELECT ts FROM recorded_military
         UNION ALL
-        SELECT bucket FROM recorded_satellites_1m
+        SELECT ts FROM recorded_satellites
         UNION ALL
-        SELECT bucket FROM recorded_quakes_1m
+        SELECT ts FROM recorded_quakes
         UNION ALL
-        SELECT bucket FROM recorded_outages_1m
+        SELECT ts FROM recorded_outages
         UNION ALL
-        SELECT bucket FROM recorded_threats_1m
+        SELECT ts FROM recorded_threats
       ) AS recorded`;
 
     const { rows } = await pool.query(sql);

@@ -64,7 +64,10 @@ export class FirmsLayer {
           heightReference: HeightReference.CLAMP_TO_GROUND,
           scaleByDistance: new NearFarScalar(500_000, 1.3, 25_000_000, 0.35),
           translucencyByDistance: new NearFarScalar(500_000, 1.0, 25_000_000, 0.35),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          // Finite near-field value (matches vessel/anomaly layers): suppress depth
+          // testing only when zoomed in close so far-side hotspots are occluded by
+          // the globe instead of bleeding through to the front.
+          disableDepthTestDistance: 500_000,
         },
         properties: {
           kind: "thermal",

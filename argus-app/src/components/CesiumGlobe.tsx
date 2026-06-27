@@ -785,6 +785,14 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const satRecordsRef = useRef<SatelliteRecord[]>([]);
   const openSkyFlightsRef = useRef<TrackedFlight[]>([]);
   const adsbLolFlightsRef = useRef<TrackedFlight[]>([]);
+
+  // Latest feed snapshots (CII input shapes) so the periodic Instability Index
+  // computation has real data instead of empty arrays.
+  const ciiGdeltRef = useRef<Array<{ lat: number; lon: number; goldsteinScale: number; avgTone: number }>>([]);
+  const ciiMilitaryRef = useRef<Array<{ latitude: number; longitude: number }>>([]);
+  const ciiSeismicRef = useRef<Array<{ latitude: number; longitude: number; magnitude: number }>>([]);
+  const ciiThreatRef = useRef<Array<{ targetedCountry?: string; lat?: number; lon?: number }>>([]);
+  const ciiOutageRef = useRef<Array<{ location?: string; lat?: number; lon?: number; severity?: number }>>([]);
   const hoveredEntityRef = useRef<Entity | null>(null);
   const hoveredOriginalSizeRef = useRef<number | null>(null);
   const hoveredOriginalScaleRef = useRef<number | null>(null);
@@ -1622,6 +1630,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setFeedHealthy("adsb");
           pushIncidents(mapMilitaryIncidents(bounded));
           militaryAlertsRef.current = analyzeMilitary(bounded);
+          ciiMilitaryRef.current = bounded
+            .filter((f) => f.latitude != null && f.longitude != null)
+            .map((f) => ({ latitude: f.latitude, longitude: f.longitude }));
           recordMilitary(bounded);
           // Feed into corroboration engine
           const milRegionEvents = bounded.filter((f) => f.latitude && f.longitude).map((f) => ({
@@ -1689,6 +1700,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           setFeedHealthy("usgs");
           pushIncidents(mapSeismicIncidents(quakes));
           seismicAlertsRef.current = analyzeSeismic(count);
+          ciiSeismicRef.current = quakes
+            .filter((q) => q.latitude != null && q.longitude != null)
+            .map((q) => ({ latitude: q.latitude, longitude: q.longitude, magnitude: q.magnitude ?? 0 }));
           recordQuakes(quakes);
           // Feed into corroboration engine
           const seismicRegionEvents = quakes.filter((q) => q.latitude && q.longitude).map((q) => ({
@@ -1755,6 +1769,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           const count = outageLayer.update(outages);
           setCount("outages", count);
           setFeedHealthy("cfradar");
+          ciiOutageRef.current = outages.map((o) => ({ lat: o.lat, lon: o.lon }));
           recordOutages(outages);
           // Feed into corroboration engine
           const infraRegionEvents = outages.map((o) => ({
@@ -1781,6 +1796,11 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           const count = threatLayer.update(threats);
           setCount("threats", count);
           setFeedHealthy("otx");
+          ciiThreatRef.current = threats.map((t) => ({
+            targetedCountry: t.targetedCountry,
+            lat: t.lat,
+            lon: t.lon,
+          }));
           recordThreats(threats);
           // Feed into corroboration engine
           const cyberRegionEvents = threats.map((t) => ({
@@ -1847,6 +1867,14 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
           const count = gdeltLayer.update(events);
           setCount("gdelt", count);
           setFeedHealthy("gdelt");
+          ciiGdeltRef.current = events
+            .filter((e) => e.latitude != null && e.longitude != null)
+            .map((e) => ({
+              lat: e.latitude,
+              lon: e.longitude,
+              goldsteinScale: e.goldsteinScale ?? 0,
+              avgTone: e.avgTone ?? 0,
+            }));
           pushIncidents(mapGdeltIncidents(events));
           // Feed into corroboration engine
           const gdeltRegionEvents = events.map((e) => ({
@@ -2012,16 +2040,16 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     // CII computation task
     poller.add({
       id: "cii",
-      intervalMs: 15 * 60_000,
+      intervalMs: 3 * 60_000,
       run: async () => {
         if (platformModeRef.current !== "live") return;
         const s = useArgusStore.getState();
         const ciiScores = computeCii({
-          gdeltEvents: [],
-          militaryFlights: [],
-          seismicEvents: [],
-          threatPulses: [],
-          outages: [],
+          gdeltEvents: ciiGdeltRef.current,
+          militaryFlights: ciiMilitaryRef.current,
+          seismicEvents: ciiSeismicRef.current,
+          threatPulses: ciiThreatRef.current,
+          outages: ciiOutageRef.current,
           fredIndicators: {},
         });
         s.setCiiScores(ciiScores);

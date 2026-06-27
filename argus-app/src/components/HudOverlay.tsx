@@ -10,7 +10,7 @@ import { decideAthenaPacket, fetchAthenaPackets } from "@/lib/ingest/athena";
 import { fetchNewsFeed, type NewsItem, type RegionDigest } from "@/lib/ingest/news";
 import { executeAthenaMachineActions } from "@/lib/athena/executeMachineActions";
 import { useArgusStore } from "@/store/useArgusStore";
-import type { AnomalyEvent } from "@/store/useArgusStore";
+import type { AnomalyEvent, AcledEvent } from "@/store/useArgusStore";
 import type { AthenaActionPacket, AthenaDecisionStatus } from "@/types/athena";
 import type { ClickedCoordinates, FeedHealth, LayerKey, PlatformMode, PlaybackSpeed, SceneMode, SelectedIntel, VisualMode } from "@/types/intel";
 import { COMMAND_REGIONS, type CommandRegion } from "@/types/regionalNews";
@@ -155,7 +155,6 @@ const layerDefs: { key: LayerKey; label: string; feed: string }[] = [
   { key: "threats", label: "Cyber Threats", feed: "OTX" },
   { key: "gdelt", label: "GDELT Events", feed: "GDELT" },
   { key: "anomalies", label: "Chaos Anomalies", feed: "Phantom" },
-  { key: "weather", label: "Weather Radar", feed: "RainViewer" },
   { key: "vessels", label: "AIS Vessels", feed: "AISStream" },
   { key: "firms", label: "Thermal Anomalies (FIRMS)", feed: "NASA FIRMS" },
   { key: "instability", label: "Instability Index", feed: "CII" },
@@ -218,8 +217,11 @@ const workspaceDefs = [
   { id: "settings", label: "Settings" },
 ] as const;
 
-const primaryWorkspaceIds = ["intel", "athena", "news", "feeds", "gdelt", "anomalies"] as const;
-const secondaryWorkspaceIds = ["signal", "status", "settings"] as const;
+// ATHENA and Signal tabs removed from the UI (buttons), but kept in workspaceDefs so
+// their (now-unreachable) panels stay type-valid. Master Blend lived in the Signal
+// panel; visualIntensity keeps its 0.75 default since the slider is no longer shown.
+const primaryWorkspaceIds = ["intel", "news", "feeds", "gdelt", "anomalies"] as const;
+const secondaryWorkspaceIds = ["status", "settings"] as const;
 
 type WorkspaceId = (typeof workspaceDefs)[number]["id"];
 // MobileTabId imported from ./mobile/MobileHudProps
@@ -450,6 +452,7 @@ export function HudOverlay({
   const playbackTimeRange = useArgusStore((s) => s.playbackTimeRange);
   const playbackCurrentTime = useArgusStore((s) => s.playbackCurrentTime);
   const acledEvents = useArgusStore((s) => s.acledEvents);
+  const ciiScores = useArgusStore((s) => s.ciiScores);
   const polymarketEvents = useArgusStore((s) => s.polymarketEvents);
   const gdacsEvents = useArgusStore((s) => s.gdacsEvents);
   const faaDelays = useArgusStore((s) => s.faaDelays);
@@ -507,6 +510,26 @@ export function HudOverlay({
   const [gdeltDigestBatchSize, setGdeltDigestBatchSize] = useState(100);
   const [anomalyCategoryFilter, setAnomalyCategoryFilter] = useState<AnomalyCategory | null>(null);
   const [gdeltEvents, setGdeltEvents] = useState<GdeltEvent[]>([]);
+  // Conflict Events: ACLED requires API credentials that aren't configured, so derive
+  // conflict events from the already-fetched GDELT feed (material conflict, or strongly
+  // negative Goldstein) when ACLED is empty. Mapped to the AcledEvent shape the panel
+  // (and selectAcledIntel) expects.
+  const conflictEvents = useMemo<AcledEvent[]>(() => {
+    return gdeltEvents
+      .filter((e) => e.quadClass === 4 || (e.goldsteinScale ?? 0) <= -5)
+      .slice(0, 40)
+      .map((e) => ({
+        event_type: QUAD_CLASS_LABELS[e.quadClass] ?? "Material Conflict",
+        country: e.actor1Country || e.actionGeoCountry || "—",
+        location: e.actionGeoName || "—",
+        fatalities: 0,
+        actor1: e.actor1Name || "Unknown",
+        event_date: e.dateAdded || "",
+        latitude: e.latitude,
+        longitude: e.longitude,
+      }));
+  }, [gdeltEvents]);
+  const displayConflictEvents = acledEvents.length > 0 ? acledEvents : conflictEvents;
   const [gdeltQuadFilter, setGdeltQuadFilter] = useState<GdeltQuadClass | null>(null);
   const [efNews, setEfNews] = useState<{ id: string; title: string; link: string; source: string; pubDate: string; snippet: string }[]>([]);
   const [efSocial, setEfSocial] = useState<{ id: string; text: string; author: string; link: string; pubDate: string }[]>([]);
@@ -1836,26 +1859,7 @@ export function HudOverlay({
                     ))}
                   </div>
 
-                  {/* GDELT Digest button */}
-                  {counts.gdelt > 0 && (
-                    <button
-                      type="button"
-                      onClick={requestGdeltDigest}
-                      disabled={gdeltDigestLoading}
-                      className="w-full rounded-lg border border-[#3498db]/40 bg-[#3498db]/10 px-2.5 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#3498db] transition hover:border-[#3498db] hover:bg-[#3498db]/20 disabled:opacity-50"
-                    >
-                      {gdeltDigestLoading
-                        ? "Generating GDELT Digest..."
-                        : gdeltDigestDocument
-                          ? `Refresh GDELT Digest (${compact(counts.gdelt)} events)`
-                          : `Generate GDELT Digest (${compact(counts.gdelt)} events)`}
-                    </button>
-                  )}
-                  {gdeltDigestError && (
-                    <div className="rounded-md border border-red-900/50 bg-red-900/10 px-2 py-1.5 font-mono text-[9px] text-red-400">
-                      Digest failed: {gdeltDigestError}
-                    </div>
-                  )}
+                  {/* GDELT digest moved to the dedicated GDELT workspace panel. */}
 
                   {/* Alerts list — clickable, filterable, scrollable */}
                   {(() => {
@@ -2076,7 +2080,7 @@ export function HudOverlay({
                     weather: counts.weather,
                     vessels: counts.vessels,
                     firms: counts.firms,
-                    instability: 0,
+                    instability: Object.keys(ciiScores).length,
                   };
                   const value = valueMap[layer.key];
 
@@ -2225,12 +2229,12 @@ export function HudOverlay({
             </div>
           </CollapsibleSection>
 
-          {/* Conflict Events (ACLED) */}
-          <CollapsibleSection title="Conflict Events" badge={acledEvents.length > 0 ? `${acledEvents.length}` : null}>
+          {/* Conflict Events (ACLED, falling back to GDELT-derived conflict) */}
+          <CollapsibleSection title="Conflict Events" badge={displayConflictEvents.length > 0 ? `${displayConflictEvents.length}` : null}>
             <div className="max-h-[300px] space-y-1 overflow-y-auto pr-0.5">
-              {acledEvents.length === 0 ? (
-                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">Awaiting ACLED data...</div>
-              ) : acledEvents.slice(0, 30).map((evt, i) => {
+              {displayConflictEvents.length === 0 ? (
+                <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 font-mono text-[9px] text-[#928374]">Awaiting conflict data...</div>
+              ) : displayConflictEvents.slice(0, 30).map((evt, i) => {
                 const typeColor = evt.event_type.toLowerCase().includes("battle") ? "text-[#fb4934]" : evt.event_type.toLowerCase().includes("protest") ? "text-[#fabd2f]" : evt.event_type.toLowerCase().includes("riot") ? "text-[#fe8019]" : "text-[#83a598]";
                 return (
                   <button
