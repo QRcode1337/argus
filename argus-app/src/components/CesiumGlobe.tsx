@@ -42,6 +42,7 @@ import { BasesLayer } from "@/lib/cesium/layers/basesLayer";
 import { OutageLayer } from "@/lib/cesium/layers/outageLayer";
 import { ThreatLayer } from "@/lib/cesium/layers/threatLayer";
 import { AnomalyLayer } from "@/lib/cesium/layers/anomalyLayer";
+import { GnssInterferenceLayer } from "@/lib/cesium/layers/gnssInterferenceLayer";
 import { SatelliteLayer } from "@/lib/cesium/layers/satelliteLayer";
 import { SeismicLayer } from "@/lib/cesium/layers/seismicLayer";
 import { FirmsLayer } from "@/lib/cesium/layers/firmsLayer";
@@ -53,6 +54,7 @@ import { CiiLayer } from "@/lib/cesium/layers/ciiLayer";
 import { VisualModeController } from "@/lib/cesium/shaders/visualModes";
 import { fetchMilitaryFlights } from "@/lib/ingest/adsb";
 import { fetchOpenSkyFlights } from "@/lib/ingest/opensky";
+import { reportPhantomAnomalyToAthena } from "@/lib/ingest/phantom";
 import { fetchAircraftPhoto } from "@/lib/ingest/planespotters";
 import { PollingManager } from "@/lib/ingest/pollingManager";
 import { computeSatellitePositions, fetchTleRecords } from "@/lib/ingest/tle";
@@ -417,6 +419,15 @@ const buildAnalysisSummary = (kind: string, props: Record<string, unknown>, name
       ]
         .filter(Boolean)
         .join(" ");
+    case "gnss":
+      return [
+        `${name} is a mapped GNSS interference watch zone.`,
+        props.severity ? `Severity: ${String(props.severity).toUpperCase()}.` : null,
+        props.summary ? String(props.summary) : null,
+        props.source ? `Source: ${props.source}.` : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
     default:
       return `${name} is the currently selected target. Review quick facts and full facts for supporting context.`;
   }
@@ -498,6 +509,8 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("Callsign", props.callsign);
       pushQuick("Category", props.flightCategory);
       pushQuick("Origin", props.originCountry);
+      pushQuick("Nav Confidence", props.navConfidence);
+      pushQuick("GNSS Zone", props.gnssInterferenceZone);
       pushQuick("Velocity (m/s)", props.velocity);
       pushQuick("Track (deg)", props.track);
       pushQuick("Vert Rate (m/s)", props.verticalRate);
@@ -510,6 +523,8 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("Category", props.aircraftCategory);
       pushQuick("Manufacturer", props.aircraftManufacturer);
       pushQuick("Origin", props.aircraftOrigin);
+      pushQuick("Nav Confidence", props.navConfidence);
+      pushQuick("GNSS Zone", props.gnssInterferenceZone);
       pushQuick("Velocity (m/s)", props.velocity);
       pushQuick("Track (deg)", props.track);
       break;
@@ -598,6 +613,8 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       pushQuick("MMSI", props.mmsi);
       pushQuick("Name", props.vesselName);
       pushQuick("Callsign", props.callsign);
+      pushQuick("Nav Confidence", props.navConfidence);
+      pushQuick("GNSS Zone", props.gnssInterferenceZone);
       pushQuick("Speed (kn)", props.sog);
       pushQuick("Course", props.cog);
       pushQuick("Heading", props.heading);
@@ -608,6 +625,12 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
       if (props.nearChokepoint) pushQuick("Near Chokepoint", props.nearChokepoint);
       if (props.nearBase) pushQuick("Near Base", props.nearBase);
       if (props.isDark) pushQuick("AIS Status", "DARK (gap > 60 min)");
+      break;
+    case "gnss":
+      pushQuick("Severity", props.severity);
+      pushQuick("Radius (km)", props.radiusKm);
+      pushQuick("Source", props.source);
+      pushQuick("Summary", props.summary);
       break;
     default:
       break;
@@ -1137,6 +1160,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
     viewer.scene.globe.enableLighting = true;
     viewer.scene.globe.baseColor = Color.fromCssColorString("#0b1118");
+    viewer.scene.globe.depthTestAgainstTerrain = true;
+    viewer.scene.globe.translucency.enabled = false;
     if (process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN) {
       void createWorldTerrainAsync({
         requestVertexNormals: true,
@@ -1174,6 +1199,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     const threatLayer = new ThreatLayer(viewer);
     const gdeltLayer = new GdeltLayer(viewer);
     const anomalyLayer = new AnomalyLayer(viewer);
+    const gnssInterferenceLayer = new GnssInterferenceLayer(viewer);
     
     // Wire anomaly store to layer
     const unsubscribeAnomalies = useArgusStore.subscribe((state) => {
@@ -1224,6 +1250,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
     // Load static bases layer immediately
     const basesCount = basesLayer.load();
+    gnssInterferenceLayer.load();
     setCount("bases", basesCount);
     visualModeRef.current = visualController;
     pickerRef.current = picker;
@@ -1528,6 +1555,11 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
                   setCount("anomalies", anomalies.length);
                 }
                 setFeedHealthy("phantom");
+
+                // Bridge high-signal Phantom anomalies -> ATHENA action packets (via collect intake)
+                anomalies.forEach((a) => {
+                  void reportPhantomAnomalyToAthena(a);
+                });
               }
             })
             .catch(() => {
@@ -1699,6 +1731,11 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
                   setCount("anomalies", phantomRawRef.current.length);
                 }
                 setFeedHealthy("phantom");
+
+                // Bridge high-signal Phantom anomalies -> ATHENA action packets (via collect intake)
+                anomalies.forEach((a) => {
+                  void reportPhantomAnomalyToAthena(a);
+                });
               }
             })
             .catch(() => {});

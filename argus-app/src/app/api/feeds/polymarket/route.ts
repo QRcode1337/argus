@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { NegativeCache } from "@/lib/cache/negativeCache";
+import { reportFeedHealth } from "@/lib/feedHealth";
 
 const GAMMA_API = "https://gamma-api.polymarket.com/events";
 
@@ -62,8 +63,10 @@ export async function GET() {
       return { events, meta: { fetchedAt: new Date().toISOString(), count: events.length } };
     });
 
+    await reportFeedHealth("polymarket", data.events.length > 0 ? "ok" : "degraded", data.events.length > 0 ? undefined : "No active geopolitical markets matched filters");
     return NextResponse.json(data);
   } catch (error) {
+    await reportFeedHealth("polymarket", "error", error instanceof Error ? error.message : String(error));
     return NextResponse.json(
       { events: [], meta: { fetchedAt: new Date().toISOString(), count: 0, error: String(error) } },
       { status: 200 },

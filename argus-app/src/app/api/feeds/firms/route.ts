@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { NegativeCache } from "@/lib/cache/negativeCache";
+import { reportFeedHealth } from "@/lib/feedHealth";
 import { parseFirmsCsv } from "@/lib/ingest/firms";
 import type { ThermalAnomaly } from "@/types/intel";
 
@@ -50,8 +51,10 @@ export async function GET() {
       };
     });
 
+    await reportFeedHealth("firms", "ok");
     return NextResponse.json(data);
   } catch (error) {
+    await reportFeedHealth("firms", "error", error instanceof Error ? error.message : String(error));
     return NextResponse.json(
       {
         anomalies: [],

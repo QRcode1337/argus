@@ -107,7 +107,7 @@ export class SatelliteLayer {
           scale: isIss ? 1.4 : 0.72,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.5, 25_000_000, 0.45),
-          disableDepthTestDistance: 0,
+          // disableDepthTestDistance: 0 removed — was causing events/markers to render through the globe and appear on the antipode. Globe now uses depthTestAgainstTerrain.
         },
         label: {
           text: sat.name.length > 9 ? `${sat.name.slice(0, 9)}…` : sat.name,
@@ -187,7 +187,7 @@ export class SatelliteLayer {
           scale: this.isIssName(sat.name) ? 1.05 : 0.72,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.5, 25_000_000, 0.45),
-          disableDepthTestDistance: 0,
+          // disableDepthTestDistance: 0 removed — was causing events/markers to render through the globe and appear on the antipode. Globe now uses depthTestAgainstTerrain.
         },
         label: {
           text: sat.name,

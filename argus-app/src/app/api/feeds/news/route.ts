@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { COMMAND_REGIONS, type CommandRegion, type RegionalPosture } from "@/types/regionalNews";
+import { reportFeedHealth } from "@/lib/feedHealth";
 
 export const dynamic = "force-dynamic";
 
@@ -56,9 +57,31 @@ const WINDOW_HOURS = {
 const TAG_KEYWORDS: Record<string, string[]> = {
   CYBER: ["cyber", "malware", "ransomware", "ddos", "phishing", "botnet", "hack", "exploit", "zero-day"],
   CONFLICT: ["war", "strike", "missile", "troop", "armed", "attack", "insurgent", "military", "defense", "carrier"],
+  DISASTER: ["earthquake", "quake", "tsunami", "wildfire", "flood", "hurricane", "typhoon", "eruption", "landslide"],
+  AIRSPACE: ["airspace", "ads-b", "transponder", "aviation", "airport", "airline", "flight", "notam", "faa", "gnss"],
+  MARITIME: ["ship", "vessel", "tanker", "port", "strait", "hormuz", "ais", "maritime", "navy", "shipping"],
   INFRA: ["outage", "blackout", "pipeline", "grid", "port", "rail", "telecom", "subsea", "cable", "infrastructure"],
   ECON: ["tariff", "inflation", "oil", "sanction", "market", "gdp", "trade", "rates", "commodities", "currency"],
   SPACE: ["satellite", "orbit", "launch", "spacex", "nasa", "space", "gnss", "gps", "starlink"],
+};
+
+const OPERATIONAL_KEYWORDS = [
+  "earthquake", "quake", "tsunami", "gnss", "gps", "jamming", "spoof", "spoofing", "airspace", "airport",
+  "flight", "faa", "notam", "missile", "drone", "strike", "carrier", "ship", "vessel", "tanker", "hormuz",
+  "port", "pipeline", "outage", "blackout", "ransomware", "exploit", "zero-day", "kev", "cisa", "satellite",
+  "launch", "wildfire", "flood", "typhoon",
+];
+
+const LOW_SIGNAL_KEYWORDS = [
+  "celebrity", "lifestyle", "fashion", "recipe", "review", "gossip", "sport", "sports", "entertainment",
+  "movie", "music", "shopping", "deal", "gadgets", "opinion",
+];
+
+const SOURCE_SCORE_ADJUSTMENTS: Record<string, number> = {
+  "Hacker News": -8,
+  "GDELT Blog": 4,
+  "BBC World": 2,
+  "Al Jazeera": 2,
 };
 
 const REGION_KEYWORDS: Record<Exclude<CommandRegion, "WORLDCOM">, string[]> = {
@@ -226,10 +249,35 @@ const classifyRegion = (text: string): CommandRegion => {
 const scoreItem = (item: ParsedEntry, sourceWeight: number, tags: string[]): number => {
   const now = Date.now();
   const ageHours = Math.max(0, (now - new Date(item.publishedAt).getTime()) / 3_600_000);
-  const recencyScore = Math.max(0, 100 - ageHours * 5);
+  const recencyScore = Math.max(0, 100 - ageHours * 6);
   const sourceScore = sourceWeight * 25;
-  const tagScore = tags.includes("GENERAL") ? 3 : tags.length * 7;
-  return Number((recencyScore * 0.62 + sourceScore + tagScore).toFixed(2));
+  const text = `${item.title} ${item.summary}`.toLowerCase();
+  const operationalHits = OPERATIONAL_KEYWORDS.reduce((acc, keyword) => acc + Number(text.includes(keyword)), 0);
+  const lowSignalHits = LOW_SIGNAL_KEYWORDS.reduce((acc, keyword) => acc + Number(text.includes(keyword)), 0);
+  const tagScore = tags.includes("GENERAL") ? 0 : tags.length * 8;
+  const disasterBoost = tags.includes("DISASTER") ? 14 : 0;
+  const airspaceBoost = tags.includes("AIRSPACE") ? 11 : 0;
+  const maritimeBoost = tags.includes("MARITIME") ? 11 : 0;
+  const conflictBoost = tags.includes("CONFLICT") ? 12 : 0;
+  const cyberBoost = tags.includes("CYBER") ? 12 : 0;
+  const infraBoost = tags.includes("INFRA") ? 10 : 0;
+  const sourceAdjustment = SOURCE_SCORE_ADJUSTMENTS[item.source] ?? 0;
+
+  const score =
+    recencyScore * 0.56 +
+    sourceScore +
+    tagScore +
+    operationalHits * 6 +
+    disasterBoost +
+    airspaceBoost +
+    maritimeBoost +
+    conflictBoost +
+    cyberBoost +
+    infraBoost +
+    sourceAdjustment -
+    lowSignalHits * 9;
+
+  return Number(score.toFixed(2));
 };
 
 const buildRegionSummary = (region: CommandRegion, items: NewsItem[]): RegionSummary => {
@@ -336,6 +384,9 @@ export async function GET(req: Request) {
   );
 
   const allEntries = sourceResults.flatMap(({ items }) => items);
+  if (allEntries.length === 0) {
+    await reportFeedHealth("news", "error", "All configured news feeds returned zero items");
+  }
   const deduped: NewsItem[] = [];
   const seenUrls = new Set<string>();
   const seenTitleSigs = new Set<string>();
@@ -393,6 +444,10 @@ export async function GET(req: Request) {
       buildRegionSummary(region, regionBuckets[region].slice(0, 15)),
     ]),
   ) as Record<CommandRegion, RegionSummary>;
+
+  if (allEntries.length > 0) {
+    await reportFeedHealth("news", byScore.length > 0 ? "ok" : "degraded", byScore.length > 0 ? undefined : "News ingest produced no usable items after dedupe");
+  }
 
   return NextResponse.json({
     items: byScore,

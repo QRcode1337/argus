@@ -21,6 +21,7 @@ import { AiActionButton } from "./mobile/AiActionButton";
 import { MobileHud } from "./mobile/MobileHud";
 import type { MobileTabId } from "./mobile/MobileHudProps";
 import PneumaHud from "./PneumaHud";
+import PneumaChat from "./PneumaChat";
 import { SettingsModal } from "./SettingsModal";
 import {
   EPIC_FURY_THEATER,
@@ -470,7 +471,7 @@ export function HudOverlay({
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [workspace, setWorkspace] = useState<WorkspaceId>("news");
   const [alertFilter, setAlertFilter] = useState<AlertSeverity | null>(null);
-  const [mobileAthenaFilter, setMobileAthenaFilter] = useState<MobileAthenaFilter>("all");
+  // mobileAthenaFilter removed (ATHENA tab replaced by GDELT on mobile; ATHENA lives in Intel block)
   const [enlargedStream, setEnlargedStream] = useState<{ src: string; title: string } | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTabId | null>(null);
   const [utcTimestamp, setUtcTimestamp] = useState("");
@@ -503,7 +504,7 @@ export function HudOverlay({
   );
   const [gdeltDigestLoading, setGdeltDigestLoading] = useState(false);
   const [gdeltDigestError, setGdeltDigestError] = useState<string | null>(null);
-  const [gdeltDigestBatchSize, setGdeltDigestBatchSize] = useState(50);
+  const [gdeltDigestBatchSize, setGdeltDigestBatchSize] = useState(100);
   const [anomalyCategoryFilter, setAnomalyCategoryFilter] = useState<AnomalyCategory | null>(null);
   const [gdeltEvents, setGdeltEvents] = useState<GdeltEvent[]>([]);
   const [gdeltQuadFilter, setGdeltQuadFilter] = useState<GdeltQuadClass | null>(null);
@@ -559,15 +560,16 @@ export function HudOverlay({
     return () => { cancelled = true; clearInterval(interval); };
   }, [epicFuryActive]);
 
-  // Fetch GDELT events when workspace is "gdelt"
+  // Fetch GDELT events (now independent of workspace so it populates for mobile GDELT tab too).
+  // Previously gated to desktop "gdelt" workspace only → mobile tab always showed empty.
+  // Loads on mount + timeRange changes (lightweight; other feeds do similar).
   useEffect(() => {
-    if (workspace !== "gdelt") return;
     let cancelled = false;
     void fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt, windowedRange(timeRange)).then((events) => {
       if (!cancelled) setGdeltEvents(events);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [workspace, timeRange]);
+  }, [timeRange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -841,20 +843,7 @@ export function HudOverlay({
       (a, b) => priorityRank[b.priority] - priorityRank[a.priority] || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }, [athenaPackets]);
-  const filteredMobileAthenaPackets = useMemo(() => {
-    switch (mobileAthenaFilter) {
-      case "proposed":
-        return sortedAthenaPackets.filter((packet) => packet.status === "proposed");
-      case "critical":
-        return sortedAthenaPackets.filter(
-          (packet) =>
-            packet.status === "proposed" &&
-            (packet.priority === "critical" || packet.priority === "high"),
-        );
-      default:
-        return sortedAthenaPackets;
-    }
-  }, [mobileAthenaFilter, sortedAthenaPackets]);
+  // filteredMobileAthenaPackets removed (dedicated mobile ATHENA tab replaced)
   const topAthenaPacket = sortedAthenaPackets.find((packet) => packet.status === "proposed") ?? sortedAthenaPackets[0] ?? null;
   const criticalAthenaCount = sortedAthenaPackets.filter(
     (packet) => packet.status === "proposed" && (packet.priority === "critical" || packet.priority === "high"),
@@ -1125,6 +1114,8 @@ export function HudOverlay({
     try {
       const params = new URLSearchParams({
         llm: "1",
+        structured: "1",
+        maxTokens: String(Math.max(4096, gdeltDigestBatchSize * 40)),
         batchSize: String(gdeltDigestBatchSize),
       });
       if (timeRange !== "ALL") {
@@ -2563,7 +2554,7 @@ export function HudOverlay({
                       id="gdelt-batch-size"
                       type="range"
                       min={50}
-                      max={100}
+                      max={250}
                       step={5}
                       value={gdeltDigestBatchSize}
                       onChange={(e) => setGdeltDigestBatchSize(Number(e.target.value))}
@@ -3077,7 +3068,8 @@ export function HudOverlay({
                               } else if (alert.coordinates) {
                                 onFlyToCoordinates(alert.coordinates.lat, alert.coordinates.lon);
                               }
-                              setMobileTab(null);
+                              // Bring up the Intel tab/page instead of closing the sheet
+                              setMobileTab("intel");
                             }}
                             className="w-full rounded-lg border border-[#3c3836] bg-[#282828] px-2.5 py-2 text-left transition hover:border-[#83a598] hover:bg-[#3c3836]"
                           >
@@ -3458,75 +3450,73 @@ export function HudOverlay({
                 </div>
               );
 
-            case "athena":
+            case "gdelt":
               return (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between font-mono text-[11px] text-[#d5c4a1]">
-                    <div>
-                      {filteredMobileAthenaPackets.length} packets · {athenaPosture ?? "standby"}
-                    </div>
-                    {athenaWatchUntil && <div className="text-[#a89984]">Watch until {new Date(athenaWatchUntil).toLocaleTimeString()}</div>}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#a89984]">Recent GDELT Events</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt, windowedRange(timeRange)).then((events) => {
+                          setGdeltEvents(events);
+                        }).catch(() => {});
+                      }}
+                      className="rounded border border-[#3c3836] bg-[#282828] px-1.5 py-0.5 font-mono text-[8px] text-[#a89984] active:bg-[#504945]"
+                    >
+                      REFRESH
+                    </button>
                   </div>
-                  <div className="flex gap-1 flex-wrap">
-                    {([
-                      {
-                        key: "all",
-                        label: "All",
-                        count: sortedAthenaPackets.length,
-                        activeClass: "border-[#83a598] bg-[#2d3432] text-[#d5c4a1]",
-                        idleClass: "border-[#504945] bg-[#282828] text-[#a89984]",
-                      },
-                      {
-                        key: "proposed",
-                        label: "Proposed",
-                        count: proposedAthenaCount,
-                        activeClass: "border-[#8ec07c] bg-[#1f2a20] text-[#8ec07c]",
-                        idleClass: "border-[#504945] bg-[#282828] text-[#a89984]",
-                      },
-                      {
-                        key: "critical",
-                        label: "Critical+",
-                        count: criticalAthenaCount,
-                        activeClass: "border-[#fb4934] bg-[#2a1f1f] text-[#fb4934]",
-                        idleClass: "border-[#504945] bg-[#282828] text-[#a89984]",
-                      },
-                    ] as const).map((filter) => (
+                  {gdeltEvents.length === 0 ? (
+                    <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#a89984]">Loading GDELT events (auto on mount)...</div>
+                  ) : (
+                    gdeltEvents.slice(0, 12).map((event, idx) => (
                       <button
-                        key={filter.key}
+                        key={event.id || idx}
                         type="button"
-                        onClick={() => setMobileAthenaFilter(filter.key)}
-                        className={`rounded border px-2 py-0.5 font-mono text-[8px] transition ${
-                          mobileAthenaFilter === filter.key ? filter.activeClass : filter.idleClass
-                        }`}
+                        onClick={() => {
+                          if (event.latitude != null && event.longitude != null) {
+                            onFlyToCoordinates(event.latitude, event.longitude);
+                          }
+                          onSelectIntel?.({
+                            id: `gdelt-${event.id || idx}`,
+                            name: `${event.actor1Name || "Unknown"} → ${event.actor2Name || "Unknown"}`,
+                            kind: "gdelt",
+                            importance: Math.abs(event.goldsteinScale || 0) >= 5 ? "important" : "normal",
+                            quickFacts: [
+                              { label: "Type", value: QUAD_CLASS_LABELS[event.quadClass as GdeltQuadClass] ?? "Unknown" },
+                              { label: "Goldstein", value: String(event.goldsteinScale) },
+                              { label: "Actor 1", value: `${event.actor1Name || "?"} (${event.actor1Country || "?"})` },
+                              { label: "Actor 2", value: `${event.actor2Name || "?"} (${event.actor2Country || "?"})` },
+                              { label: "Location", value: event.actionGeoName || "Global" },
+                              { label: "Mentions", value: String(event.numMentions || 0) },
+                            ],
+                            fullFacts: [],
+                            coordinates: event.latitude != null && event.longitude != null ? { lat: event.latitude, lon: event.longitude } : undefined,
+                          });
+                          // Close sheet after tap on mobile
+                          setMobileTab(null);
+                        }}
+                        className="w-full text-left rounded-lg border border-[#3c3836] bg-[#1d2021] p-2.5 font-mono text-[10px] active:bg-[#282828]"
                       >
-                        {filter.label} {filter.count}
+                        <div className="text-[#ebdbb2] truncate">{event.actionGeoName || event.actor1Name || "Global"}</div>
+                        <div className="mt-0.5 flex justify-between text-[9px] text-[#a89984]">
+                          <span>{event.eventCode || "?"} · Goldstein {event.goldsteinScale != null ? event.goldsteinScale.toFixed(1) : "—"}</span>
+                          <span className="text-[#7fb4c5]">{event.numMentions || 0} mentions</span>
+                        </div>
+                        {event.sourceUrl && (
+                          <div className="mt-1 text-[8px] text-[#7298a8] truncate">Tap to fly • Source available</div>
+                        )}
                       </button>
-                    ))}
-                  </div>
-                  <div className="space-y-3 max-h-[42vh] overflow-auto pr-1">
-                    {filteredMobileAthenaPackets.length === 0 ? (
-                      <div className="rounded-lg border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#a89984]">ATHENA standing by. Packets from Phantom/GDELT will appear here.</div>
-                    ) : (
-                      filteredMobileAthenaPackets.slice(0, 15).map((packet) => (
-                        <AthenaActionCard
-                          key={packet.id}
-                          packet={packet}
-                          compact={false}
-                          mobile={true}
-                          onSimulate={(nextPacket) => { void handleAthenaDecision(nextPacket, "simulated"); }}
-                          onApprove={(nextPacket) => { void handleAthenaDecision(nextPacket, "approved"); }}
-                          onDismiss={(nextPacket) => { void handleAthenaDecision(nextPacket, "dismissed"); }}
-                          onExportJson={exportAthenaJson}
-                          onFlyTo={(p) => {
-                            if (p.region.lat != null && p.region.lon != null) {
-                              onFlyToCoordinates(p.region.lat, p.region.lon);
-                              setMobileTab(null);
-                            }
-                          }}
-                        />
-                      ))
-                    )}
-                  </div>
+                    ))
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { void requestGdeltDigest(); setMobileTab(null); }}
+                    className="mt-1 w-full rounded border border-[#fabd2f]/30 bg-[#fabd2f]/10 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-[#fabd2f]"
+                  >
+                    Generate Strategic Digest
+                  </button>
                 </div>
               );
 
@@ -3728,6 +3718,21 @@ export function HudOverlay({
           </div>
 
           <PneumaHud threatLevel={intelBriefing?.threatLevel ?? "GREEN"} inline />
+
+          <div className="mt-3">
+            <PneumaChat
+              context={{
+                threatLevel: intelBriefing?.threatLevel ?? "GREEN",
+                summary: intelBriefing?.summary,
+                criticalCount: intelBriefing?.criticalCount,
+                warningCount: intelBriefing?.warningCount,
+                infoCount: intelBriefing?.infoCount,
+                alerts: intelBriefing?.alerts,
+                hypotheses,
+                cognitiveLens,
+              }}
+            />
+          </div>
 
           <div className="mt-3 space-y-2">
             <div className="rounded-xl border border-[#3c3836] bg-[#1d2021] p-3 font-mono text-[10px] text-[#7fb4c5]">

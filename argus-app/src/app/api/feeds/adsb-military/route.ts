@@ -23,9 +23,9 @@ export async function GET() {
     const body = await response.text();
 
     if (response.ok) {
-      reportFeedHealth("adsb-military", "ok");
+      await reportFeedHealth("adsb", "ok");
     } else {
-      reportFeedHealth("adsb-military", "degraded", `upstream ${response.status}`);
+      await reportFeedHealth("adsb", "degraded", `upstream ${response.status}`);
     }
 
     return new NextResponse(body, {
@@ -36,7 +36,7 @@ export async function GET() {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "ADS-B proxy failed";
-    reportFeedHealth("adsb-military", "error", message);
+    await reportFeedHealth("adsb", "error", message);
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

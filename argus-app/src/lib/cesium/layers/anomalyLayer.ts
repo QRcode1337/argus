@@ -54,7 +54,12 @@ export class AnomalyLayer {
           scale: 0.9,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(1_000_000, 1.4, 25_000_000, 0.5),
-          disableDepthTestDistance: 0,
+          // IMPORTANT: removed disableDepthTestDistance: 0
+          // That value disables depth testing entirely, causing markers to render
+          // straight through the globe and appear on the opposite side of the planet.
+          // With globe.depthTestAgainstTerrain now enabled, entities on the back side
+          // will be properly occluded.
+          eyeOffset: new Cartesian3(0, 0, -80), // small lift toward camera to reduce z-fighting with globe surface
         },
         label: {
           text: label,
@@ -66,6 +71,7 @@ export class AnomalyLayer {
           verticalOrigin: VerticalOrigin.BOTTOM,
           pixelOffset: new Cartesian2(0, -18),
           scaleByDistance: new NearFarScalar(500_000, 0.85, 8_000_000, 0),
+          // label depth behavior left at default so globe can occlude when on far side
         },
         properties: {
           kind: "anomaly",

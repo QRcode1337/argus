@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { NegativeCache } from "@/lib/cache/negativeCache";
+import { reportFeedHealth } from "@/lib/feedHealth";
 
 const ACLED_BASE = "https://api.acleddata.com/acled/read";
 
@@ -31,6 +32,7 @@ export async function GET() {
   const email = process.env.ACLED_EMAIL;
 
   if (!apiKey || !email) {
+    await reportFeedHealth("acled", "error", "ACLED credentials not configured");
     return NextResponse.json(
       { events: [], meta: { fetchedAt: new Date().toISOString(), count: 0, error: "ACLED_API_KEY or ACLED_EMAIL not configured" } },
       { status: 200 },
@@ -65,8 +67,10 @@ export async function GET() {
       return { events, meta: { fetchedAt: new Date().toISOString(), count: events.length } };
     });
 
+    await reportFeedHealth("acled", "ok");
     return NextResponse.json(data);
   } catch (error) {
+    await reportFeedHealth("acled", "error", error instanceof Error ? error.message : String(error));
     return NextResponse.json(
       { events: [], meta: { fetchedAt: new Date().toISOString(), count: 0, error: String(error) } },
       { status: 200 },

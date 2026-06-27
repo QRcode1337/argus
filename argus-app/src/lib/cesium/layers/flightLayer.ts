@@ -11,6 +11,7 @@ import {
   type Viewer,
 } from "cesium";
 
+import { classifyNavigationConfidence } from "@/lib/gnss/interference";
 import { createAirplaneSvg } from "@/lib/cesium/tacticalMarker";
 import type { TrackedFlight } from "@/types/intel";
 
@@ -64,6 +65,7 @@ export class FlightLayer {
 
       const heading = flight.trueTrack ?? 0;
       const rotation = -CesiumMath.toRadians(heading);
+      const navConfidence = classifyNavigationConfidence(flight.latitude, flight.longitude);
 
       const existing = this.entities.get(flight.id);
       if (existing) {
@@ -75,6 +77,11 @@ export class FlightLayer {
         }
         if (existing.billboard) {
           existing.billboard.rotation = new ConstantProperty(rotation) as any;
+        }
+        if (existing.properties) {
+          existing.properties.navConfidence = navConfidence.level;
+          existing.properties.gnssInterferenceZone = navConfidence.zone?.label ?? null;
+          existing.properties.navConfidenceReason = navConfidence.reason;
         }
 
         // Update trail if this flight is being tracked
@@ -97,7 +104,7 @@ export class FlightLayer {
           rotation: new ConstantProperty(rotation) as any,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(2_000_000, 1.3, 20_000_000, 0.4),
-          disableDepthTestDistance: 0,
+          // disableDepthTestDistance: 0 removed — was causing events/markers to render through the globe and appear on the antipode. Globe now uses depthTestAgainstTerrain.
         },
         properties: {
           kind: "flight",
@@ -109,6 +116,9 @@ export class FlightLayer {
           verticalRate: flight.verticalRate,
           onGround: flight.onGround,
           squawk: flight.squawk,
+          navConfidence: navConfidence.level,
+          gnssInterferenceZone: navConfidence.zone?.label ?? null,
+          navConfidenceReason: navConfidence.reason,
         },
       });
 

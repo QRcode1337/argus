@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { reportFeedHealth } from "@/lib/feedHealth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const apiKey = process.env.FRED_API_KEY;
   if (!apiKey) {
+    await reportFeedHealth("fred", "error", "FRED_API_KEY not configured");
     return NextResponse.json({ error: "FRED_API_KEY not configured" }, { status: 500 });
   }
 
@@ -25,6 +27,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
+      await reportFeedHealth("fred", "error", `FRED returned ${response.status}`);
       return NextResponse.json(
         { error: `FRED returned ${response.status}` },
         { status: response.status },
@@ -32,8 +35,14 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
+    await reportFeedHealth("fred", "ok");
     return NextResponse.json(data);
   } catch (error) {
+    await reportFeedHealth(
+      "fred",
+      "error",
+      error instanceof Error ? error.message : "FRED proxy failed",
+    );
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "FRED proxy failed" },
       { status: 502 },

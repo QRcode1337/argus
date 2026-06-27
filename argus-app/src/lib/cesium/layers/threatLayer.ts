@@ -47,7 +47,7 @@ export class ThreatLayer {
           scale: 0.85,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(1_000_000, 1.4, 25_000_000, 0.5),
-          disableDepthTestDistance: 0,
+          // disableDepthTestDistance: 0 removed — was causing events/markers to render through the globe and appear on the antipode. Globe now uses depthTestAgainstTerrain.
         },
         label: {
           text: (() => { const t = topLine; return t.length > 9 ? `${t.slice(0, 9)}…` : t; })(),

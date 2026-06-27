@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import type { AthenaActionPacket } from "@/types/athena";
 import type { SelectedIntel } from "@/types/intel";
 
-export type MobileTabId = "brief" | "intel" | "news" | "ops" | "athena";
+export type MobileTabId = "brief" | "intel" | "news" | "ops" | "gdelt";
 
 export interface MobileHudProps {
   activeTab: MobileTabId | null;

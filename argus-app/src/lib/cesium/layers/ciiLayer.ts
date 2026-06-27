@@ -79,7 +79,7 @@ export class CiiLayer {
           ),
           scale: new ConstantProperty(scoreScale(entry.score)),
           scaleByDistance: new NearFarScalar(1_000_000, 1.2, 20_000_000, 0.5),
-          disableDepthTestDistance: 0,
+          // disableDepthTestDistance: 0 removed — was causing events/markers to render through the globe and appear on the antipode. Globe now uses depthTestAgainstTerrain.
         },
         description: `${country.name} — CII: ${entry.score.toFixed(0)}/100\n${Object.entries(entry.signals).map(([k, v]) => `${k}: ${v.toFixed(0)}`).join(", ")}`,
         properties: {

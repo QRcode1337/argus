@@ -15,6 +15,7 @@ import {
 } from "cesium";
 
 import { createBoatSvg } from "@/lib/cesium/tacticalMarker";
+import { classifyNavigationConfidence } from "@/lib/gnss/interference";
 import { analyzeVessel } from "@/lib/maritime/vesselIntel";
 import type { AisVessel } from "@/types/vessel";
 
@@ -77,6 +78,7 @@ export class VesselLayer {
         ? vessel.heading
         : (Number.isFinite(vessel.cog) ? vessel.cog : 0);
       const rotation = -CesiumMath.toRadians(hdg);
+      const navConfidence = classifyNavigationConfidence(vessel.lat, vessel.lon);
 
       const existing = this.entities.get(vessel.mmsi);
       if (existing) {
@@ -88,6 +90,11 @@ export class VesselLayer {
         }
         if (existing.billboard) {
           existing.billboard.rotation = new ConstantProperty(rotation) as any;
+        }
+        if (existing.properties) {
+          existing.properties.navConfidence = navConfidence.level;
+          existing.properties.gnssInterferenceZone = navConfidence.zone?.label ?? null;
+          existing.properties.navConfidenceReason = navConfidence.reason;
         }
 
         // Update trail if this vessel is being tracked
@@ -152,6 +159,9 @@ export class VesselLayer {
           nearChokepoint: intel.nearChokepoint,
           nearBase: intel.nearBase,
           isDark: intel.isDark,
+          navConfidence: navConfidence.level,
+          gnssInterferenceZone: navConfidence.zone?.label ?? null,
+          navConfidenceReason: navConfidence.reason,
         },
       });
 

@@ -229,15 +229,15 @@ export async function GET() {
     };
 
     cache = { data: payload, cachedAt: Date.now() };
-    reportFeedHealth("adsb-lol-all", "ok");
+    await reportFeedHealth("adsblol", "ok");
     return NextResponse.json(payload);
   } catch (err) {
     const message = err instanceof Error ? err.message : "adsb.lol poll failed";
     if (cache) {
-      reportFeedHealth("adsb-lol-all", "degraded", message);
+      await reportFeedHealth("adsblol", "degraded", message);
       return NextResponse.json({ ...cache.data, _stale: true });
     }
-    reportFeedHealth("adsb-lol-all", "error", message);
+    await reportFeedHealth("adsblol", "error", message);
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

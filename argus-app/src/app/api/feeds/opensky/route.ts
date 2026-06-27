@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { reportFeedHealth } from "@/lib/feedHealth";
 
 export const dynamic = "force-dynamic";
 
@@ -165,6 +166,7 @@ async function fetchAdsbLolRegionalFallback(): Promise<AdsbLolAircraft[]> {
 export async function GET() {
   const now = Date.now();
   if (cachedBody && now - cachedAt < CACHE_TTL_MS) {
+    await reportFeedHealth("opensky", "ok");
     return new NextResponse(cachedBody, {
       status: 200,
       headers: { "Content-Type": "application/json", "X-Cache": "HIT" },
@@ -191,6 +193,7 @@ export async function GET() {
       const body = await response.text();
       cachedBody = body;
       cachedAt = now;
+      await reportFeedHealth("opensky", "ok");
       return new NextResponse(body, {
         status: 200,
         headers: { "Content-Type": "application/json", "X-Cache": "MISS", "X-Source": "opensky" },
@@ -206,6 +209,7 @@ export async function GET() {
       const body = JSON.stringify(adsbLolToOpenSky(fallbackAircraft));
       cachedBody = body;
       cachedAt = now;
+      await reportFeedHealth("opensky", "degraded", "Serving regional ADS-B fallback");
       return new NextResponse(body, {
         status: 200,
         headers: {
@@ -233,6 +237,7 @@ export async function GET() {
         const body = JSON.stringify(converted);
         cachedBody = body;
         cachedAt = now;
+        await reportFeedHealth("opensky", "degraded", "Serving explicit fallback endpoint");
         return new NextResponse(body, {
           status: 200,
           headers: {
@@ -248,12 +253,14 @@ export async function GET() {
   }
 
   if (cachedBody) {
+    await reportFeedHealth("opensky", "degraded", "Serving stale cached flight data");
     return new NextResponse(cachedBody, {
       status: 200,
       headers: { "Content-Type": "application/json", "X-Cache": "STALE" },
     });
   }
 
+  await reportFeedHealth("opensky", "error", "All flight data sources unavailable");
   return NextResponse.json(
     { error: "All flight data sources unavailable" },
     { status: 502 },

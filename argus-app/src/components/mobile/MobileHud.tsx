@@ -15,7 +15,7 @@ const TABS: TabDef[] = [
   { id: "intel", label: "Intel", glyph: "◎" },
   { id: "news", label: "News", glyph: "◫" },
   { id: "ops", label: "Ops", glyph: "⚙" },
-  { id: "athena", label: "ATHENA", glyph: "⚡" },
+  { id: "gdelt", label: "GDELT", glyph: "◉" },
 ];
 
 function tabTitle(activeTab: MobileTabId | null): string {
@@ -28,8 +28,8 @@ function tabTitle(activeTab: MobileTabId | null): string {
       return "News Feed";
     case "ops":
       return "Operations";
-    case "athena":
-      return "ATHENA Actions";
+    case "gdelt":
+      return "GDELT Events";
     default:
       return "Mobile HUD";
   }
@@ -46,15 +46,7 @@ export function MobileHud({
   selectedIntel,
   athenaPackets,
 }: MobileHudProps) {
-  const criticalAthenaCount = useMemo(
-    () =>
-      athenaPackets.filter(
-        (packet) =>
-          packet.status === "proposed" &&
-          (packet.priority === "critical" || packet.priority === "high"),
-      ).length,
-    [athenaPackets],
-  );
+  // athenaPackets kept for Intel/Brief integration on mobile
 
   return (
     <div className="md:hidden">
@@ -91,7 +83,7 @@ export function MobileHud({
         <div className="flex w-full max-w-md items-center justify-between gap-2 rounded-[1.35rem] border border-[#3c3836] bg-[#1d2021f2] px-3 py-2 shadow-[0_-18px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.id;
-            const showAthenaBadge = tab.id === "athena" && criticalAthenaCount > 0 && !isActive;
+            const showAthenaBadge = false; // replaced by gdelt tab
             const showIntelBadge = tab.id === "intel" && !!selectedIntel && !isActive;
 
             return (
@@ -109,9 +101,7 @@ export function MobileHud({
                   {tab.glyph}
                 </span>
                 <span>{tab.label}</span>
-                {showAthenaBadge ? (
-                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#fb4934]" />
-                ) : null}
+
                 {showIntelBadge ? (
                   <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#83a598]" />
                 ) : null}

@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { NegativeCache } from "@/lib/cache/negativeCache";
+import { reportFeedHealth } from "@/lib/feedHealth";
 
 const GDACS_RSS = "https://www.gdacs.org/xml/rss.xml";
 
@@ -93,8 +94,10 @@ export async function GET() {
       return { events: events.slice(0, 50), meta: { fetchedAt: new Date().toISOString(), count: events.length } };
     });
 
+    await reportFeedHealth("gdacs", "ok");
     return NextResponse.json(data);
   } catch (error) {
+    await reportFeedHealth("gdacs", "error", error instanceof Error ? error.message : String(error));
     return NextResponse.json(
       { events: [], meta: { fetchedAt: new Date().toISOString(), count: 0, error: String(error) } },
       { status: 200 },

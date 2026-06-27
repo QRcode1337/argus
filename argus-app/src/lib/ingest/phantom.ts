@@ -71,3 +71,39 @@ export async function checkPhantomHealth(phantomUrl: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Forward a Phantom anomaly (if high-signal) to ARGUS API intake.
+ * This triggers DB persistence + ATHENA Action Packet generation for qualifying events.
+ * Non-blocking and best-effort (failures are silent; ATHENA is advisory).
+ */
+export async function reportPhantomAnomalyToAthena(anomaly: PhantomAnomaly): Promise<void> {
+  const severityLower = String(anomaly.severity || "").toLowerCase();
+  const chaos = Number(anomaly.chaos_score || 0);
+  const isHighSignal =
+    severityLower === "high" || severityLower === "critical" || chaos >= 0.75;
+  if (!isHighSignal) return;
+
+  try {
+    await fetch("/api/feeds/anomalies/collect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: anomaly.anomaly_type,
+        chaosScore: chaos,
+        lat: anomaly.lat,
+        lon: anomaly.lon,
+        severity: severityLower,
+        payload: {
+          entity_id: anomaly.entity_id,
+          detail: anomaly.detail,
+          detected_at: anomaly.detected_at,
+        },
+      }),
+      // short timeout; do not block UI
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch {
+    // Swallow: collection/ATHENA is best-effort
+  }
+}

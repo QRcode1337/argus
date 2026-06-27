@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
+import { reportFeedHealth } from "@/lib/feedHealth";
 
 const GDELT_LAST_UPDATE = "http://data.gdeltproject.org/gdeltv2/lastupdate.txt";
 
@@ -147,6 +148,7 @@ export async function GET(req: Request) {
     // Return cached if fresh
     if (cachedEvents.length > 0 && Date.now() - cachedAt < CACHE_TTL_MS) {
       const filtered = applyWindow(cachedEvents, windowParam);
+      await reportFeedHealth("gdelt", "ok");
       return NextResponse.json(
         { events: filtered, cached: true, count: filtered.length, window: windowParam ?? "ALL" },
         {
@@ -161,6 +163,7 @@ export async function GET(req: Request) {
 
     const exportUrl = await fetchLatestExportUrl();
     if (!exportUrl) {
+      await reportFeedHealth("gdelt", "error", "Failed to resolve GDELT export URL");
       return NextResponse.json(
         { error: "Failed to resolve GDELT export URL" },
         { status: 502 },
@@ -169,6 +172,7 @@ export async function GET(req: Request) {
 
     const zipRes = await fetch(exportUrl, { cache: "no-store" });
     if (!zipRes.ok) {
+      await reportFeedHealth("gdelt", "error", `GDELT export fetch failed: ${zipRes.status}`);
       return NextResponse.json(
         { error: `GDELT export fetch failed: ${zipRes.status}` },
         { status: 502 },
@@ -184,6 +188,7 @@ export async function GET(req: Request) {
 
     // Find the local file header
     if (view.getUint32(0, true) !== 0x04034b50) {
+      await reportFeedHealth("gdelt", "error", "Invalid ZIP");
       return NextResponse.json({ error: "Invalid ZIP" }, { status: 502 });
     }
 
@@ -225,6 +230,11 @@ export async function GET(req: Request) {
       }
       csvText = new TextDecoder().decode(merged);
     } else {
+      await reportFeedHealth(
+        "gdelt",
+        "error",
+        `Unsupported ZIP compression: ${compressionMethod}`,
+      );
       return NextResponse.json(
         { error: `Unsupported ZIP compression: ${compressionMethod}` },
         { status: 502 },
@@ -235,6 +245,7 @@ export async function GET(req: Request) {
     cachedEvents = events;
     cachedAt = Date.now();
     const filtered = applyWindow(events, windowParam);
+    await reportFeedHealth("gdelt", "ok");
 
     return NextResponse.json(
       { events: filtered, cached: false, count: filtered.length, window: windowParam ?? "ALL" },
@@ -247,6 +258,11 @@ export async function GET(req: Request) {
       },
     );
   } catch (error) {
+    await reportFeedHealth(
+      "gdelt",
+      "error",
+      error instanceof Error ? error.message : "GDELT fetch failed",
+    );
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "GDELT fetch failed" },
       { status: 502 },

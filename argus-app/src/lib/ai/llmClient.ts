@@ -18,7 +18,14 @@ function getEffectiveApiKey(apiKey?: string, endpoint?: string): string | undefi
     return process.env.GEMINI_API_KEY || apiKey || process.env.OPENAI_COMPATIBLE_API_KEY;
   }
   if (endpoint && /do-ai\.run|gradient/i.test(endpoint)) {
-    return process.env.GRADIENT_ENDPOINT_ACCESS_KEY || process.env.GRADIENT_MODEL_ACCESS_KEY || apiKey;
+    // Prefer an explicitly-passed key (e.g. ARGUS AI assistant override) over the
+    // shared GRADIENT_* env keys, so a per-call agent key wins for do-ai endpoints.
+    return (
+      apiKey ||
+      process.env.ARGUS_AI_AGENT_KEY ||
+      process.env.GRADIENT_ENDPOINT_ACCESS_KEY ||
+      process.env.GRADIENT_MODEL_ACCESS_KEY
+    );
   }
   return apiKey || process.env.OPENAI_COMPATIBLE_API_KEY || process.env.GEMINI_API_KEY;
 }
@@ -102,7 +109,7 @@ export async function queryLlm(
 
   const maxTokens = Number.isFinite(options.maxTokens)
     ? Math.max(256, Math.floor(options.maxTokens as number))
-    : 2048;
+    : 4096;
 
   const timeoutMs = Number.isFinite(options.timeoutMs)
     ? Math.max(10_000, Math.floor(options.timeoutMs as number))
@@ -146,12 +153,12 @@ export async function queryLlm(
         const generator = await getGradientGenerator();
         const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
 
-        // Generate 3 candidates: Id, Ego, Superego
+        // Generate 3 candidates: Id, Ego, Superego — pass target maxTokens for full reports
         const candidates = await generator.generateCandidates(fullPrompt, {
           mood: "neutral",
           memories: [],
           persona: "balanced",
-        });
+        }, undefined, undefined, maxTokens);
 
         // Create hash-based embedding from input text
         const embedding = hashEmbedding(fullPrompt);

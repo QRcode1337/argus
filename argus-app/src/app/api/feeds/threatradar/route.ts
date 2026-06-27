@@ -1,7 +1,32 @@
 import { NextResponse } from "next/server";
-import { normalizeThreatRadar, type ThreatRadarThreat } from "@/lib/ingest/threatradar";
+import type { ThreatRadarThreat } from "@/lib/ingest/threatradar";
+import { reportFeedHealth } from "@/lib/feedHealth";
 
 export const dynamic = "force-dynamic";
+
+type CisaKevVulnerability = {
+  cveID?: string;
+  vulnerabilityName?: string;
+  shortDescription?: string;
+  dateAdded?: string;
+  vendorProject?: string;
+  product?: string;
+};
+
+type OtxIndicator = {
+  type?: string;
+  indicator?: string;
+};
+
+type OtxPulse = {
+  id?: string;
+  name?: string;
+  description?: string;
+  author_name?: string;
+  modified?: string;
+  tags?: string[];
+  indicators?: OtxIndicator[];
+};
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -15,23 +40,29 @@ export async function GET(req: Request) {
       next: { revalidate: 3600 },
     });
     if (cisaRes.ok) {
-      const cisaData = await cisaRes.json();
-      if (cisaData && Array.isArray(cisaData.vulnerabilities)) {
+      const cisaData = (await cisaRes.json()) as {
+        vulnerabilities?: CisaKevVulnerability[];
+      };
+      if (Array.isArray(cisaData.vulnerabilities)) {
         // Sort by dateAdded descending
         const recentCisa = cisaData.vulnerabilities
-          .sort((a: any, b: any) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime())
+          .sort(
+            (a, b) =>
+              new Date(b.dateAdded ?? 0).getTime() -
+              new Date(a.dateAdded ?? 0).getTime(),
+          )
           .slice(0, Math.ceil(limit / 2));
-        
-        recentCisa.forEach((v: any) => {
+
+        recentCisa.forEach((v) => {
           threats.push({
-            id: v.cveID,
-            title: v.vulnerabilityName,
-            description: v.shortDescription,
+            id: v.cveID ?? crypto.randomUUID(),
+            title: v.vulnerabilityName ?? "Unnamed vulnerability",
+            description: v.shortDescription ?? "",
             severity: "critical",
             cve: v.cveID,
             source: "CISA KEV",
-            publishedAt: new Date(v.dateAdded).toISOString(),
-            tags: ["CISA", "KEV", v.vendorProject, v.product].filter(Boolean),
+            publishedAt: new Date(v.dateAdded ?? Date.now()).toISOString(),
+            tags: ["CISA", "KEV", v.vendorProject, v.product].filter((x): x is string => Boolean(x)),
           });
         });
       }
@@ -50,24 +81,26 @@ export async function GET(req: Request) {
         next: { revalidate: 300 },
       });
       if (otxRes.ok) {
-        const otxData = await otxRes.json();
-        if (otxData && Array.isArray(otxData.results)) {
-          otxData.results.forEach((p: any) => {
-            const cveIndicators = (p.indicators || []).filter((i: any) => i.type === "CVE");
+        const otxData = (await otxRes.json()) as { results?: OtxPulse[] };
+        if (Array.isArray(otxData.results)) {
+          otxData.results.forEach((p) => {
+            const cveIndicators = (p.indicators ?? []).filter(
+              (indicator) => indicator.type === "CVE",
+            );
             const cve = cveIndicators.length > 0 ? cveIndicators[0].indicator : undefined;
-            
+
             threats.push({
-              id: p.id,
-              title: p.name,
-              description: p.description || p.name,
+              id: p.id ?? crypto.randomUUID(),
+              title: p.name ?? "Unnamed pulse",
+              description: p.description || p.name || "",
               severity: "high",
               cve,
               source: p.author_name ? `OTX: ${p.author_name}` : "AlienVault OTX",
               publishedAt: p.modified ? new Date(p.modified).toISOString() : new Date().toISOString(),
               tags: Array.isArray(p.tags) ? p.tags : [],
-              iocs: Array.isArray(p.indicators) ? p.indicators.slice(0, 10).map((i: any) => ({
-                type: i.type,
-                value: i.indicator
+              iocs: Array.isArray(p.indicators) ? p.indicators.slice(0, 10).map((i) => ({
+                type: String(i.type ?? ""),
+                value: String(i.indicator ?? ""),
               })) : undefined,
             });
           });
@@ -82,9 +115,11 @@ export async function GET(req: Request) {
   threats.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
   if (threats.length === 0) {
+    await reportFeedHealth("threatradar", "error", "All threat sources unavailable");
     return NextResponse.json({ threats: [], total: 0, updatedAt: new Date().toISOString(), error: "All threat sources unavailable" }, { status: 502 });
   }
 
+  await reportFeedHealth("threatradar", "ok");
   return NextResponse.json({
     threats: threats.slice(0, limit),
     total: threats.length,

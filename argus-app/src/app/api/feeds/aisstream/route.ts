@@ -76,6 +76,7 @@ type WsConstructor = new (
 ) => WsLike;
 
 let cache: AisCache | null = null;
+let refreshPromise: Promise<AisPayload> | null = null;
 const CACHE_TTL_MS = 45_000; // Serve cached data for 45s to avoid hammering the WebSocket
 
 const REQUEST_TIMEOUT_MS = Number(process.env.AISSTREAM_TIMEOUT_MS ?? 12000);
@@ -194,11 +195,38 @@ async function fetchSnapshotFromWs(apiKey: string): Promise<AisPayload> {
   });
 }
 
+async function refreshSnapshot(apiKey: string): Promise<AisPayload> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const data = await fetchSnapshotFromWs(apiKey);
+      cache = { data, cachedAt: new Date().toISOString() };
+      await reportFeedHealth("ais", "ok");
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "AISStream proxy failed";
+      if (cache) {
+        await reportFeedHealth("ais", "degraded", message);
+        return cache.data;
+      }
+      await reportFeedHealth("ais", "error", message);
+      throw error;
+    }
+  })();
+
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
 export async function GET() {
   const apiKey = process.env.AISSTREAM_API_KEY;
   if (!apiKey) {
     const message = "AISSTREAM_API_KEY not configured";
-    reportFeedHealth("aisstream", "error", message);
+    await reportFeedHealth("ais", "error", message);
     return NextResponse.json({ vessels: [], _degraded: true, _source: "ais-empty", _reason: message });
   }
 
@@ -207,25 +235,22 @@ export async function GET() {
     return NextResponse.json({ ...cache.data, _cached: true });
   }
 
+  if (cache) {
+    void refreshSnapshot(apiKey);
+    await reportFeedHealth("ais", "degraded", "Refreshing stale cached AIS snapshot");
+    return NextResponse.json({
+      ...cache.data,
+      _stale: true,
+      _source: "ais-cache",
+      _cachedAt: cache.cachedAt,
+    });
+  }
+
   try {
-    const data = await fetchSnapshotFromWs(apiKey);
-    cache = { data, cachedAt: new Date().toISOString() };
-    reportFeedHealth("aisstream", "ok");
+    const data = await refreshSnapshot(apiKey);
     return NextResponse.json(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : "AISStream proxy failed";
-
-    if (cache) {
-      reportFeedHealth("aisstream", "degraded", message);
-      return NextResponse.json({
-        ...cache.data,
-        _stale: true,
-        _source: "ais-cache",
-        _cachedAt: cache.cachedAt,
-      });
-    }
-
-    reportFeedHealth("aisstream", "error", message);
     return NextResponse.json({ vessels: [], _degraded: true, _source: "ais-empty", _reason: message });
   }
 }

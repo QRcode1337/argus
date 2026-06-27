@@ -66,7 +66,7 @@ export class SeismicLayer {
           scale: Math.max(0.46, Math.min(1.24, magSize(quake.magnitude) / 8)),
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(1_000_000, 1.2, 20_000_000, 0.4),
-          disableDepthTestDistance: 0,
+          // disableDepthTestDistance: 0 removed — was causing events/markers to render through the globe and appear on the antipode. Globe now uses depthTestAgainstTerrain.
         },
         description: `${quake.place} (M${quake.magnitude.toFixed(1)})`,
         properties: {

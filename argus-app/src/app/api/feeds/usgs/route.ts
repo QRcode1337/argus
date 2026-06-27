@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { reportFeedHealth } from "@/lib/feedHealth";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,12 @@ export async function GET() {
 
     const body = await response.text();
 
+    if (response.ok) {
+      await reportFeedHealth("usgs", "ok");
+    } else {
+      await reportFeedHealth("usgs", "degraded", `upstream ${response.status}`);
+    }
+
     return new NextResponse(body, {
       status: response.status,
       headers: {
@@ -24,6 +31,11 @@ export async function GET() {
       },
     });
   } catch (error) {
+    await reportFeedHealth(
+      "usgs",
+      "error",
+      error instanceof Error ? error.message : "USGS proxy failed",
+    );
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "USGS proxy failed" },
       { status: 502 },

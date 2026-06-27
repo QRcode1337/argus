@@ -59,7 +59,7 @@ export class BasesLayer {
           scale: 0.7,
           verticalOrigin: VerticalOrigin.CENTER,
           scaleByDistance: new NearFarScalar(1_000_000, 1.2, 20_000_000, 0.4),
-          disableDepthTestDistance: 0,
+          // disableDepthTestDistance: 0 removed — was causing events/markers to render through the globe and appear on the antipode. Globe now uses depthTestAgainstTerrain.
         },
         label: {
           text: (() => { const t = `${typeTag} ${base.name}`; return t.length > 9 ? `${t.slice(0, 9)}…` : t; })(),
