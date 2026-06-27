@@ -76,8 +76,8 @@ export class GdeltLayer {
           // disableDepthTestDistance: 0 removed — was causing events/markers to render through the globe and appear on the antipode. Globe now uses depthTestAgainstTerrain.
         },
         label: {
-          text: event.actionGeoName.length > 9 ? `${event.actionGeoName.slice(0, 9)}…` : event.actionGeoName,
-          font: "bold 11px monospace",
+          text: event.actionGeoName.length > 16 ? `${event.actionGeoName.slice(0, 16)}…` : event.actionGeoName,
+          font: "bold 14px monospace",
           style: LabelStyle.FILL_AND_OUTLINE,
           fillColor: labelColor,
           outlineColor: Color.BLACK,

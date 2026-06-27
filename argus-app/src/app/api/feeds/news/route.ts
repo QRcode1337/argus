@@ -309,7 +309,30 @@ const buildRegionSummary = (region: CommandRegion, items: NewsItem[]): RegionSum
     riskPoints >= 18 ? "HIGH" : riskPoints >= 8 ? "ELEVATED" : "STABLE";
 
   const lead = items[0];
-  const summary = `${region} posture ${posture.toLowerCase()}. Lead item: ${lead.title}. Primary signals: ${keySignals.join(", ") || "GENERAL"}.`;
+  const sourceCount = new Set(items.map((it) => it.source)).size;
+  const signalBreakdown = [...tagCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([tag, n]) => `${tag} (${n})`)
+    .join(", ");
+  const leadLines = items
+    .slice(0, 3)
+    .map((it, i) => `(${i + 1}) ${it.title} [${it.source}]`)
+    .join("; ");
+  const newest = items.reduce((a, b) => (a.publishedAt > b.publishedAt ? a : b), items[0]);
+  const postureRationale =
+    posture === "HIGH"
+      ? "concentrated conflict and cyber reporting driving an elevated risk posture"
+      : posture === "ELEVATED"
+        ? "a moderate clustering of conflict, cyber, or infrastructure signals"
+        : "no dominant escalation signature across current reporting";
+
+  const summary =
+    `${region} regional posture is ${posture} — ${postureRationale}, derived from ${items.length} ` +
+    `ranked item${items.length === 1 ? "" : "s"} across ${sourceCount} source${sourceCount === 1 ? "" : "s"}. ` +
+    `Top developments: ${leadLines}. ` +
+    `Dominant signal mix: ${signalBreakdown || "GENERAL"}. ` +
+    `Most recent dispatch: "${newest.title}" (${newest.source}).`;
 
   return {
     posture,

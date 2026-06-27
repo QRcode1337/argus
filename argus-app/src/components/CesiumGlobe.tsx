@@ -485,6 +485,8 @@ const buildSelectedIntel = (entity: Entity): SelectedIntel | null => {
     (typeof props.callsign === "string" && props.callsign) ||
     (typeof props.name === "string" && props.name) ||
     (typeof props.place === "string" && props.place) ||
+    // Full GDELT location name (map label is truncated, so prefer the prop)
+    (typeof props.actionGeoName === "string" && props.actionGeoName) ||
     (typeof labelText === "string" && labelText) ||
     entity.id;
 
@@ -2238,6 +2240,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         (typeof props.callsign === "string" && props.callsign) ||
         (typeof props.name === "string" && props.name) ||
         (typeof props.place === "string" && props.place) ||
+        (typeof props.actionGeoName === "string" && props.actionGeoName) ||
         entity.id;
 
       const kind = inferKindFromId(entity.id);

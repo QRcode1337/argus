@@ -220,8 +220,8 @@ const workspaceDefs = [
 // ATHENA and Signal tabs removed from the UI (buttons), but kept in workspaceDefs so
 // their (now-unreachable) panels stay type-valid. Master Blend lived in the Signal
 // panel; visualIntensity keeps its 0.75 default since the slider is no longer shown.
-const primaryWorkspaceIds = ["intel", "news", "feeds", "gdelt", "anomalies"] as const;
-const secondaryWorkspaceIds = ["status", "settings"] as const;
+const primaryWorkspaceIds = ["intel", "news", "feeds", "gdelt"] as const;
+const secondaryWorkspaceIds = ["status", "anomalies", "settings"] as const;
 
 type WorkspaceId = (typeof workspaceDefs)[number]["id"];
 // MobileTabId imported from ./mobile/MobileHudProps
@@ -1620,15 +1620,38 @@ export function HudOverlay({
                 ))}
               </div>
 
-              <div className="rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  onSelectIntel({
+                    id: `news-synthesis-${newsRegionFilter}`,
+                    name: `${newsRegionFilter} Regional News Synthesis`,
+                    kind: "info",
+                    importance: activeRegionDigest?.posture === "HIGH" ? "important" : "normal",
+                    quickFacts: [
+                      { label: "Posture", value: activeRegionDigest?.posture ?? "STABLE" },
+                      { label: "Region", value: newsRegionFilter },
+                      { label: "Items in scope", value: String(filteredNewsItems.length) },
+                    ],
+                    fullFacts: filteredNewsItems.slice(0, 12).map((it) => ({
+                      label: it.source,
+                      value: it.title,
+                    })),
+                    analysisSummary:
+                      activeRegionDigest?.summary ??
+                      "Collecting source headlines for regional summary...",
+                  })
+                }
+                className="w-full rounded-md border border-[#3c3836] bg-[#1d2021] px-2 py-1.5 text-left transition hover:border-[#83a598] hover:bg-[#23292b]"
+              >
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#a89984]">AI Summary</span>
+                  <span className="font-mono text-[8px] uppercase tracking-[0.12em] text-[#a89984]">AI Summary · tap for detail</span>
                   <span className="font-mono text-[8px] text-[#83a598]">{activeRegionDigest?.posture ?? "STABLE"}</span>
                 </div>
-                <p className="mt-1 font-mono text-[9px] leading-relaxed text-[#8bb8c9]">
+                <p className="mt-1 font-mono text-[10px] leading-relaxed text-[#8bb8c9]">
                   {activeRegionDigest?.summary ?? "Collecting source headlines for regional summary..."}
                 </p>
-              </div>
+              </button>
 
               <input
                 type="text"
