@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(process.cwd()),
   // Turbopack disabled to prevent os error 60 file read timeouts with large Cesium assets
-  serverExternalPackages: ["cesium"],
+  serverExternalPackages: ["cesium", "raindrop-ai"],
   webpack: (config) => {
     // Tell webpack NOT to parse the Cesium static assets (thousands of files causing ETIMEDOUT)
     config.watchOptions = {
