@@ -1,1 +1,4 @@
-export { dynamic, GET } from "../adsb-military/route";
+// Alias for /api/feeds/adsb-military. Route segment config must be declared
+// locally — Next.js cannot statically parse a re-exported `dynamic`.
+export const dynamic = "force-dynamic";
+export { GET } from "../adsb-military/route";
