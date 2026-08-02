@@ -1,6 +1,7 @@
 export type PollingTask = {
   id: string;
   intervalMs: number;
+  startDelayMs?: number;
   run: () => Promise<void>;
 };
 
@@ -55,6 +56,14 @@ export class PollingManager {
     };
 
     this.feeds.set(task.id, state);
+    if ((task.startDelayMs ?? 0) > 0) {
+      state.timer = setTimeout(() => {
+        state.timer = null;
+        void this.execute(state);
+      }, task.startDelayMs);
+      return;
+    }
+
     void this.execute(state);
   }
 

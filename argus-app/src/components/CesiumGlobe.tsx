@@ -149,6 +149,14 @@ type ImageryLayerWithProvider = {
   imageryProvider?: ImageryProviderWithErrorEvent;
 };
 
+type StartupProfile = {
+  lowPerformance: boolean;
+  loadTerrain: boolean;
+  loadBuildings: boolean;
+  resolutionScale: number;
+  targetFrameRate: number;
+};
+
 /** Zoom-box hotspot regions rendered as rectangles on the globe */
 const ZOOM_REGIONS = [
   { id: "zr-mideast", label: "MIDEAST", west: 30, south: 12, east: 63, north: 42, color: "#fb4934", height: 1_200_000 },
@@ -164,6 +172,39 @@ const ZOOM_REGIONS = [
   { id: "zr-taiwan-str", label: "TAIWAN STR.", west: 115, south: 21, east: 125, north: 28, color: "#fb4934", height: 600_000 },
   { id: "zr-horn-africa", label: "HORN / RED SEA", west: 36, south: 2, east: 55, north: 18, color: "#fe8019", height: 800_000 },
 ] as const;
+
+const getStartupProfile = (): StartupProfile => {
+  if (typeof window === "undefined") {
+    return {
+      lowPerformance: false,
+      loadTerrain: true,
+      loadBuildings: true,
+      resolutionScale: 1,
+      targetFrameRate: 45,
+    };
+  }
+
+  const nav = navigator as Navigator & {
+    deviceMemory?: number;
+  };
+  const deviceMemory = nav.deviceMemory ?? 8;
+  const hardwareConcurrency = nav.hardwareConcurrency ?? 8;
+  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  const isSmallViewport = window.innerWidth < 900;
+  const lowPerformance =
+    deviceMemory <= 4 ||
+    hardwareConcurrency <= 4 ||
+    prefersReducedMotion ||
+    isSmallViewport;
+
+  return {
+    lowPerformance,
+    loadTerrain: !lowPerformance,
+    loadBuildings: !lowPerformance,
+    resolutionScale: lowPerformance ? Math.min(1, 1.25 / window.devicePixelRatio) : 1,
+    targetFrameRate: lowPerformance ? 30 : 45,
+  };
+};
 
 /**
  * Nuke ALL Cesium error panels unconditionally.
@@ -1139,6 +1180,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       return;
     }
 
+    const startupProfile = getStartupProfile();
     (window as unknown as { CESIUM_BASE_URL?: string }).CESIUM_BASE_URL = "/cesium";
     if (process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN) {
       Ion.defaultAccessToken = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
@@ -1155,11 +1197,18 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       navigationHelpButton: false,
       selectionIndicator: false,
       timeline: false,
+      scene3DOnly: true,
+      requestRenderMode: startupProfile.lowPerformance,
+      maximumRenderTimeChange: startupProfile.lowPerformance ? Infinity : 0.5,
       shouldAnimate: true,
     });
     const restoreErrorPanelSuppression = suppressCesiumErrorPanels(viewer);
     const cleanupFns = [] as Array<() => void>;
+    let disposed = false;
     cleanupFns.push(restoreErrorPanelSuppression);
+    cleanupFns.push(() => {
+      disposed = true;
+    });
     const cameraController = viewer.scene.screenSpaceCameraController;
     cameraController.enableCollisionDetection = collisionEnabledRef.current;
     cameraController.inertiaSpin = 0.82;
@@ -1168,25 +1217,44 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     cameraController.minimumZoomDistance = 15;
     cameraController.maximumZoomDistance = 60_000_000;
 
-    viewer.scene.globe.enableLighting = true;
+    viewer.targetFrameRate = startupProfile.targetFrameRate;
+    viewer.resolutionScale = startupProfile.resolutionScale;
+    viewer.scene.requestRenderMode = startupProfile.lowPerformance;
+    viewer.scene.globe.enableLighting = !startupProfile.lowPerformance;
     viewer.scene.globe.baseColor = Color.fromCssColorString("#0b1118");
-    viewer.scene.globe.depthTestAgainstTerrain = true;
+    viewer.scene.globe.depthTestAgainstTerrain = !startupProfile.lowPerformance;
     viewer.scene.globe.translucency.enabled = false;
-    if (process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN) {
-      void createWorldTerrainAsync({
-        requestVertexNormals: true,
-      })
-        .then((terrain) => {
-          viewer.terrainProvider = terrain;
+    if (process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN && startupProfile.loadTerrain) {
+      const terrainTimer = window.setTimeout(() => {
+        void createWorldTerrainAsync({
+          requestVertexNormals: true,
         })
-        .catch((error) => {
-          console.error("Failed to load Cesium World Terrain", error);
-        });
+          .then((terrain) => {
+            if (!disposed) {
+              viewer.terrainProvider = terrain;
+            }
+          })
+          .catch((error) => {
+            console.error("Failed to load Cesium World Terrain", error);
+          });
+      }, 500);
+      cleanupFns.push(() => window.clearTimeout(terrainTimer));
     }
 
-    void createOsmBuildingsAsync().then((tileset) => {
-      viewer.scene.primitives.add(tileset);
-    });
+    if (startupProfile.loadBuildings) {
+      const buildingsTimer = window.setTimeout(() => {
+        void createOsmBuildingsAsync()
+          .then((tileset) => {
+            if (!disposed) {
+              viewer.scene.primitives.add(tileset);
+            }
+          })
+          .catch((error) => {
+            console.error("Failed to load OSM buildings", error);
+          });
+      }, 1200);
+      cleanupFns.push(() => window.clearTimeout(buildingsTimer));
+    }
 
     const onCameraChanged = () => {
       const cartographic = viewer.camera.positionCartographic;
@@ -1495,6 +1563,14 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     }, ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
     const poller = new PollingManager();
+    let bootDelayMs = 0;
+    const queuePollingTask = (task: Parameters<typeof poller.add>[0]) => {
+      bootDelayMs += 250;
+      poller.add({
+        ...task,
+        startDelayMs: task.startDelayMs ?? bootDelayMs,
+      });
+    };
     let lastTleFetchAt = 0;
 
     // Wire corroboration engine callbacks
@@ -1520,7 +1596,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       Notification.requestPermission().catch(() => {});
     }
 
-    poller.add({
+    queuePollingTask({
       id: "opensky",
       intervalMs: ARGUS_CONFIG.pollMs.openSky,
       run: async () => {
@@ -1585,7 +1661,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "adsb-lol",
       intervalMs: ARGUS_CONFIG.pollMs.adsblol,
       run: async () => {
@@ -1619,7 +1695,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "adsb-military",
       intervalMs: ARGUS_CONFIG.pollMs.adsbMilitary,
       run: async () => {
@@ -1652,7 +1728,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "satellites",
       intervalMs: ARGUS_CONFIG.pollMs.satellites,
       run: async () => {
@@ -1690,7 +1766,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "usgs",
       intervalMs: ARGUS_CONFIG.pollMs.usgs,
       run: async () => {
@@ -1762,7 +1838,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "cloudflare-radar",
       intervalMs: ARGUS_CONFIG.pollMs.cloudflareRadar,
       run: async () => {
@@ -1789,7 +1865,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "otx",
       intervalMs: ARGUS_CONFIG.pollMs.otx,
       run: async () => {
@@ -1820,7 +1896,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "fred",
       intervalMs: ARGUS_CONFIG.pollMs.fred,
       run: async () => {
@@ -1834,7 +1910,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "aisstream",
       intervalMs: ARGUS_CONFIG.pollMs.aisstream,
       run: async () => {
@@ -1860,7 +1936,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "gdelt",
       intervalMs: ARGUS_CONFIG.pollMs.gdelt,
       run: async () => {
@@ -1895,7 +1971,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     });
 
     // --- New feed polling tasks ---
-    poller.add({
+    queuePollingTask({
       id: "acled",
       intervalMs: ARGUS_CONFIG.pollMs.acled,
       run: async () => {
@@ -1921,7 +1997,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "polymarket",
       intervalMs: ARGUS_CONFIG.pollMs.polymarket,
       run: async () => {
@@ -1938,7 +2014,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "gdacs",
       intervalMs: ARGUS_CONFIG.pollMs.gdacs,
       run: async () => {
@@ -1964,7 +2040,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "firms",
       intervalMs: ARGUS_CONFIG.pollMs.firms,
       run: async () => {
@@ -1984,7 +2060,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       },
     });
 
-    poller.add({
+    queuePollingTask({
       id: "faa",
       intervalMs: ARGUS_CONFIG.pollMs.faa,
       run: async () => {
@@ -2003,7 +2079,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     });
 
     // --- ThreatRadar polling task ---
-    poller.add({
+    queuePollingTask({
       id: "threatradar",
       intervalMs: ARGUS_CONFIG.pollMs.threatRadar,
       run: async () => {
@@ -2021,7 +2097,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     });
 
     // --- Breaking News polling task ---
-    poller.add({
+    queuePollingTask({
       id: "news",
       intervalMs: ARGUS_CONFIG.pollMs.news,
       run: async () => {
@@ -2040,7 +2116,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     });
 
     // CII computation task
-    poller.add({
+    queuePollingTask({
       id: "cii",
       intervalMs: 3 * 60_000,
       run: async () => {
