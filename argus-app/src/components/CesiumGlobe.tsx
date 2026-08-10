@@ -221,36 +221,67 @@ const getStartupProfile = (startupVariant: CesiumGlobeProps["startupVariant"] = 
   const nav = navigator as Navigator & {
     deviceMemory?: number;
   };
+  // Safari does not expose deviceMemory; defaulting to 8 made desktop Safari look
+  // "high-end" and still load full flight/sat entity budgets after terrain/buildings
+  // were already skipped — which is enough to OOM WebKit's GPU process.
   const deviceMemory = nav.deviceMemory ?? 8;
   const hardwareConcurrency = nav.hardwareConcurrency ?? 8;
   const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   const isSmallViewport = window.innerWidth < 900;
   const webkitConstrained = isWebKitConstrained();
-  const lowPerformance =
+  const lowPowerHints =
     deviceMemory <= 4 ||
     hardwareConcurrency <= 4 ||
     prefersReducedMotion ||
     isSmallViewport;
   const mobileLiteStartup = startupVariant === "mobile-lite";
+  // Treat all WebKit (macOS Safari + every iOS browser) as a constrained path:
+  // no terrain/buildings, capped entities, request-render mode, lower res.
+  const lowPerformance = lowPowerHints || mobileLiteStartup || webkitConstrained;
 
   return {
-    lowPerformance: lowPerformance || mobileLiteStartup,
-    requestRenderMode: lowPerformance || mobileLiteStartup || webkitConstrained,
-    aggressiveFeedBudget: mobileLiteStartup || (lowPerformance && isSmallViewport),
+    lowPerformance,
+    requestRenderMode: lowPerformance || webkitConstrained,
+    aggressiveFeedBudget: mobileLiteStartup || webkitConstrained || (lowPowerHints && isSmallViewport),
     suppressAmbientOverlays: mobileLiteStartup,
-    loadTerrain: !lowPerformance && !mobileLiteStartup && !webkitConstrained,
-    loadBuildings: !lowPerformance && !mobileLiteStartup && !webkitConstrained,
+    loadTerrain: !lowPerformance,
+    loadBuildings: !lowPerformance,
     resolutionScale: mobileLiteStartup
       ? Math.min(0.5, 1 / Math.max(window.devicePixelRatio * 1.5, 1))
-      : lowPerformance
-        ? Math.min(0.75, 1 / Math.max(window.devicePixelRatio, 1))
-        : webkitConstrained
-          ? Math.min(0.85, 1 / Math.max(window.devicePixelRatio, 1))
+      : webkitConstrained
+        ? Math.min(0.7, 1 / Math.max(window.devicePixelRatio, 1))
+        : lowPerformance
+          ? Math.min(0.75, 1 / Math.max(window.devicePixelRatio, 1))
           : 1,
-    targetFrameRate: mobileLiteStartup ? 18 : lowPerformance ? 24 : webkitConstrained ? 30 : 45,
-    maxFlights: mobileLiteStartup ? 150 : lowPerformance && isSmallViewport ? 600 : ARGUS_CONFIG.limits.maxFlights,
-    maxMilitaryFlights: mobileLiteStartup ? 32 : lowPerformance && isSmallViewport ? 120 : ARGUS_CONFIG.limits.maxMilitaryFlights,
-    maxSatellites: mobileLiteStartup ? 24 : lowPerformance && isSmallViewport ? 80 : ARGUS_CONFIG.limits.maxSatellites,
+    targetFrameRate: mobileLiteStartup ? 18 : webkitConstrained ? 24 : lowPerformance ? 24 : 45,
+    // Desktop Safari previously still pulled full 7k/2.5k/1.2k entity caps.
+    maxFlights: mobileLiteStartup
+      ? 150
+      : webkitConstrained
+        ? 800
+        : lowPowerHints && isSmallViewport
+          ? 600
+          : lowPerformance
+            ? 2000
+            : ARGUS_CONFIG.limits.maxFlights,
+    maxMilitaryFlights: mobileLiteStartup
+      ? 32
+      : webkitConstrained
+        ? 180
+        : lowPowerHints && isSmallViewport
+          ? 120
+          : lowPerformance
+            ? 400
+            : ARGUS_CONFIG.limits.maxMilitaryFlights,
+    maxSatellites: mobileLiteStartup
+      ? 24
+      : webkitConstrained
+        ? 100
+        : lowPowerHints && isSmallViewport
+          ? 80
+          : lowPerformance
+            ? 300
+            : ARGUS_CONFIG.limits.maxSatellites,
   };
 };
 
@@ -900,6 +931,7 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
   const [showFullIntel, setShowFullIntel] = useState(false);
   const [analyticsStatus, setAnalyticsStatus] = useState<string | null>(null);
   const [collisionEnabled, setCollisionEnabled] = useState(false);
+  const [webglContextLost, setWebglContextLost] = useState(false);
   const pushIncidents = useEpicFuryStore((s) => s.pushIncidents);
   const setEpicFuryActive = useEpicFuryStore((s) => s.setActive);
   const collisionEnabledRef = useRef(collisionEnabled);
@@ -1229,9 +1261,16 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
     }
 
     const startupProfile = getStartupProfile(startupVariant);
+    setWebglContextLost(false);
     (window as unknown as { CESIUM_BASE_URL?: string }).CESIUM_BASE_URL = "/cesium";
     if (process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN) {
       Ion.defaultAccessToken = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
+    }
+
+    // Satellite-to-ground link polylines are expensive on WebKit; default them off
+    // for constrained startups so the first paint stays light.
+    if (startupProfile.aggressiveFeedBudget || isWebKitConstrained()) {
+      useArgusStore.getState().setLayer("satelliteLinks", false);
     }
 
     const viewer = new Viewer(mountRef.current, {
@@ -1247,7 +1286,9 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
       timeline: false,
       scene3DOnly: true,
       requestRenderMode: startupProfile.requestRenderMode,
-      maximumRenderTimeChange: startupProfile.requestRenderMode ? Infinity : 0.5,
+      // Infinity can leave Safari with a black canvas if nothing dirty-checks the
+      // scene; a finite threshold still saves frames without stalling first paint.
+      maximumRenderTimeChange: startupProfile.requestRenderMode ? 1.0 : 0.5,
       shouldAnimate: true,
     });
     const restoreErrorPanelSuppression = suppressCesiumErrorPanels(viewer);
@@ -1260,18 +1301,23 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
 
     // Safari/WebKit evicts the WebGL context under GPU memory pressure instead
     // of degrading gracefully the way Chrome does. Cesium has no built-in
-    // recovery for a lost context, so at minimum surface it loudly instead of
-    // leaving a silently frozen/black globe.
+    // recovery for a lost context, so surface a visible recovery UI instead of
+    // leaving a silently frozen/black globe while feed polls keep running.
     const onWebglContextLost = (event: Event) => {
       event.preventDefault();
       console.error(
-        "[CesiumGlobe] WebGL context lost — the globe will stop rendering. This usually means the browser's GPU process ran out of memory (common on Safari/WebKit with terrain + 3D buildings loaded).",
+        "[CesiumGlobe] WebGL context lost — the globe will stop rendering. This usually means the browser's GPU process ran out of memory (common on Safari/WebKit with heavy entity load).",
       );
+      if (!disposed) {
+        setWebglContextLost(true);
+      }
     };
     viewer.scene.canvas.addEventListener("webglcontextlost", onWebglContextLost, false);
     cleanupFns.push(() => {
       viewer.scene.canvas.removeEventListener("webglcontextlost", onWebglContextLost, false);
     });
+    // Kick an initial render so requestRenderMode paths never sit on a blank frame.
+    viewer.scene.requestRender();
     const cameraController = viewer.scene.screenSpaceCameraController;
     cameraController.enableCollisionDetection = collisionEnabledRef.current;
     cameraController.inertiaSpin = 0.82;
@@ -1637,8 +1683,9 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
 
     const poller = new PollingManager();
     let bootDelayMs = 0;
+    const bootStepMs = startupProfile.aggressiveFeedBudget ? 550 : 250;
     const queuePollingTask = (task: Parameters<typeof poller.add>[0]) => {
-      bootDelayMs += 250;
+      bootDelayMs += bootStepMs;
       poller.add({
         ...task,
         startDelayMs: task.startDelayMs ?? bootDelayMs,
@@ -1751,7 +1798,10 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
           }
 
           const data = (await res.json()) as AdsbLolAllResponse;
-          const normalized = normalizeAdsbLolAircraft(data.aircraft ?? []);
+          const normalized = normalizeAdsbLolAircraft(data.aircraft ?? []).slice(
+            0,
+            startupProfile.maxFlights,
+          );
           adsbLolFlightsRef.current = normalized;
           setAdsbLolData(normalized);
           syncFlightLayer();
@@ -2872,6 +2922,29 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
           ) : null}
           {!isFlatMapMode(sceneMode) && visualMode === "crt" ? (
             <div className="argus-scanlines pointer-events-none absolute inset-0" />
+          ) : null}
+          {webglContextLost ? (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0b1118ee] px-5">
+              <div className="w-full max-w-md rounded-[24px] border border-[#5b4a1f] bg-[#11161df2] p-6 text-center shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
+                <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[#f0c674]">
+                  GPU Context Lost
+                </div>
+                <h2 className="font-mono text-[18px] uppercase tracking-[0.14em] text-[#fbf1c7]">
+                  Globe stopped rendering
+                </h2>
+                <p className="mt-3 text-[13px] leading-6 text-[#c8bea7]">
+                  The browser freed the WebGL context — common on Safari/WebKit when the scene is too heavy.
+                  Reload to restart on the lighter path.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="mt-6 w-full rounded-2xl border border-[#f0c674] bg-[#f0c674] px-4 py-3 font-mono text-[12px] uppercase tracking-[0.18em] text-[#11161d] transition hover:bg-[#f4d68a]"
+                >
+                  Reload Globe
+                </button>
+              </div>
+            </div>
           ) : null}
         </div>
       </div>
