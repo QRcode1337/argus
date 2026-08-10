@@ -109,6 +109,7 @@ import { clusterNews } from "@/lib/analysis/newsClustering";
 
 type CesiumGlobeProps = {
   className?: string;
+  startupVariant?: "default" | "mobile-lite";
 };
 
 type AnalyticsLayer = {
@@ -150,11 +151,17 @@ type ImageryLayerWithProvider = {
 };
 
 type StartupProfile = {
+  aggressiveFeedBudget: boolean;
   lowPerformance: boolean;
+  requestRenderMode: boolean;
+  suppressAmbientOverlays: boolean;
   loadTerrain: boolean;
   loadBuildings: boolean;
   resolutionScale: number;
   targetFrameRate: number;
+  maxFlights: number;
+  maxMilitaryFlights: number;
+  maxSatellites: number;
 };
 
 /** Zoom-box hotspot regions rendered as rectangles on the globe */
@@ -173,14 +180,41 @@ const ZOOM_REGIONS = [
   { id: "zr-horn-africa", label: "HORN / RED SEA", west: 36, south: 2, east: 55, north: 18, color: "#fe8019", height: 800_000 },
 ] as const;
 
-const getStartupProfile = (): StartupProfile => {
+/**
+ * Detects the WebKit engine (Safari on macOS, and every browser on iOS/iPadOS,
+ * since Apple forces all iOS browsers onto WebKit). WebKit's WebGL/GPU memory
+ * ceiling is much stricter than Chromium's, and it doesn't degrade gracefully
+ * under memory pressure the way Chrome does — it just kills the tab. Cesium's
+ * world terrain + OSM 3D buildings tileset are the biggest GPU-memory cost in
+ * this scene, so WebKit gets them disabled regardless of viewport size.
+ */
+const isWebKitConstrained = (): boolean => {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+  const ua = navigator.userAgent;
+  const isIOSDevice =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === "MacIntel" && (navigator.maxTouchPoints ?? 0) > 1);
+  const isDesktopSafari =
+    /AppleWebKit/.test(ua) && /Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|EdgiOS|OPiOS|Edg\//.test(ua);
+  return isIOSDevice || isDesktopSafari;
+};
+
+const getStartupProfile = (startupVariant: CesiumGlobeProps["startupVariant"] = "default"): StartupProfile => {
   if (typeof window === "undefined") {
     return {
       lowPerformance: false,
+      aggressiveFeedBudget: false,
+      requestRenderMode: false,
+      suppressAmbientOverlays: false,
       loadTerrain: true,
       loadBuildings: true,
       resolutionScale: 1,
       targetFrameRate: 45,
+      maxFlights: ARGUS_CONFIG.limits.maxFlights,
+      maxMilitaryFlights: ARGUS_CONFIG.limits.maxMilitaryFlights,
+      maxSatellites: ARGUS_CONFIG.limits.maxSatellites,
     };
   }
 
@@ -191,18 +225,32 @@ const getStartupProfile = (): StartupProfile => {
   const hardwareConcurrency = nav.hardwareConcurrency ?? 8;
   const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   const isSmallViewport = window.innerWidth < 900;
+  const webkitConstrained = isWebKitConstrained();
   const lowPerformance =
     deviceMemory <= 4 ||
     hardwareConcurrency <= 4 ||
     prefersReducedMotion ||
     isSmallViewport;
+  const mobileLiteStartup = startupVariant === "mobile-lite";
 
   return {
-    lowPerformance,
-    loadTerrain: !lowPerformance,
-    loadBuildings: !lowPerformance,
-    resolutionScale: lowPerformance ? Math.min(1, 1.25 / window.devicePixelRatio) : 1,
-    targetFrameRate: lowPerformance ? 30 : 45,
+    lowPerformance: lowPerformance || mobileLiteStartup,
+    requestRenderMode: lowPerformance || mobileLiteStartup || webkitConstrained,
+    aggressiveFeedBudget: mobileLiteStartup || (lowPerformance && isSmallViewport),
+    suppressAmbientOverlays: mobileLiteStartup,
+    loadTerrain: !lowPerformance && !mobileLiteStartup && !webkitConstrained,
+    loadBuildings: !lowPerformance && !mobileLiteStartup && !webkitConstrained,
+    resolutionScale: mobileLiteStartup
+      ? Math.min(0.5, 1 / Math.max(window.devicePixelRatio * 1.5, 1))
+      : lowPerformance
+        ? Math.min(0.75, 1 / Math.max(window.devicePixelRatio, 1))
+        : webkitConstrained
+          ? Math.min(0.85, 1 / Math.max(window.devicePixelRatio, 1))
+          : 1,
+    targetFrameRate: mobileLiteStartup ? 18 : lowPerformance ? 24 : webkitConstrained ? 30 : 45,
+    maxFlights: mobileLiteStartup ? 150 : lowPerformance && isSmallViewport ? 600 : ARGUS_CONFIG.limits.maxFlights,
+    maxMilitaryFlights: mobileLiteStartup ? 32 : lowPerformance && isSmallViewport ? 120 : ARGUS_CONFIG.limits.maxMilitaryFlights,
+    maxSatellites: mobileLiteStartup ? 24 : lowPerformance && isSmallViewport ? 80 : ARGUS_CONFIG.limits.maxSatellites,
   };
 };
 
@@ -803,7 +851,7 @@ const buildUnifiedAirPicture = (
   };
 };
 
-export function CesiumGlobe({ className }: CesiumGlobeProps) {
+export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlobeProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Viewer | null>(null);
 
@@ -883,7 +931,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
   const anomalyAtlasLoadedRef = useRef(false);
   useEffect(() => {
     const viewer = viewerRef.current;
-    if (!viewer || anomalyAtlasLoadedRef.current) return;
+    if (!viewer || anomalyAtlasLoadedRef.current || startupVariant === "mobile-lite") return;
     anomalyAtlasLoadedRef.current = true;
 
     for (const site of ANOMALY_SITES) {
@@ -919,7 +967,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
         },
       });
     }
-  }, []);
+  }, [startupVariant]);
 
   const analyticsLayers = useArgusStore(useShallow((s) => s.analyticsLayers));
   const visualMode = useArgusStore((s) => s.visualMode);
@@ -1180,7 +1228,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       return;
     }
 
-    const startupProfile = getStartupProfile();
+    const startupProfile = getStartupProfile(startupVariant);
     (window as unknown as { CESIUM_BASE_URL?: string }).CESIUM_BASE_URL = "/cesium";
     if (process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN) {
       Ion.defaultAccessToken = process.env.NEXT_PUBLIC_CESIUM_ION_TOKEN;
@@ -1198,8 +1246,8 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       selectionIndicator: false,
       timeline: false,
       scene3DOnly: true,
-      requestRenderMode: startupProfile.lowPerformance,
-      maximumRenderTimeChange: startupProfile.lowPerformance ? Infinity : 0.5,
+      requestRenderMode: startupProfile.requestRenderMode,
+      maximumRenderTimeChange: startupProfile.requestRenderMode ? Infinity : 0.5,
       shouldAnimate: true,
     });
     const restoreErrorPanelSuppression = suppressCesiumErrorPanels(viewer);
@@ -1208,6 +1256,21 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     cleanupFns.push(restoreErrorPanelSuppression);
     cleanupFns.push(() => {
       disposed = true;
+    });
+
+    // Safari/WebKit evicts the WebGL context under GPU memory pressure instead
+    // of degrading gracefully the way Chrome does. Cesium has no built-in
+    // recovery for a lost context, so at minimum surface it loudly instead of
+    // leaving a silently frozen/black globe.
+    const onWebglContextLost = (event: Event) => {
+      event.preventDefault();
+      console.error(
+        "[CesiumGlobe] WebGL context lost — the globe will stop rendering. This usually means the browser's GPU process ran out of memory (common on Safari/WebKit with terrain + 3D buildings loaded).",
+      );
+    };
+    viewer.scene.canvas.addEventListener("webglcontextlost", onWebglContextLost, false);
+    cleanupFns.push(() => {
+      viewer.scene.canvas.removeEventListener("webglcontextlost", onWebglContextLost, false);
     });
     const cameraController = viewer.scene.screenSpaceCameraController;
     cameraController.enableCollisionDetection = collisionEnabledRef.current;
@@ -1219,7 +1282,11 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
 
     viewer.targetFrameRate = startupProfile.targetFrameRate;
     viewer.resolutionScale = startupProfile.resolutionScale;
-    viewer.scene.requestRenderMode = startupProfile.lowPerformance;
+    viewer.scene.requestRenderMode = startupProfile.requestRenderMode;
+    viewer.scene.fog.enabled = !startupProfile.suppressAmbientOverlays;
+    if (viewer.scene.skyAtmosphere) {
+      viewer.scene.skyAtmosphere.show = !startupProfile.suppressAmbientOverlays;
+    }
     viewer.scene.globe.enableLighting = !startupProfile.lowPerformance;
     viewer.scene.globe.baseColor = Color.fromCssColorString("#0b1118");
     viewer.scene.globe.depthTestAgainstTerrain = !startupProfile.lowPerformance;
@@ -1297,7 +1364,9 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     
     const vesselLayer = new VesselLayer(viewer);
     const weatherLayer = new WeatherLayer(viewer);
-    void weatherLayer.init();
+    if (!startupProfile.suppressAmbientOverlays) {
+      void weatherLayer.init();
+    }
 
     cleanupFns.push(() => {
         unsubscribeAnomalies();
@@ -1327,55 +1396,59 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     ciiLayerRef.current = ciiLayer;
 
     // Load static bases layer immediately
-    const basesCount = basesLayer.load();
-    gnssInterferenceLayer.load();
+    const basesCount = startupProfile.suppressAmbientOverlays ? 0 : basesLayer.load();
+    if (!startupProfile.suppressAmbientOverlays) {
+      gnssInterferenceLayer.load();
+    }
     setCount("bases", basesCount);
     visualModeRef.current = visualController;
     pickerRef.current = picker;
     viewerRef.current = viewer;
 
     // --- Zoom-box hotspot regions ---
-    for (const zr of ZOOM_REGIONS) {
-      const baseColor = Color.fromCssColorString(zr.color);
-      viewer.entities.add({
-        id: zr.id,
-        name: zr.label,
-        rectangle: {
-          coordinates: Rectangle.fromDegrees(zr.west, zr.south, zr.east, zr.north),
-          material: new ColorMaterialProperty(baseColor.withAlpha(0.08)),
-          outline: true,
-          outlineColor: new ConstantProperty(baseColor.withAlpha(0.45)),
-          outlineWidth: new ConstantProperty(1),
-          height: 0,
-        },
-        label: {
-          text: zr.label,
-          font: "11px monospace",
-          style: LabelStyle.FILL_AND_OUTLINE,
-          outlineWidth: 3,
-          outlineColor: Color.fromCssColorString("#0b1118"),
-          fillColor: baseColor.withAlpha(0.85),
-          horizontalOrigin: HorizontalOrigin.CENTER,
-          verticalOrigin: VerticalOrigin.CENTER,
-          scaleByDistance: new NearFarScalar(1_500_000, 1.2, 20_000_000, 0.4),
-          translucencyByDistance: new NearFarScalar(500_000, 0, 2_000_000, 1),
-          pixelOffset: new Cartesian2(0, 0),
-          showBackground: true,
-          backgroundColor: Color.fromCssColorString("#0b1118").withAlpha(0.55),
-          backgroundPadding: new Cartesian2(6, 3),
-        },
-        position: Cartesian3.fromDegrees(
-          (zr.west + zr.east) / 2,
-          (zr.south + zr.north) / 2,
-          0,
-        ),
-        properties: {
-          zoomRegion: true,
-          zoomHeight: zr.height,
-          centerLon: (zr.west + zr.east) / 2,
-          centerLat: (zr.south + zr.north) / 2,
-        } as unknown as Record<string, unknown>,
-      });
+    if (!startupProfile.suppressAmbientOverlays) {
+      for (const zr of ZOOM_REGIONS) {
+        const baseColor = Color.fromCssColorString(zr.color);
+        viewer.entities.add({
+          id: zr.id,
+          name: zr.label,
+          rectangle: {
+            coordinates: Rectangle.fromDegrees(zr.west, zr.south, zr.east, zr.north),
+            material: new ColorMaterialProperty(baseColor.withAlpha(0.08)),
+            outline: true,
+            outlineColor: new ConstantProperty(baseColor.withAlpha(0.45)),
+            outlineWidth: new ConstantProperty(1),
+            height: 0,
+          },
+          label: {
+            text: zr.label,
+            font: "11px monospace",
+            style: LabelStyle.FILL_AND_OUTLINE,
+            outlineWidth: 3,
+            outlineColor: Color.fromCssColorString("#0b1118"),
+            fillColor: baseColor.withAlpha(0.85),
+            horizontalOrigin: HorizontalOrigin.CENTER,
+            verticalOrigin: VerticalOrigin.CENTER,
+            scaleByDistance: new NearFarScalar(1_500_000, 1.2, 20_000_000, 0.4),
+            translucencyByDistance: new NearFarScalar(500_000, 0, 2_000_000, 1),
+            pixelOffset: new Cartesian2(0, 0),
+            showBackground: true,
+            backgroundColor: Color.fromCssColorString("#0b1118").withAlpha(0.55),
+            backgroundPadding: new Cartesian2(6, 3),
+          },
+          position: Cartesian3.fromDegrees(
+            (zr.west + zr.east) / 2,
+            (zr.south + zr.north) / 2,
+            0,
+          ),
+          properties: {
+            zoomRegion: true,
+            zoomHeight: zr.height,
+            centerLon: (zr.west + zr.east) / 2,
+            centerLat: (zr.south + zr.north) / 2,
+          } as unknown as Record<string, unknown>,
+        });
+      }
     }
 
     picker.setInputAction((event: { position: Cartesian2 }) => {
@@ -1592,7 +1665,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
     );
 
     // Request notification permission
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+    if (!startupProfile.suppressAmbientOverlays && typeof Notification !== "undefined" && Notification.permission === "default") {
       Notification.requestPermission().catch(() => {});
     }
 
@@ -1601,9 +1674,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       intervalMs: ARGUS_CONFIG.pollMs.openSky,
       run: async () => {
         if (platformModeRef.current !== "live") return;
+        if (!useArgusStore.getState().layers.flights) return;
         try {
           const flights = await fetchOpenSkyFlights(ARGUS_CONFIG.endpoints.openSky);
-          const bounded = flights.slice(0, ARGUS_CONFIG.limits.maxFlights);
+          const bounded = flights.slice(0, startupProfile.maxFlights);
           openSkyFlightsRef.current = bounded;
           syncFlightLayer();
           setFeedHealthy("opensky");
@@ -1700,9 +1774,10 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       intervalMs: ARGUS_CONFIG.pollMs.adsbMilitary,
       run: async () => {
         if (platformModeRef.current !== "live") return;
+        if (!useArgusStore.getState().layers.military) return;
         try {
           const flights = await fetchMilitaryFlights(ARGUS_CONFIG.endpoints.adsbMilitary);
-          const bounded = flights.slice(0, ARGUS_CONFIG.limits.maxMilitaryFlights);
+          const bounded = flights.slice(0, startupProfile.maxMilitaryFlights);
           const count = militaryLayer.upsertFlights(bounded);
           setCount("military", count);
           setFeedHealthy("adsb");
@@ -1733,11 +1808,12 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       intervalMs: ARGUS_CONFIG.pollMs.satellites,
       run: async () => {
         if (platformModeRef.current !== "live") return;
+        if (!useArgusStore.getState().layers.satellites) return;
         try {
           const now = Date.now();
           if (now - lastTleFetchAt > 60_000 || useArgusStore.getState().counts.satellites === 0) {
             const records = await fetchTleRecords(ARGUS_CONFIG.endpoints.celestrak);
-            const bounded = records.slice(0, ARGUS_CONFIG.limits.maxSatellites);
+            const bounded = records.slice(0, startupProfile.maxSatellites);
             satLayer.setRecords(bounded);
             satRecordsRef.current = bounded;
             lastTleFetchAt = now;
@@ -1771,6 +1847,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       intervalMs: ARGUS_CONFIG.pollMs.usgs,
       run: async () => {
         if (platformModeRef.current !== "live") return;
+        if (!useArgusStore.getState().layers.seismic) return;
         try {
           const quakes = await fetchUsgsQuakes(ARGUS_CONFIG.endpoints.usgs);
           const count = seismicLayer.upsertEarthquakes(quakes);
@@ -1842,6 +1919,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "cloudflare-radar",
       intervalMs: ARGUS_CONFIG.pollMs.cloudflareRadar,
       run: async () => {
+        if (!useArgusStore.getState().layers.outages) return;
         try {
           const outages = await fetchInternetOutages(ARGUS_CONFIG.endpoints.cloudflareRadar);
           const count = outageLayer.update(outages);
@@ -1869,6 +1947,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "otx",
       intervalMs: ARGUS_CONFIG.pollMs.otx,
       run: async () => {
+        if (!useArgusStore.getState().layers.threats) return;
         try {
           const threats = await fetchThreatPulses(ARGUS_CONFIG.endpoints.otx);
           const count = threatLayer.update(threats);
@@ -1914,6 +1993,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "aisstream",
       intervalMs: ARGUS_CONFIG.pollMs.aisstream,
       run: async () => {
+        if (!useArgusStore.getState().layers.vessels) return;
         try {
           const vessels = await fetchAisVessels(ARGUS_CONFIG.endpoints.aisstream);
           const count = vesselLayer.upsertVessels(vessels);
@@ -1940,6 +2020,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "gdelt",
       intervalMs: ARGUS_CONFIG.pollMs.gdelt,
       run: async () => {
+        if (!useArgusStore.getState().layers.gdelt) return;
         try {
           const events = await fetchGdeltEvents(ARGUS_CONFIG.endpoints.gdelt);
           const count = gdeltLayer.update(events);
@@ -1975,6 +2056,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "acled",
       intervalMs: ARGUS_CONFIG.pollMs.acled,
       run: async () => {
+        if (startupProfile.aggressiveFeedBudget) return;
         try {
           const res = await fetch(ARGUS_CONFIG.endpoints.acled, { signal: AbortSignal.timeout(15_000) });
           if (!res.ok) throw new Error(`ACLED ${res.status}`);
@@ -2001,6 +2083,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "polymarket",
       intervalMs: ARGUS_CONFIG.pollMs.polymarket,
       run: async () => {
+        if (startupProfile.aggressiveFeedBudget) return;
         try {
           const res = await fetch(ARGUS_CONFIG.endpoints.polymarket, { signal: AbortSignal.timeout(15_000) });
           if (!res.ok) throw new Error(`Polymarket ${res.status}`);
@@ -2018,6 +2101,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "gdacs",
       intervalMs: ARGUS_CONFIG.pollMs.gdacs,
       run: async () => {
+        if (startupProfile.aggressiveFeedBudget) return;
         try {
           const res = await fetch(ARGUS_CONFIG.endpoints.gdacs, { signal: AbortSignal.timeout(15_000) });
           if (!res.ok) throw new Error(`GDACS ${res.status}`);
@@ -2044,6 +2128,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "firms",
       intervalMs: ARGUS_CONFIG.pollMs.firms,
       run: async () => {
+        if (!useArgusStore.getState().layers.firms) return;
         try {
           const anomalies = await fetchFirmsAnomalies(ARGUS_CONFIG.endpoints.firms);
           const layer = firmsLayerRef.current;
@@ -2064,6 +2149,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "faa",
       intervalMs: ARGUS_CONFIG.pollMs.faa,
       run: async () => {
+        if (startupProfile.aggressiveFeedBudget) return;
         try {
           const res = await fetch(ARGUS_CONFIG.endpoints.faa, { signal: AbortSignal.timeout(15_000) });
           if (!res.ok) throw new Error(`FAA ${res.status}`);
@@ -2083,6 +2169,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "threatradar",
       intervalMs: ARGUS_CONFIG.pollMs.threatRadar,
       run: async () => {
+        if (startupProfile.aggressiveFeedBudget) return;
         try {
           const res = await fetch(ARGUS_CONFIG.endpoints.threatRadar, { signal: AbortSignal.timeout(15_000) });
           if (!res.ok) throw new Error(`ThreatRadar ${res.status}`);
@@ -2101,6 +2188,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       id: "news",
       intervalMs: ARGUS_CONFIG.pollMs.news,
       run: async () => {
+        if (startupProfile.aggressiveFeedBudget) return;
         try {
           const res = await fetch(ARGUS_CONFIG.endpoints.news, { signal: AbortSignal.timeout(15_000) });
           if (!res.ok) throw new Error(`News ${res.status}`);
@@ -2121,6 +2209,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       intervalMs: 3 * 60_000,
       run: async () => {
         if (platformModeRef.current !== "live") return;
+        if (startupProfile.aggressiveFeedBudget) return;
         const s = useArgusStore.getState();
         const ciiScores = computeCii({
           gdeltEvents: ciiGdeltRef.current,
@@ -2182,7 +2271,7 @@ export function CesiumGlobe({ className }: CesiumGlobeProps) {
       visualModeRef.current = null;
       pickerRef.current = null;
     };
-  }, [pushIncidents, setAdsbLolData, setCamera, setClickedCoordinates, setCount, setFeedError, setFeedHealthy, syncFlightLayer]);
+  }, [pushIncidents, setAdsbLolData, setCamera, setClickedCoordinates, setCount, setFeedError, setFeedHealthy, startupVariant, syncFlightLayer]);
 
   // DVR playback data loop
   const playbackModeState = useArgusStore((s) => s.platformMode);

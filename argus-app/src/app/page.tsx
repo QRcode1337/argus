@@ -1,7 +1,7 @@
-import { CesiumGlobe } from "@/components/CesiumGlobe";
+import { ArgusHome } from "@/components/ArgusHome";
 
 export const dynamic = "force-dynamic";
 
 export default function Home() {
-  return <CesiumGlobe />;
+  return <ArgusHome />;
 }
