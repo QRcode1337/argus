@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/react";
 
 import "./globals.css";
 
@@ -30,7 +29,6 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${jetbrainsMono.variable} antialiased`}>
         {children}
-        <Analytics />
       </body>
     </html>
   );
