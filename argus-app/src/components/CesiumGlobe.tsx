@@ -236,14 +236,23 @@ const getStartupProfile = (startupVariant: CesiumGlobeProps["startupVariant"] = 
     isSmallViewport;
   const mobileLiteStartup = startupVariant === "mobile-lite";
   // Treat all WebKit (macOS Safari + every iOS browser) as a constrained path:
-  // no terrain/buildings, capped entities, request-render mode, lower res.
+  // no terrain/buildings, capped entities, lower res.
+  // NOTE: do NOT force requestRenderMode on desktop Safari — with Cesium it often
+  // paints one frame then goes permanently black while JS/feeds keep running
+  // (globe "loads for a second then disappears"). Continuous render at a capped
+  // frame rate is more reliable; keep requestRenderMode for true mobile/low-end only.
+  //
+  // ALSO: Safari 27 / WebKit Metal fails to compile Cesium's skyAtmosphere
+  // atmosphere-scattering shader (ANGLE_Out / MSL link error on
+  // _ucomputeAtmosphereScattering). That hard-kills WebGL after first paint.
+  // Disable atmosphere overlays on all WebKit.
   const lowPerformance = lowPowerHints || mobileLiteStartup || webkitConstrained;
 
   return {
     lowPerformance,
-    requestRenderMode: lowPerformance || webkitConstrained,
+    requestRenderMode: mobileLiteStartup || (lowPowerHints && isSmallViewport),
     aggressiveFeedBudget: mobileLiteStartup || webkitConstrained || (lowPowerHints && isSmallViewport),
-    suppressAmbientOverlays: mobileLiteStartup,
+    suppressAmbientOverlays: mobileLiteStartup || webkitConstrained,
     loadTerrain: !lowPerformance,
     loadBuildings: !lowPerformance,
     resolutionScale: mobileLiteStartup
@@ -554,6 +563,44 @@ const buildAnalysisSummary = (kind: string, props: Record<string, unknown>, name
 };
 
 const isFlatMapMode = (sceneMode: SceneMode): boolean => sceneMode === "flat_map";
+
+/** Base imagery for globe scene modes. Kept as a helper so init + mode toggles share one path. */
+const applyGlobeBaseImagery = (viewer: Viewer, sceneMode: SceneMode): void => {
+  if (isFlatMapMode(sceneMode)) {
+    return;
+  }
+
+  const layers = viewer.imageryLayers;
+  const baseLayer = layers.length > 0 ? layers.get(0) : null;
+  if (baseLayer) {
+    layers.remove(baseLayer, true);
+  }
+
+  const satelliteProvider = new UrlTemplateImageryProvider({
+    url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  });
+  const streetProvider = new UrlTemplateImageryProvider({
+    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  });
+  const darkProvider = new UrlTemplateImageryProvider({
+    url: "https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+  });
+
+  const provider =
+    sceneMode === "globe_street"
+      ? streetProvider
+      : sceneMode === "globe_map"
+        ? darkProvider
+        : satelliteProvider;
+
+  layers.addImageryProvider(provider, 0);
+  viewer.scene.globe.baseColor =
+    sceneMode === "globe_map"
+      ? Color.fromCssColorString("#0b1118")
+      : Color.fromCssColorString("#13212b");
+  // Critical under requestRenderMode / WebKit: layer swaps do not always dirty the scene.
+  viewer.scene.requestRender();
+};
 
 const PRIORITY_THRESHOLDS = {
   earthquakeMagnitude: 4.5,
@@ -932,6 +979,7 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
   const [analyticsStatus, setAnalyticsStatus] = useState<string | null>(null);
   const [collisionEnabled, setCollisionEnabled] = useState(false);
   const [webglContextLost, setWebglContextLost] = useState(false);
+  const appliedSceneModeRef = useRef<SceneMode | null>(null);
   const pushIncidents = useEpicFuryStore((s) => s.pushIncidents);
   const setEpicFuryActive = useEpicFuryStore((s) => s.setActive);
   const collisionEnabledRef = useRef(collisionEnabled);
@@ -1273,6 +1321,7 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
       useArgusStore.getState().setLayer("satelliteLinks", false);
     }
 
+    const initialSceneMode = useArgusStore.getState().sceneMode;
     const viewer = new Viewer(mountRef.current, {
       animation: false,
       baseLayerPicker: false,
@@ -1285,12 +1334,15 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
       selectionIndicator: false,
       timeline: false,
       scene3DOnly: true,
+      // Avoid Cesium Ion default basemap flash → tear-down. Apply ARGUS imagery
+      // immediately so the first painted frame is the real globe.
+      baseLayer: false,
       requestRenderMode: startupProfile.requestRenderMode,
-      // Infinity can leave Safari with a black canvas if nothing dirty-checks the
-      // scene; a finite threshold still saves frames without stalling first paint.
-      maximumRenderTimeChange: startupProfile.requestRenderMode ? 1.0 : 0.5,
+      maximumRenderTimeChange: 0.5,
       shouldAnimate: true,
     });
+    applyGlobeBaseImagery(viewer, initialSceneMode);
+    appliedSceneModeRef.current = initialSceneMode;
     const restoreErrorPanelSuppression = suppressCesiumErrorPanels(viewer);
     const cleanupFns = [] as Array<() => void>;
     let disposed = false;
@@ -1329,9 +1381,23 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
     viewer.targetFrameRate = startupProfile.targetFrameRate;
     viewer.resolutionScale = startupProfile.resolutionScale;
     viewer.scene.requestRenderMode = startupProfile.requestRenderMode;
-    viewer.scene.fog.enabled = !startupProfile.suppressAmbientOverlays;
-    if (viewer.scene.skyAtmosphere) {
-      viewer.scene.skyAtmosphere.show = !startupProfile.suppressAmbientOverlays;
+    if (startupProfile.suppressAmbientOverlays) {
+      // Destroy atmosphere objects entirely. Merely setting .show=false can still
+      // trigger shader compilation on Safari WebGL-via-Metal, which fails with:
+      //   MSL: ANGLE_Out / _ucomputeAtmosphereScattering link error
+      // and leaves a blank globe after the first frame.
+      viewer.scene.skyAtmosphere = undefined;
+      viewer.scene.skyBox = undefined;
+      viewer.scene.sun = undefined;
+      viewer.scene.moon = undefined;
+      viewer.scene.fog.enabled = false;
+      viewer.scene.globe.showGroundAtmosphere = false;
+    } else {
+      viewer.scene.fog.enabled = true;
+      if (viewer.scene.skyAtmosphere) {
+        viewer.scene.skyAtmosphere.show = true;
+      }
+      viewer.scene.globe.showGroundAtmosphere = true;
     }
     viewer.scene.globe.enableLighting = !startupProfile.lowPerformance;
     viewer.scene.globe.baseColor = Color.fromCssColorString("#0b1118");
@@ -2800,40 +2866,18 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
     // Keep Cesium in 3D for live ingest + smooth return to globe mode.
     viewer.scene.mode = CesiumSceneMode.SCENE3D;
     if (isFlatMapMode(sceneMode)) {
+      appliedSceneModeRef.current = sceneMode;
       return;
     }
 
-    const layers = viewer.imageryLayers;
-    const baseLayer = layers.length > 0 ? layers.get(0) : null;
-    if (baseLayer) {
-      layers.remove(baseLayer, true);
+    // Init already applied the starting basemap. Skip the first redundant
+    // strip/replace that caused: Earth for ~1s → black globe (especially Safari).
+    if (appliedSceneModeRef.current === sceneMode) {
+      return;
     }
 
-    const satelliteProvider = new UrlTemplateImageryProvider({
-      url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      
-    });
-    const streetProvider = new UrlTemplateImageryProvider({
-      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      
-    });
-    const darkProvider = new UrlTemplateImageryProvider({
-      url: "https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-      
-    });
-
-    const provider =
-      sceneMode === "globe_street"
-        ? streetProvider
-        : sceneMode === "globe_map"
-          ? darkProvider
-          : satelliteProvider;
-
-    layers.addImageryProvider(provider, 0);
-    viewer.scene.globe.baseColor =
-      sceneMode === "globe_map"
-        ? Color.fromCssColorString("#0b1118")
-        : Color.fromCssColorString("#13212b");
+    applyGlobeBaseImagery(viewer, sceneMode);
+    appliedSceneModeRef.current = sceneMode;
   }, [sceneMode]);
 
   // Day/Night terminator toggle
