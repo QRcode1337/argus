@@ -8,6 +8,7 @@ const Sentry = require("@sentry/node");
 const analyticsRoutes = require("./routes/analytics");
 const athenaRoutes = require("./routes/athena");
 const feedsRoutes = require("./routes/feeds");
+const iotRoutes = require("./routes/iot");
 const recordRoutes = require("./routes/record");
 const playbackRoutes = require("./routes/playback");
 
@@ -43,7 +44,9 @@ function createServer(options = {}) {
 
   app.set("io", io);
   app.disable("x-powered-by");
-  app.use(express.json());
+  // Flight batches carry up to ARGUS_CONFIG.limits.maxFlights (7000) records —
+  // ~2MB of JSON. The 100kb express default silently 413d every one of them.
+  app.use(express.json({ limit: "16mb" }));
   app.use(
     cors({
       origin: corsOrigins.length > 0 ? corsOrigins : true,
@@ -57,6 +60,7 @@ function createServer(options = {}) {
   app.use("/api/analytics", analyticsRoutes);
   app.use("/api/athena", athenaRoutes);
   app.use("/api/feeds", feedsRoutes);
+  app.use("/api/iot", iotRoutes);
   app.use("/api/record", recordRoutes);
   app.use("/api/playback", playbackRoutes);
 

@@ -45,6 +45,31 @@ function geomExpr(lon, lat, idx) {
   return { expr: "NULL", values: [], consumed: 0 };
 }
 
+/**
+ * Postgres caps a single extended-query statement at 65535 bind parameters.
+ * A full 7000-flight batch needs ~98k, which failed the whole insert with a
+ * 500. Split rows into chunks that stay under the cap and sum the row counts.
+ *
+ * `mapRow` is the same callback buildBatch takes; `makeSql` receives the
+ * VALUES tuples for one chunk and returns the statement to run.
+ */
+const PG_MAX_BIND_PARAMS = 65535;
+
+async function insertChunked(rows, mapRow, makeSql) {
+  // Probe row 0 to learn the per-row parameter cost. Add the 2 slots a
+  // geometry point consumes so a probe row lacking lon/lat can't undercount.
+  const perRow = mapRow(rows[0], 1).values.length + 2;
+  const chunkSize = Math.max(1, Math.floor(PG_MAX_BIND_PARAMS / perRow));
+
+  let recorded = 0;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const { tuples, values } = buildBatch(rows.slice(i, i + chunkSize), mapRow);
+    const result = await pool.query(makeSql(tuples), values);
+    recorded += result.rowCount;
+  }
+  return recorded;
+}
+
 // ---------------------------------------------------------------------------
 // POST /flights  ->  recorded_flights
 // ---------------------------------------------------------------------------
@@ -55,7 +80,7 @@ router.post("/flights", async (req, res, next) => {
       return res.status(400).json({ error: "flights array required" });
     }
 
-    const { tuples, values } = buildBatch(rows, (r, idx) => {
+    const recorded = await insertChunked(rows, (r, idx) => {
       const ts = new Date().toISOString();
       const vals = [
         ts,
@@ -75,17 +100,14 @@ router.post("/flights", async (req, res, next) => {
       const g = geomExpr(r.longitude, r.latitude, idx + vals.length);
       ph.push(g.expr);
       return { placeholders: ph, values: [...vals, ...g.values] };
-    });
-
-    const sql = `
+    }, (tuples) => `
       INSERT INTO recorded_flights
         (ts, icao24, callsign, lon, lat, alt_m, velocity, heading,
          vertical_rate, on_ground, origin_country, squawk, geom)
       VALUES ${tuples}
-      ON CONFLICT DO NOTHING`;
+      ON CONFLICT DO NOTHING`);
 
-    const result = await pool.query(sql, values);
-    res.json({ recorded: result.rowCount });
+    res.json({ recorded });
   } catch (err) {
     next(err);
   }
@@ -101,7 +123,7 @@ router.post("/military", async (req, res, next) => {
       return res.status(400).json({ error: "flights array required" });
     }
 
-    const { tuples, values } = buildBatch(rows, (r, idx) => {
+    const recorded = await insertChunked(rows, (r, idx) => {
       const ts = new Date().toISOString();
       const vals = [
         ts,
@@ -118,17 +140,14 @@ router.post("/military", async (req, res, next) => {
       const g = geomExpr(r.longitude, r.latitude, idx + vals.length);
       ph.push(g.expr);
       return { placeholders: ph, values: [...vals, ...g.values] };
-    });
-
-    const sql = `
+    }, (tuples) => `
       INSERT INTO recorded_military
         (ts, icao24, callsign, lon, lat, alt_m, velocity, heading,
          aircraft_type, geom)
       VALUES ${tuples}
-      ON CONFLICT DO NOTHING`;
+      ON CONFLICT DO NOTHING`);
 
-    const result = await pool.query(sql, values);
-    res.json({ recorded: result.rowCount });
+    res.json({ recorded });
   } catch (err) {
     next(err);
   }
@@ -144,7 +163,7 @@ router.post("/satellites", async (req, res, next) => {
       return res.status(400).json({ error: "satellites array required" });
     }
 
-    const { tuples, values } = buildBatch(rows, (r, idx) => {
+    const recorded = await insertChunked(rows, (r, idx) => {
       const ts = new Date().toISOString();
       const vals = [
         ts,
@@ -160,16 +179,13 @@ router.post("/satellites", async (req, res, next) => {
       const g = geomExpr(r.longitude, r.latitude, idx + vals.length);
       ph.push(g.expr);
       return { placeholders: ph, values: [...vals, ...g.values] };
-    });
-
-    const sql = `
+    }, (tuples) => `
       INSERT INTO recorded_satellites
         (ts, norad_id, name, lon, lat, alt_km, tle_line1, tle_line2, geom)
       VALUES ${tuples}
-      ON CONFLICT DO NOTHING`;
+      ON CONFLICT DO NOTHING`);
 
-    const result = await pool.query(sql, values);
-    res.json({ recorded: result.rowCount });
+    res.json({ recorded });
   } catch (err) {
     next(err);
   }
@@ -185,7 +201,7 @@ router.post("/quakes", async (req, res, next) => {
       return res.status(400).json({ error: "quakes array required" });
     }
 
-    const { tuples, values } = buildBatch(rows, (r, idx) => {
+    const recorded = await insertChunked(rows, (r, idx) => {
       const ts = new Date().toISOString();
       const vals = [
         ts,
@@ -200,16 +216,13 @@ router.post("/quakes", async (req, res, next) => {
       const g = geomExpr(r.longitude, r.latitude, idx + vals.length);
       ph.push(g.expr);
       return { placeholders: ph, values: [...vals, ...g.values] };
-    });
-
-    const sql = `
+    }, (tuples) => `
       INSERT INTO recorded_quakes
         (ts, event_id, lon, lat, depth_km, magnitude, place, geom)
       VALUES ${tuples}
-      ON CONFLICT DO NOTHING`;
+      ON CONFLICT DO NOTHING`);
 
-    const result = await pool.query(sql, values);
-    res.json({ recorded: result.rowCount });
+    res.json({ recorded });
   } catch (err) {
     next(err);
   }
@@ -225,7 +238,7 @@ router.post("/outages", async (req, res, next) => {
       return res.status(400).json({ error: "outages array required" });
     }
 
-    const { tuples, values } = buildBatch(rows, (r, idx) => {
+    const recorded = await insertChunked(rows, (r, idx) => {
       const ts = new Date().toISOString();
       const { location, cause, type, startDate, endDate, asnName, ...rest } = r;
       const vals = [
@@ -240,16 +253,13 @@ router.post("/outages", async (req, res, next) => {
       ];
       const ph = vals.map((_, i) => `$${idx + i}`);
       return { placeholders: ph, values: vals };
-    });
-
-    const sql = `
+    }, (tuples) => `
       INSERT INTO recorded_outages
         (ts, location, cause, outage_type, start_date, end_date, asn_name, raw)
       VALUES ${tuples}
-      ON CONFLICT DO NOTHING`;
+      ON CONFLICT DO NOTHING`);
 
-    const result = await pool.query(sql, values);
-    res.json({ recorded: result.rowCount });
+    res.json({ recorded });
   } catch (err) {
     next(err);
   }
@@ -265,7 +275,7 @@ router.post("/threats", async (req, res, next) => {
       return res.status(400).json({ error: "threats array required" });
     }
 
-    const { tuples, values } = buildBatch(rows, (r, idx) => {
+    const recorded = await insertChunked(rows, (r, idx) => {
       const ts = new Date().toISOString();
       const {
         id,
@@ -290,16 +300,13 @@ router.post("/threats", async (req, res, next) => {
       const g = geomExpr(longitude, latitude, idx + vals.length);
       ph.push(g.expr);
       return { placeholders: ph, values: [...vals, ...g.values] };
-    });
-
-    const sql = `
+    }, (tuples) => `
       INSERT INTO recorded_threats
         (ts, pulse_id, name, adversary, targeted_country, lon, lat, raw, geom)
       VALUES ${tuples}
-      ON CONFLICT DO NOTHING`;
+      ON CONFLICT DO NOTHING`);
 
-    const result = await pool.query(sql, values);
-    res.json({ recorded: result.rowCount });
+    res.json({ recorded });
   } catch (err) {
     next(err);
   }
