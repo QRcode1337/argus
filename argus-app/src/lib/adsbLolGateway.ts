@@ -22,6 +22,15 @@ const MIN_INTERVAL_MS = 2_000;
 /** How long to stop calling upstream entirely after it returns a 429. */
 const COOLDOWN_MS = 60_000;
 
+/**
+ * adsb.lol rejects Node's default `undici` User-Agent with
+ * `403 User-Agent too generic; include valid contact info`, so every call
+ * must identify the project and a way to reach us.
+ */
+const USER_AGENT =
+  process.env.ADSB_LOL_USER_AGENT ??
+  "ArgusIntelDashboard/1.0 (+https://github.com/QRcode1337/argus)";
+
 export class AdsbRateLimitError extends Error {
   constructor(public readonly retryAfterMs: number) {
     super(`adsb.lol rate limited; backing off for ${Math.ceil(retryAfterMs / 1000)}s`);
@@ -54,7 +63,7 @@ async function run(url: string, timeoutMs: number, priority: boolean): Promise<R
 
   const response = await fetch(url, {
     cache: "no-store",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", "User-Agent": USER_AGENT },
     signal: AbortSignal.timeout(timeoutMs),
   });
 
