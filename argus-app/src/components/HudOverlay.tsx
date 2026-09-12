@@ -1264,6 +1264,12 @@ export function HudOverlay({
           ARG<span className="text-[#83a598]">US</span>
         </h1>
         <p className="mt-1 hidden text-[10px] uppercase tracking-[0.45em] text-[#928374] md:block">Epsilon LLC</p>
+        <a
+          href="/iot"
+          className="mt-2 inline-block rounded-md border border-[#3c3836] bg-[#282828] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.24em] text-[#83a598] transition hover:border-[#83a598] hover:text-[#ebdbb2]"
+        >
+          Sensors
+        </a>
       </header>
 
       {/* Active style display (top-right) — desktop only */}

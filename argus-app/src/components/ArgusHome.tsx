@@ -70,6 +70,13 @@ function ArgusLaunchScreen({ launching = false, onLaunch }: { launching?: boolea
           >
             {launching ? "Launching Live Globe..." : "Launch Live Globe"}
           </button>
+
+          <a
+            href="/iot"
+            className="mt-4 block text-center font-mono text-[10px] uppercase tracking-[0.24em] text-[#83a598] transition hover:text-[#ebdbb2]"
+          >
+            Sensor Network →
+          </a>
         </div>
       </div>
     </div>

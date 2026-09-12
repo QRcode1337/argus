@@ -31,3 +31,4 @@ node_modules/
 .vercel
 phantom/target/
 .worktrees/
+iot-broker/passwd

@@ -1,0 +1,35 @@
+services:
+  iot-broker:
+    image: eclipse-mosquitto:2
+    container_name: argus_iot_broker
+    ports:
+      # Tailscale interface only — no public exposure
+      - "100.109.15.116:1883:1883"
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - ./iot-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./iot-broker/passwd:/mosquitto/config/passwd:ro
+    networks:
+      - argus_network
+    restart: unless-stopped
+
+  iot-bridge:
+    build: ./iot-bridge
+    container_name: argus_iot_bridge
+    environment:
+      - MQTT_HOST=iot-broker
+      - MQTT_PORT=1883
+      - MQTT_USER=argus-bridge
+      - MQTT_PASSWORD=${MQTT_PASSWORD:?set MQTT_PASSWORD in .env}
+      - DATABASE_URL=postgresql://argus:argus_dev@pgbouncer:5432/argus
+      - LOG_LEVEL=INFO
+    depends_on:
+      - iot-broker
+    networks:
+      - argus_network
+    restart: unless-stopped
+
+networks:
+  argus_network:
+    external: true
+    name: argus_argus_network

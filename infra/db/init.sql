@@ -292,3 +292,35 @@ CREATE INDEX IF NOT EXISTS idx_athena_action_packets_status ON athena_action_pac
 CREATE INDEX IF NOT EXISTS idx_athena_action_packets_priority ON athena_action_packets (priority);
 CREATE INDEX IF NOT EXISTS idx_athena_action_packets_created_at ON athena_action_packets (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_athena_action_packets_region_label ON athena_action_packets (region_label);
+
+-- ----------------------------------------------------------------
+-- iot (device telemetry — MQTT bridge writes here)
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS iot_devices (
+  id             SERIAL PRIMARY KEY,
+  device_id      VARCHAR(80)   NOT NULL UNIQUE,
+  name           VARCHAR(120),
+  description    TEXT,
+  location       GEOMETRY(POINT, 4326),
+  meta           JSONB         DEFAULT '{}'::jsonb,
+  last_seen      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  created_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS iot_readings (
+  time       TIMESTAMPTZ   NOT NULL,
+  device_id  VARCHAR(80)   NOT NULL,
+  metric     VARCHAR(60)   NOT NULL,
+  value      DOUBLE PRECISION NOT NULL,
+  unit       VARCHAR(20),
+  meta       JSONB         DEFAULT '{}'::jsonb
+);
+
+SELECT create_hypertable('iot_readings', 'time',
+       chunk_time_interval => INTERVAL '1 day',
+       migrate_data => true,
+       if_not_exists => true);
+
+CREATE INDEX IF NOT EXISTS idx_iot_readings_device_metric_time
+  ON iot_readings (device_id, metric, time DESC);
+CREATE INDEX IF NOT EXISTS idx_iot_devices_last_seen ON iot_devices (last_seen DESC);

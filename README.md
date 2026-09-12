@@ -68,7 +68,27 @@ Current feed integrations include:
 - FRED macro feed
 - AISStream vessel snapshot
 
-Most third-party feeds are proxied through server routes to avoid browser CORS/API key exposure.
+### IoT / Sensor Network (2026-08)
+
+Device telemetry pipeline: `MOSQUITTO (MQTT) → iot-bridge → TimescaleDB → /iot UI`.
+
+- **Broker**: `iot-broker` (mosquitto, auth required). Listeners bound to the
+  Tailscale interface (`100.109.15.116:1883`) and localhost only — not public.
+  Credentials live in `iot-broker/passwd` (granted users: `argus-bridge`, `device`);
+  the bridge reads its password from `MQTT_PASSWORD` in the root `.env` (both gitignored).
+- **Bridge**: `iot-bridge` subscribes to `iot/{device_id}/{metric}/data`
+  (payload `{"value":…, "unit":…, "name":…, "lat":…, "lon":…, "meta":{…}}`)
+  and `iot/{device_id}/register` (identity: name/description/lat/lon/meta),
+  buffering + batch-flushing into the `iot_readings` hypertable and upserting
+  `iot_devices`. Schema is self-healing on bridge start; also declared in
+  `infra/db/init.sql`.
+- **API**: `GET /api/iot/devices`, `GET /api/iot/readings?device=&metric=&from=&to=&limit=`,
+  `GET /api/iot/metrics?device=`.
+- **UI**: `/iot` (device cards + 24h SVG sparklines), linked from the HUD header ("Sensors").
+- **Run**: `docker compose -f docker-compose.iot.yml up -d --build`.
+
+> The Tailscale IP in `docker-compose.iot.yml` ports mapping is environment-specific —
+> update it if the tailnet address changes (devices connect over the tailnet).
 
 ---
 
@@ -79,6 +99,8 @@ argus/
   argus-app/         # Next.js app + Cesium UI + feed proxy routes
   argus-api/         # Express API service
   ingestor/          # Data ingestion/processing jobs
+  iot-bridge/        # MQTT → TimescaleDB telemetry bridge
+  iot-broker/        # Mosquitto config + credentials
   nginx/             # Nginx config
   cloudflared/       # Cloudflare tunnel config
   infra/             # DB init / infra assets
