@@ -235,39 +235,21 @@ const getStartupProfile = (startupVariant: CesiumGlobeProps["startupVariant"] = 
     prefersReducedMotion ||
     isSmallViewport;
   const mobileLiteStartup = startupVariant === "mobile-lite";
-  // Treat all WebKit (macOS Safari + every iOS browser) as a constrained path:
-  // no terrain/buildings, capped entities, lower res.
-  // NOTE: do NOT force requestRenderMode on desktop Safari — with Cesium it often
-  // paints one frame then goes permanently black while JS/feeds keep running
-  // (globe "loads for a second then disappears"). Continuous render at a capped
-  // frame rate is more reliable; keep requestRenderMode for true mobile/low-end only.
-  //
-  // ALSO: Safari 27 / WebKit Metal fails to compile Cesium's skyAtmosphere
-  // atmosphere-scattering shader (ANGLE_Out / MSL link error on
-  // _ucomputeAtmosphereScattering). That hard-kills WebGL after first paint.
-  // Disable atmosphere overlays on all WebKit.
-  const lowPerformance = lowPowerHints || mobileLiteStartup || webkitConstrained;
+  const lowPerformance = false;
 
   return {
     lowPerformance,
     requestRenderMode: mobileLiteStartup || (lowPowerHints && isSmallViewport),
-    aggressiveFeedBudget: mobileLiteStartup || webkitConstrained || (lowPowerHints && isSmallViewport),
-    suppressAmbientOverlays: mobileLiteStartup || webkitConstrained,
+    aggressiveFeedBudget: mobileLiteStartup || (lowPowerHints && isSmallViewport),
+    suppressAmbientOverlays: mobileLiteStartup,
     loadTerrain: !lowPerformance,
     loadBuildings: !lowPerformance,
-    resolutionScale: mobileLiteStartup
-      ? Math.min(0.5, 1 / Math.max(window.devicePixelRatio * 1.5, 1))
-      : webkitConstrained
-        ? Math.min(0.7, 1 / Math.max(window.devicePixelRatio, 1))
-        : lowPerformance
-          ? Math.min(0.75, 1 / Math.max(window.devicePixelRatio, 1))
-          : 1,
-    targetFrameRate: mobileLiteStartup ? 18 : webkitConstrained ? 24 : lowPerformance ? 24 : 45,
-    // Desktop Safari previously still pulled full 7k/2.5k/1.2k entity caps.
+    resolutionScale: 1.0,
+    targetFrameRate: 60,
     maxFlights: mobileLiteStartup
       ? 150
       : webkitConstrained
-        ? 800
+        ? 1500
         : lowPowerHints && isSmallViewport
           ? 600
           : lowPerformance
@@ -578,12 +560,15 @@ const applyGlobeBaseImagery = (viewer: Viewer, sceneMode: SceneMode): void => {
 
   const satelliteProvider = new UrlTemplateImageryProvider({
     url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    maximumLevel: 19,
   });
   const streetProvider = new UrlTemplateImageryProvider({
     url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    maximumLevel: 19,
   });
   const darkProvider = new UrlTemplateImageryProvider({
     url: "https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+    maximumLevel: 19,
   });
 
   const provider =
@@ -1380,6 +1365,7 @@ export function CesiumGlobe({ className, startupVariant = "default" }: CesiumGlo
 
     viewer.targetFrameRate = startupProfile.targetFrameRate;
     viewer.resolutionScale = startupProfile.resolutionScale;
+    viewer.scene.globe.maximumScreenSpaceError = 1.33;
     viewer.scene.requestRenderMode = startupProfile.requestRenderMode;
     if (startupProfile.suppressAmbientOverlays) {
       // Destroy atmosphere objects entirely. Merely setting .show=false can still

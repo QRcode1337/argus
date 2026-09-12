@@ -132,7 +132,7 @@ export class VisualModeController {
         gain: 0.75,
         bloom: 0.45,
         scanlines: 0.6,
-        pixelation: 0.2,
+        pixelation: 0.0,
       }),
       flir: this.makeStage("argus-flir", flirShader, {
         intensity: 0.75,

@@ -182,23 +182,21 @@ const emptyFeed = (): FeedHealth => ({
 
 export const useArgusStore = create<ArgusStore>((set) => ({
   layers: {
-    // Lean defaults: heavy entity feeds start off so first paint stays light
-    // (especially Safari/WebKit). User can enable the rest from FEEDS.
-    flights: false,
-    military: false,
+    flights: true,
+    military: true,
     satellites: true,
     satelliteLinks: false,
-    seismic: false,
-    bases: false,
-    outages: false,
-    threats: false,
+    seismic: true,
+    bases: true,
+    outages: true,
+    threats: true,
     gdelt: true,
-    anomalies: false,
-    weather: false,
-    vessels: false,
-    instability: false,
-    adsblol: false,
-    firms: false,
+    anomalies: true,
+    weather: true,
+    vessels: true,
+    instability: true,
+    adsblol: true,
+    firms: true,
   },
   counts: {
     flights: 0,
@@ -255,7 +253,7 @@ export const useArgusStore = create<ArgusStore>((set) => ({
       gain: 0.75,
       bloom: 0.45,
       scanlines: 0.6,
-      pixelation: 0.2,
+      pixelation: 0.0,
     },
     flir: {
       bias: 0.52,
