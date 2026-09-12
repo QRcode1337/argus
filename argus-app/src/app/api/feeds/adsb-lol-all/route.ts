@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { reportFeedHealth } from "@/lib/feedHealth";
+import { adsbLolJson } from "@/lib/adsbLolGateway";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,12 @@ type AdsbLolPayload = {
 };
 
 let cache: { data: AdsbLolPayload; cachedAt: number } | null = null;
-const CACHE_TTL_MS = 30_000;
+let inflight: Promise<AdsbLolPayload> | null = null;
+// This is a wide-area situational sweep, not a live tracker — the live layer is
+// /api/feeds/adsb-military. Refreshing every 5 min (rather than on the client's
+// 60s poll) keeps sustained load on adsb.lol to ~5 req/min, leaving quota for
+// the military feed. Clients get the cached snapshot in between.
+const CACHE_TTL_MS = 5 * 60_000;
 
 interface AdsbLolAircraft {
   hex: string;
@@ -74,27 +80,31 @@ const REGIONAL_POINTS = [
   { lat: -33.0, lon: 145.0, radius: 200, label: "AUSTRALIA" },
 ] as const;
 
-// Key aircraft types for military/transp
-const AIRCRAFT_TYPES = [
-  "B747", "B767", "B777", "B787", "C17", "C5", "KC135",
-  "A330", "A400", "C130", "B737", "A320", "E170", "E190",
-  "DH8", "AT4", "B757", "A310", "MD11", "L1011",
-];
+// Key aircraft types for military/transport.
+// Trimmed from 20 to the military/strategic-airlift types only: each entry is a
+// separate upstream request, and the civil airliner types (B737, A320, E170,
+// E190, DH8, AT4, B757, A310, MD11, L1011, B747, B767, B777, B787, A330) are
+// already covered by the regional point polling above and by the OpenSky feed.
+// Dropping them cuts this refresh from ~40 upstream calls to ~25, which is what
+// keeps us under adsb.lol's rate limit.
+const AIRCRAFT_TYPES = ["C17", "C5", "KC135", "A400", "C130"];
 
 // Squawk codes for emergencies
 const EMERGENCY_SQUAWKS = ["7500", "7600", "7700"];
 
-async function pollJson<T>(url: string): Promise<T | null> {
-  try {
-    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(8_000) });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
-}
+// Paced through the shared gateway so this fan-out cannot rate-limit the
+// adsb-military feed (both hit api.adsb.lol).
+const pollJson = <T,>(url: string): Promise<T | null> => adsbLolJson<T>(url);
 
-async function pollAll(): Promise<{ hex: string; ac: AdsbLolAircraft[]; source: string }[]> {
+/**
+ * @param quick When true, poll only the regional points (~10 upstream calls,
+ *   ~20s) instead of the full sweep (~25 calls, ~50s+). Used on a cold cache so
+ *   the first client gets a populated globe well inside nginx's 60s proxy
+ *   timeout; the full sweep then runs in the background.
+ */
+async function pollAll(
+  quick = false,
+): Promise<{ hex: string; ac: AdsbLolAircraft[]; source: string }[]> {
   const BASE = "https://api.adsb.lol";
   const results: { hex: string; ac: AdsbLolAircraft[]; source: string }[] = [];
   const seen = new Set<string>();
@@ -114,6 +124,8 @@ async function pollAll(): Promise<{ hex: string; ac: AdsbLolAircraft[]; source: 
       results.push({ hex: `region-${pt.label}`, ac: newAircraft, source: pt.label });
     }
   }
+
+  if (quick) return results;
 
   // 2. Aircraft type filtering (for specific aircraft of interest)
   for (const type of AIRCRAFT_TYPES) {
@@ -201,43 +213,74 @@ async function pollAll(): Promise<{ hex: string; ac: AdsbLolAircraft[]; source: 
   return results;
 }
 
+function refresh(quick = false): Promise<AdsbLolPayload> {
+  if (inflight) return inflight;
+
+  inflight = (async () => {
+    try {
+      const results = await pollAll(quick);
+
+      // Flatten into a single deduplicated array, tagging each aircraft with its source.
+      const allAircraft: Record<string, AdsbLolAircraft & { _source?: string }> = {};
+      for (const r of results) {
+        for (const ac of r.ac) {
+          if (!allAircraft[ac.hex]) {
+            allAircraft[ac.hex] = { ...ac, _source: r.source };
+          }
+        }
+      }
+
+      const aircraftArray = Object.values(allAircraft);
+
+      const payload: AdsbLolPayload = {
+        aircraft: aircraftArray,
+        sourceCount: results.length,
+        totalCount: aircraftArray.length,
+        timestamp: new Date().toISOString(),
+      };
+
+      cache = { data: payload, cachedAt: Date.now() };
+      await reportFeedHealth("adsblol", "ok");
+      return payload;
+    } finally {
+      inflight = null;
+    }
+  })();
+
+  return inflight;
+}
+
 export async function GET() {
   if (cache && Date.now() - cache.cachedAt < CACHE_TTL_MS) {
     return NextResponse.json({ ...cache.data, _cached: true });
   }
 
+  // Stale-while-revalidate: a full paced refresh takes ~25s, far longer than the
+  // client is willing to wait, so serve the previous snapshot immediately and
+  // let the refresh land in the background.
+  if (cache) {
+    void refresh().catch(async (err) => {
+      const message = err instanceof Error ? err.message : "adsb.lol poll failed";
+      await reportFeedHealth("adsblol", "degraded", message);
+    });
+    return NextResponse.json({
+      ...cache.data,
+      _stale: true,
+      _cachedAt: new Date(cache.cachedAt).toISOString(),
+    });
+  }
+
+  // Cold cache: return the fast regional-only sweep, then fill in the rest.
   try {
-    const results = await pollAll();
-
-    // Flatten into a single deduplicated array, tagging each aircraft with its source.
-    const allAircraft: Record<string, AdsbLolAircraft & { _source?: string }> = {};
-    for (const r of results) {
-      for (const ac of r.ac) {
-        if (!allAircraft[ac.hex]) {
-          allAircraft[ac.hex] = { ...ac, _source: r.source };
-        }
-      }
-    }
-
-    const aircraftArray = Object.values(allAircraft);
-
-    const payload: AdsbLolPayload = {
-      aircraft: aircraftArray,
-      sourceCount: results.length,
-      totalCount: aircraftArray.length,
-      timestamp: new Date().toISOString(),
-    };
-
-    cache = { data: payload, cachedAt: Date.now() };
-    await reportFeedHealth("adsblol", "ok");
-    return NextResponse.json(payload);
+    const payload = await refresh(true);
+    void refresh().catch(async (err) => {
+      const message = err instanceof Error ? err.message : "adsb.lol poll failed";
+      await reportFeedHealth("adsblol", "degraded", message);
+    });
+    return NextResponse.json({ ...payload, _partial: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "adsb.lol poll failed";
-    if (cache) {
-      await reportFeedHealth("adsblol", "degraded", message);
-      return NextResponse.json({ ...cache.data, _stale: true });
-    }
     await reportFeedHealth("adsblol", "error", message);
-    return NextResponse.json({ error: message }, { status: 502 });
+    return NextResponse.json({ aircraft: [], totalCount: 0, _degraded: true, _reason: message });
   }
 }
