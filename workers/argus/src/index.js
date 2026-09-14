@@ -1,0 +1,101 @@
+/**
+ * Argus edge Worker (Option A)
+ * - Default: passthrough to origin (Tunnel → DO droplet)
+ * - GET|POST /analyze: gated; GraphQL Analytics → Workers AI summarize
+ * Do NOT call env.AI on every request.
+ */
+
+const ANALYZE_PATH = "/analyze";
+
+function unauthorized() {
+  return new Response(JSON.stringify({ error: "unauthorized" }), {
+    status: 401,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function checkSecret(request, env) {
+  const expected = env.ANALYZE_SECRET;
+  if (!expected) return false;
+  const auth = request.headers.get("authorization") || "";
+  const bearer = auth.toLowerCase().startsWith("bearer ")
+    ? auth.slice(7).trim()
+    : "";
+  const header = request.headers.get("x-argus-analyze-secret") || "";
+  return bearer === expected || header === expected;
+}
+
+async function fetchGraphQLAnalytics(env) {
+  const accountId = env.CF_ACCOUNT_ID;
+  const token = env.CF_API_TOKEN;
+  if (!accountId || !token) {
+    return { error: "missing CF_ACCOUNT_ID or CF_API_TOKEN" };
+  }
+  // Placeholder query shape — tighten zone/filter once zone tag is known.
+  const query = `
+    query ($accountTag: string!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          httpRequests1hGroups(limit: 24, orderBy: [datetime_DESC]) {
+            dimensions { datetime }
+            sum { requests bytes threats }
+            uniq { uniques }
+          }
+        }
+      }
+    }
+  `;
+  const res = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      query,
+      variables: { accountTag: accountId },
+    }),
+  });
+  const body = await res.json();
+  return { status: res.status, body };
+}
+
+async function summarizeWithWorkersAI(env, analytics) {
+  if (!env.AI) return { summary: null, note: "Workers AI binding missing" };
+  const prompt = `Summarize this Cloudflare traffic analytics for an operator. Focus on request volume, anomalies, threats, and geo/status if present. Be concise.\n\n${JSON.stringify(analytics).slice(0, 12000)}`;
+  const out = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+    messages: [
+      { role: "system", content: "You are a terse traffic analyst." },
+      { role: "user", content: prompt },
+    ],
+  });
+  return { summary: out?.response ?? out };
+}
+
+async function handleAnalyze(request, env) {
+  if (!checkSecret(request, env)) return unauthorized();
+  const analytics = await fetchGraphQLAnalytics(env);
+  const ai = await summarizeWithWorkersAI(env, analytics);
+  return new Response(
+    JSON.stringify({ ok: true, analytics, ai }, null, 2),
+    { headers: { "content-type": "application/json" } },
+  );
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    if (url.pathname === ANALYZE_PATH || url.pathname === `${ANALYZE_PATH}/`) {
+      return handleAnalyze(request, env);
+    }
+    // Passthrough: prefer ORIGIN_URL if set; else let zone/Tunnel routing handle origin.
+    if (env.ORIGIN_URL) {
+      const target = new URL(request.url);
+      const origin = new URL(env.ORIGIN_URL);
+      target.protocol = origin.protocol;
+      target.host = origin.host;
+      return fetch(new Request(target.toString(), request));
+    }
+    return fetch(request);
+  },
+};
