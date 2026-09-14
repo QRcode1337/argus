@@ -1,7 +1,7 @@
 /**
  * Argus edge Worker (Option A)
  * - Default: passthrough to origin (Tunnel → DO droplet)
- * - GET|POST /analyze: gated; GraphQL Analytics → Workers AI summarize
+ * - GET|POST /analyze: gated; zone GraphQL Analytics → Workers AI summarize
  * Do NOT call env.AI on every request.
  */
 
@@ -28,23 +28,36 @@ function checkSecret(request, env) {
 async function fetchGraphQLAnalytics(env) {
   const accountId = env.CF_ACCOUNT_ID;
   const token = env.CF_API_TOKEN;
+  const zoneTag = env.CF_ZONE_ID;
   if (!accountId || !token) {
     return { error: "missing CF_ACCOUNT_ID or CF_API_TOKEN" };
   }
-  // Placeholder query shape — tighten zone/filter once zone tag is known.
+  if (!zoneTag) {
+    return { error: "missing CF_ZONE_ID (argusweb.bond zone tag)" };
+  }
+
+  // Zone-scoped adaptive groups — not account-wide httpRequests1hGroups.
   const query = `
-    query ($accountTag: string!) {
+    query ZoneTraffic($zoneTag: string!, $since: Time!, $until: Time!) {
       viewer {
-        accounts(filter: { accountTag: $accountTag }) {
-          httpRequests1hGroups(limit: 24, orderBy: [datetime_DESC]) {
-            dimensions { datetime }
+        zones(filter: { zoneTag: $zoneTag }) {
+          httpRequestsAdaptiveGroups(
+            limit: 48
+            filter: { datetime_geq: $since, datetime_lt: $until }
+            orderBy: [datetime_DESC]
+          ) {
+            dimensions { datetimeHour clientCountryName edgeResponseStatus }
             sum { requests bytes threats }
-            uniq { uniques }
+            avg { sampleInterval }
           }
         }
       }
     }
   `;
+
+  const until = new Date();
+  const since = new Date(until.getTime() - 24 * 60 * 60 * 1000);
+
   const res = await fetch("https://api.cloudflare.com/client/v4/graphql", {
     method: "POST",
     headers: {
@@ -53,16 +66,26 @@ async function fetchGraphQLAnalytics(env) {
     },
     body: JSON.stringify({
       query,
-      variables: { accountTag: accountId },
+      variables: {
+        zoneTag,
+        since: since.toISOString(),
+        until: until.toISOString(),
+        accountTag: accountId,
+      },
     }),
   });
   const body = await res.json();
-  return { status: res.status, body };
+  return {
+    status: res.status,
+    zoneTag,
+    window: { since: since.toISOString(), until: until.toISOString() },
+    body,
+  };
 }
 
 async function summarizeWithWorkersAI(env, analytics) {
   if (!env.AI) return { summary: null, note: "Workers AI binding missing" };
-  const prompt = `Summarize this Cloudflare traffic analytics for an operator. Focus on request volume, anomalies, threats, and geo/status if present. Be concise.\n\n${JSON.stringify(analytics).slice(0, 12000)}`;
+  const prompt = `Summarize this Cloudflare zone traffic for an operator (last 24h). Focus on request volume, countries, status codes, threats, and anomalies. Be concise and factual — no hype.\n\n${JSON.stringify(analytics).slice(0, 12000)}`;
   const out = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
     messages: [
       { role: "system", content: "You are a terse traffic analyst." },

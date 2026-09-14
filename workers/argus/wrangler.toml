@@ -13,5 +13,7 @@ binding = "AI"
 # Secrets (set via `wrangler secret put`):
 #   ANALYZE_SECRET  — shared secret for /analyze (Authorization: Bearer …)
 #   CF_API_TOKEN    — Cloudflare API token with Analytics Read
-#   CF_ACCOUNT_ID   — Cloudflare account id for GraphQL Analytics
+#   CF_ACCOUNT_ID   — Cloudflare account id
+#   CF_ZONE_ID      — Zone tag/id for argusweb.bond (required for GraphQL zone filter)
+# optional: ORIGIN_URL if not relying on zone route alone
 # Origin passthrough uses the existing Tunnel CNAME; do not put env.AI on every hit.
