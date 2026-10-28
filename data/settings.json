@@ -1,7 +1,7 @@
 {
   "llm": {
     "provider": "openai_compatible",
-    "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai",
-    "model": "gemini-3-flash-preview"
+    "endpoint": "https://uwziiweo6bvm7fyvapqsmdxp.agents.do-ai.run/api/v1",
+    "model": "deepseek-v4.1-flash"
   }
 }

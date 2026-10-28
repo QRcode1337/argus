@@ -3,6 +3,7 @@ import { queryLlm } from "@/lib/ai/llmClient";
 import { fetchGdeltEvents } from "@/lib/ingest/gdelt";
 import { ARGUS_CONFIG } from "@/lib/config";
 import { QUAD_CLASS_LABELS, type GdeltQuadClass } from "@/types/gdelt";
+import { gdeltEventScore } from "@/lib/gdelt/eventScore";
 
 const DEFAULT_BATCH_SIZE = 20;
 const MIN_BATCH_SIZE = 12;
@@ -133,14 +134,7 @@ function formatActor(name?: string, country?: string) {
   return `${safeName} (${safeCountry})`;
 }
 
-function eventScore(event: {
-  goldsteinScale: number;
-  numMentions: number;
-  numSources: number;
-  avgTone: number;
-}) {
-  return Math.abs(event.goldsteinScale) * 2 + event.numMentions * 0.6 + event.numSources * 0.4 + Math.abs(event.avgTone) * 0.2;
-}
+const eventScore = gdeltEventScore;
 
 function average(values: number[]) {
   if (!values.length) return 0;
