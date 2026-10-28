@@ -13,8 +13,10 @@ const MIN_SUMMARY_LENGTH = 800;
 const FAST_CACHE_TTL_MS = 120_000;
 const FULL_MODE_BATCH_SIZE = 250;
 // LLM mode sends fewer detailed events than the ranking/RSS ceiling above —
-// 250 pushed DeepSeek past 85s and started timing out; 100 took 56s.
-const LLM_DETAIL_BATCH_SIZE = 82;
+// 250 pushed DeepSeek past 85s and started timing out; 100 took 56s; 82
+// took 55s (latency here is dominated by fixed reasoning overhead, not a
+// linear per-event cost in this range).
+const LLM_DETAIL_BATCH_SIZE = 66;
 const FULL_MODE_MAX_TOKENS = 14000;
 const MAX_LLM_TOKENS = 16384;
 const MIN_LLM_TOKENS = 1024;
