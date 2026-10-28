@@ -8,10 +8,15 @@ import { gdeltEventScore } from "@/lib/gdelt/eventScore";
 const DEFAULT_BATCH_SIZE = 20;
 const MIN_BATCH_SIZE = 12;
 const MAX_BATCH_SIZE = 300;
-const LLM_TIMEOUT_MS = 60000;
+const LLM_TIMEOUT_MS = 85000;
 const MIN_SUMMARY_LENGTH = 800;
 const FAST_CACHE_TTL_MS = 120_000;
 const FULL_MODE_BATCH_SIZE = 250;
+// LLM mode sends fewer detailed events than the ranking/RSS ceiling above —
+// 250 pushed DeepSeek past 85s and started timing out. 100 is a middle
+// ground: meaningfully more than the old 45, chosen to finish well inside
+// the timeout budget.
+const LLM_DETAIL_BATCH_SIZE = 100;
 const FULL_MODE_MAX_TOKENS = 14000;
 const MAX_LLM_TOKENS = 16384;
 const MIN_LLM_TOKENS = 1024;
@@ -437,7 +442,7 @@ export async function GET(req: Request) {
 
     // Detailed top events — significantly more when requested
     const sorted = events.sort((a, b) => Math.abs(b.goldsteinScale) - Math.abs(a.goldsteinScale));
-    const effectiveBatchSize = useLlm ? FULL_MODE_BATCH_SIZE : Math.min(batchSize, FULL_MODE_BATCH_SIZE);
+    const effectiveBatchSize = useLlm ? LLM_DETAIL_BATCH_SIZE : Math.min(batchSize, FULL_MODE_BATCH_SIZE);
 
     const llmCap = effectiveBatchSize;
     const detailLines = sorted.slice(0, llmCap).map((e) => {
