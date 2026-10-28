@@ -437,9 +437,9 @@ export async function GET(req: Request) {
 
     // Detailed top events — significantly more when requested
     const sorted = events.sort((a, b) => Math.abs(b.goldsteinScale) - Math.abs(a.goldsteinScale));
-    const effectiveBatchSize = useLlm ? 45 : Math.min(batchSize, FULL_MODE_BATCH_SIZE);
+    const effectiveBatchSize = useLlm ? FULL_MODE_BATCH_SIZE : Math.min(batchSize, FULL_MODE_BATCH_SIZE);
 
-    const llmCap = useLlm ? 45 : effectiveBatchSize;
+    const llmCap = effectiveBatchSize;
     const detailLines = sorted.slice(0, llmCap).map((e) => {
       const quadLabel = QUAD_CLASS_LABELS[e.quadClass as GdeltQuadClass] ?? "Unknown";
       return [
@@ -466,8 +466,8 @@ GLOBAL EVENT SUMMARY: ${events.length} total GDELT events. Cooperation: ${quadCo
 Top actors: ${topActors}
 Top regions: ${topRegions}
 
-DETAILED EVENTS (top 45 by importance):
-${detailLines.slice(0,45).join("\n")}
+DETAILED EVENTS (top ${detailLines.length} by importance):
+${detailLines.join("\n")}
 
 ${tailInfo}`
       : [
