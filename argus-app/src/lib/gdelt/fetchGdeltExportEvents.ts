@@ -44,6 +44,45 @@ export async function fetchLatestExportUrl(): Promise<string | null> {
   return url && url.endsWith(".export.CSV.zip") ? url : null;
 }
 
+const GDELT_BASE = "http://data.gdeltproject.org/gdeltv2";
+const TIMESTAMP_RE = /\/(\d{14})\.export\.CSV\.zip$/;
+
+function formatGdeltTimestamp(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}` +
+    `${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}`
+  );
+}
+
+/**
+ * GDELT publishes every 15 minutes, but the "latest" pointer can briefly
+ * reference a file that hasn't actually landed yet (seen in practice —
+ * both the current and prior slot 404ing at once). Steps back through
+ * earlier 15-minute slots rather than failing on the very first miss.
+ */
+function previousSlotUrls(latestUrl: string, maxSteps: number): string[] {
+  const match = latestUrl.match(TIMESTAMP_RE);
+  if (!match) return [];
+
+  const ts = match[1];
+  const base = Date.UTC(
+    Number(ts.slice(0, 4)),
+    Number(ts.slice(4, 6)) - 1,
+    Number(ts.slice(6, 8)),
+    Number(ts.slice(8, 10)),
+    Number(ts.slice(10, 12)),
+    Number(ts.slice(12, 14)),
+  );
+
+  const urls: string[] = [];
+  for (let step = 1; step <= maxSteps; step++) {
+    const prior = new Date(base - step * 15 * 60_000);
+    urls.push(`${GDELT_BASE}/${formatGdeltTimestamp(prior)}.export.CSV.zip`);
+  }
+  return urls;
+}
+
 export function parseGdeltTsv(tsv: string): GdeltEvent[] {
   const lines = tsv.trim().split("\n");
   const events: GdeltEvent[] = [];
@@ -115,17 +154,8 @@ export function applyGdeltWindow(
   });
 }
 
-/**
- * Fetches the latest GDELT v2 export, decompresses it, and parses it into
- * events. Throws on any failure — callers decide how to surface the error.
- */
-export async function fetchGdeltExportEvents(): Promise<GdeltEvent[]> {
-  const exportUrl = await fetchLatestExportUrl();
-  if (!exportUrl) {
-    throw new Error("Failed to resolve GDELT export URL");
-  }
-
-  const zipRes = await fetch(exportUrl, { cache: "no-store" });
+async function fetchAndParseZip(url: string): Promise<GdeltEvent[]> {
+  const zipRes = await fetch(url, { cache: "no-store" });
   if (!zipRes.ok) {
     throw new Error(`GDELT export fetch failed: ${zipRes.status}`);
   }
@@ -183,4 +213,48 @@ export async function fetchGdeltExportEvents(): Promise<GdeltEvent[]> {
   }
 
   return parseGdeltTsv(csvText);
+}
+
+let lastKnownGoodEvents: GdeltEvent[] | null = null;
+let lastKnownGoodAt = 0;
+const LAST_KNOWN_GOOD_MAX_AGE_MS = 6 * 3_600_000; // 6 hours
+
+/**
+ * Fetches the latest GDELT v2 export, decompresses it, and parses it into
+ * events.
+ *
+ * GDELT's "latest" pointer can briefly reference a file that 404s (the
+ * slot hasn't landed yet, or the upstream pipeline is lagging — observed
+ * in practice to affect more than one consecutive 15-minute slot at a
+ * time). Steps back through earlier slots before giving up, and as a
+ * last resort falls back to the most recent successful fetch rather than
+ * throwing, as long as it's not too stale.
+ */
+export async function fetchGdeltExportEvents(): Promise<GdeltEvent[]> {
+  const exportUrl = await fetchLatestExportUrl();
+  if (!exportUrl) {
+    throw new Error("Failed to resolve GDELT export URL");
+  }
+
+  const candidates = [exportUrl, ...previousSlotUrls(exportUrl, 6)];
+  let lastError: unknown = null;
+
+  for (const url of candidates) {
+    try {
+      const events = await fetchAndParseZip(url);
+      lastKnownGoodEvents = events;
+      lastKnownGoodAt = Date.now();
+      return events;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastKnownGoodEvents && Date.now() - lastKnownGoodAt < LAST_KNOWN_GOOD_MAX_AGE_MS) {
+    return lastKnownGoodEvents;
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("GDELT export fetch failed across all recent slots");
 }

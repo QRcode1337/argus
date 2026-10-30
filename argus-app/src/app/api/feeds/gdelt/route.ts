@@ -47,14 +47,29 @@ export async function GET(req: Request) {
       },
     );
   } catch (error) {
-    await reportFeedHealth(
-      "gdelt",
-      "error",
-      error instanceof Error ? error.message : "GDELT fetch failed",
-    );
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "GDELT fetch failed" },
-      { status: 502 },
-    );
+    const message = error instanceof Error ? error.message : "GDELT fetch failed";
+    await reportFeedHealth("gdelt", "error", message);
+
+    // fetchGdeltExportEvents() already retries across several recent GDELT
+    // slots internally; if it still failed, fall back to our own stale
+    // cache (if any) rather than a hard 502 — this is what was turning a
+    // transient upstream gap into a fully broken feed/digest.
+    if (cachedEvents.length > 0) {
+      const { searchParams } = new URL(req.url);
+      const windowParam = searchParams.get("window");
+      const filtered = applyGdeltWindow(cachedEvents, windowParam);
+      return NextResponse.json(
+        { events: filtered, cached: true, stale: true, count: filtered.length, window: windowParam ?? "ALL" },
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "public, max-age=60",
+          },
+        },
+      );
+    }
+
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }
